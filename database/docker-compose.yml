@@ -1,0 +1,23 @@
+# Local PostgreSQL + PostGIS for development.
+# Start:  docker compose up -d      Stop: docker compose down
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: pgs-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pgs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pgs}
+      POSTGRES_DB: ${POSTGRES_DB:-pgs}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgs-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pgs} -d ${POSTGRES_DB:-pgs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgs-postgres-data:
