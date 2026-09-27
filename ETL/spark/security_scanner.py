@@ -4,25 +4,34 @@ real virus scanner - it's a simple rule-based check for a university
 project demo. Real malware scanning (ClamAV) is separate, later work.
 """
 
+# Security Scanner
+# -----------------
+# Basic, rule-based checks run on each file before it's handed to
+# transform.py. Not a real antivirus - for real malware detection see
+# the ClamAV step described in the main ETL README.
+#
+# Checks performed:
+#   - Extension    - flags known-risky extensions (.exe, .bat, etc.)
+#                    and unrecognized ones.
+#   - Size         - flags empty files and files over 10 MB.
+#   - Filename     - flags unusually long names and double-extension
+#                    patterns (e.g. invoice.pdf.exe).
+#   - SHA-256 hash - a content fingerprint, for later duplicate detection.
+#
+# Returns one of SAFE, SUSPICIOUS, or UNKNOWN, with reasons.
+
 import hashlib
-from typing import TYPE_CHECKING, Any, TypedDict, cast
-
-try:
-    from pyspark.sql import DataFrame
-except ImportError:  # pragma: no cover - optional dependency for type checking/runtime
-    DataFrame = Any  # type: ignore[misc,assignment]
-
-if TYPE_CHECKING:
-    from pyspark.sql import DataFrame as SparkDataFrame
 
 # Extensions we treat as risky to auto-run/auto-open.
 SUSPICIOUS_EXTENSIONS = {
-    "exe", "bat", "cmd", "com", "scr", "msi", "vbs", "js", "jar", "ps1", "sh"
+    "exe", "bat", "cmd", "com", "scr",
+    "msi", "vbs", "js", "jar", "ps1", "sh",
 }
 
 # Extensions we expect to see routinely from the web crawler.
 EXPECTED_EXTENSIONS = {
-    "html", "htm", "pdf", "txt", "json", "png", "jpg", "jpeg", "gif", "docx", "csv"
+    "html", "htm", "pdf", "txt", "json",
+    "png", "jpg", "jpeg", "gif", "docx", "csv",
 }
 
 MAX_SAFE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -30,9 +39,11 @@ MAX_FILENAME_LENGTH = 100
 
 
 def get_extension(filename: str) -> str:
-    if "." not in filename:
+    name = filename.lstrip(".")  # ignore one leading dot, e.g. hidden files like .gitattributes
+    if "." not in name:
         return ""
-    return filename.rsplit(".", 1)[-1].lower()
+    return name.rsplit(".", 1)[-1].lower()
+
 
 def get_file_size(content: bytes) -> int:
     return len(content)
@@ -46,22 +57,15 @@ def get_sha256(content: bytes) -> str:
     """
     return hashlib.sha256(content).hexdigest()
 
+
 def has_double_extension(filename: str) -> bool:
     parts = filename.split(".")
     return len(parts) > 2
 
-class ScanResult(TypedDict):
-    filename: str
-    extension: str
-    size_bytes: int
-    sha256: str
-    verdict: str
-    reasons: list[str]
 
-
-def scan_file(filename: str, content: bytes) -> ScanResult:
-    suspicious_reasons: list[str] = []
-    unknown_reasons: list[str] = []
+def scan_file(filename: str, content: bytes) -> dict:
+    suspicious_reasons = []
+    unknown_reasons = []
 
     ext = get_extension(filename)
     if ext in SUSPICIOUS_EXTENSIONS:
@@ -101,8 +105,9 @@ def scan_file(filename: str, content: bytes) -> ScanResult:
         "verdict": verdict,
         "reasons": reasons,
     }
-    
-def scan_file_spark(spark: Any, filename: str, content: bytes) -> "DataFrame":
+
+
+def scan_file_spark(spark, filename: str, content: bytes):
     """Same as scan_file(), but wraps the result in a Spark DataFrame -
     matches the pattern used by analyze_text() in transform.py so both
     modules look and behave the same way."""
@@ -112,34 +117,8 @@ def scan_file_spark(spark: Any, filename: str, content: bytes) -> "DataFrame":
     # put columns in a sensible reading order (Spark would otherwise sort them A-Z)
     return df.select("filename", "extension", "size_bytes", "sha256", "verdict", "reasons")
 
+
 if __name__ == "__main__":
     # Quick manual check, no Spark/Docker needed: python3 security_scanner.py
     sample = scan_file("hello.txt", b"This is a normal file used to test the Spark Security Scanner.")
     print(sample)
-
-    from pyspark.sql import SparkSession
-    from security_scanner import scan_file_spark
-
-    spark: SparkSession = (
-        SparkSession.builder
-        .appName("SecurityScannerTest")
-        .master("local[*]")
-        .getOrCreate()
-    )
-
-    # Every file below is 100% harmless. Verdicts are triggered by
-    # filename/size patterns only, never by actual malicious content.
-    test_files = {
-        "hello.txt": b"This is a normal file used to test the Spark Security Scanner.",
-        "notice.pdf": b"%PDF-1.4 dummy pdf content for testing",
-        "photo.jpg": b"dummy jpeg bytes for testing",
-        "weird_report.xyz": b"harmless content with an unusual extension",
-        "a_very_long_filename_that_someone_might_accidentally_save_from_a_browser_download_dialog_without_editing_it.txt": b"short harmless content",
-    }
-
-    for filename, content in test_files.items():
-        df = scan_file_spark(spark, filename, content)
-        df.show(truncate=60)  # type: ignore[union-attr]
-
-    spark.stop()
-        
