@@ -1,7 +1,8 @@
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["api", "database/src"]
+src = ["api", "database/src", "search-engine/src"]
+extend-exclude = ["search-engine/src/pgs_search/grpc/generated"]
 
 [tool.ruff.lint]
 select = [
@@ -17,7 +18,7 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["pgs_db"]
+known-first-party = ["pgs_db", "pgs_search"]
 
 [tool.pyright]
 include = ["api", "database/src"]
