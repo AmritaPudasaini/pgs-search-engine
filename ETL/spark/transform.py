@@ -1,10 +1,3 @@
-"""Spark transformation logic for the ETL pipeline.
-
-The pure-Python helpers in this module are intentionally dependency-light so
-they can be unit tested outside Docker. Spark callers use ``analyze_text`` as a
-thin DataFrame wrapper around the same transformation logic.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -16,10 +9,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
 
-
-WORD_RE = re.compile(r"[\w\u0900-\u097F]+", re.UNICODE)
-SPACE_RE = re.compile(r"\s+")
-
+WORD_RE = re.compile(r"[\w\u0900-\u097F]+", re.UNICODE) # create tokens like ["Hello", "नेपाल", "123"]
+SPACE_RE = re.compile(r"\s+") # remove space
 
 @dataclass(frozen=True)
 class GeoRule:
@@ -27,7 +18,6 @@ class GeoRule:
     district: str
     municipality: str
     aliases: tuple[str, ...]
-
 
 SAMPLE_GEO_RULES = (
     GeoRule(
@@ -50,12 +40,11 @@ SAMPLE_GEO_RULES = (
     ),
 )
 
-
 class _HTMLTextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self._parts: list[str] = []
-        self._skip_depth = 0
+        self._skip_depth = 0 # tracks whether the parser is currently inside tags that should be ignored, like <script> or <style>.
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag.lower() in {"script", "style", "noscript"}:
@@ -72,27 +61,23 @@ class _HTMLTextExtractor(HTMLParser):
     def text(self) -> str:
         return normalize_text(" ".join(self._parts))
 
-
 def normalize_text(text: str) -> str:
-    return SPACE_RE.sub(" ", text or "").strip()
-
+    return SPACE_RE.sub(" ", text or "").strip() # replace spaces with text or if text null then ""
 
 def extract_html_text(raw_html: str) -> str:
     parser = _HTMLTextExtractor()
     parser.feed(raw_html)
     return parser.text()
 
-
 def extract_pdf_text(raw_bytes: bytes) -> str:
     """Extract text from a PDF using pypdf when available."""
     try:
         from pypdf import PdfReader
-    except ImportError as exc:  # pragma: no cover - exercised in Docker/manual runs
+    except ImportError as exc:
         raise RuntimeError("PDF parsing requires pypdf; install ETL/spark requirements") from exc
 
     reader = PdfReader(io.BytesIO(raw_bytes))
     return normalize_text(" ".join(page.extract_text() or "" for page in reader.pages))
-
 
 def extract_text_from_file(path: str | Path, content_type: str | None = None) -> str:
     file_path = Path(path)
@@ -107,7 +92,6 @@ def extract_text_from_file(path: str | Path, content_type: str | None = None) ->
         return extract_html_text(raw_text)
     return normalize_text(raw_text)
 
-
 def detect_language(text: str) -> str:
     devanagari = sum(1 for char in text if "\u0900" <= char <= "\u097F")
     latin = sum(1 for char in text if ("A" <= char <= "Z") or ("a" <= char <= "z"))
@@ -119,14 +103,11 @@ def detect_language(text: str) -> str:
         return "en"
     return "unknown"
 
-
 def tokenize(text: str) -> list[str]:
     return [match.group(0).lower() for match in WORD_RE.finditer(text)]
 
-
 def sha256_text(text: str) -> str:
     return hashlib.sha256(normalize_text(text).encode("utf-8")).hexdigest()
-
 
 def simhash_text(text: str, bits: int = 64) -> int:
     tokens = tokenize(text)
@@ -145,10 +126,8 @@ def simhash_text(text: str, bits: int = 64) -> int:
             fingerprint |= 1 << index
     return fingerprint
 
-
 def hamming_distance(left: int, right: int) -> int:
-    return (left ^ right).bit_count()
-
+    return (left ^ right).bit_count() # if diff bits then 1 and counts all those 1s
 
 def resolve_geo(text: str, domain: str = "") -> dict[str, str] | None:
     haystack = f"{domain} {text}".lower()
@@ -162,8 +141,7 @@ def resolve_geo(text: str, domain: str = "") -> dict[str, str] | None:
             }
     return None
 
-
-def transform_document(
+def transform_document( # * means, after it, all should be named
     *,
     source_url: str,
     text: str,
@@ -194,7 +172,6 @@ def transform_document(
         "duplicate_of": None,
     }
 
-
 def transform_file(signal: dict, dfs_root: str | Path) -> dict:
     object_key = signal["object_key"]
     file_path = Path(dfs_root) / object_key
@@ -214,7 +191,6 @@ def transform_file(signal: dict, dfs_root: str | Path) -> dict:
     )
     transformed["security_scan"] = security_scan
     return transformed
-
 
 def mark_duplicates(documents: Iterable[dict], fuzzy_distance: int = 3) -> list[dict]:
     """Mark exact SHA256 duplicates and near-duplicates by SimHash distance."""
@@ -246,14 +222,12 @@ def mark_duplicates(documents: Iterable[dict], fuzzy_distance: int = 3) -> list[
 
     return output
 
-
 def append_jsonl(path: str | Path, records: Iterable[dict]) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("a", encoding="utf-8") as handle:
         for record in records:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
-
 
 def analyze_text(spark, text: str):
     """Spark DataFrame wrapper used by the Docker Spark smoke test."""

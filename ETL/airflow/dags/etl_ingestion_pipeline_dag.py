@@ -22,7 +22,6 @@ SPARK_LIB = "/opt/airflow/spark_lib"
 KAFKA_BOOTSTRAP = "kafka:29092"
 KAFKA_TOPIC = "scraped_files_topic"
 
-
 def _load_existing_records(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -31,7 +30,6 @@ def _load_existing_records(path: Path) -> list[dict]:
         if line.strip():
             records.append(json.loads(line))
     return records
-
 
 @dag(
     dag_id="etl_ingestion_pipeline",
@@ -66,7 +64,7 @@ def etl_ingestion_pipeline():
 
     @task
     def transform_document(signal: dict) -> dict:
-        if SPARK_LIB not in sys.path:
+        if SPARK_LIB not in sys.path: # to make sure Python can find custom modules/files inside SPARK_LIB
             sys.path.insert(0, SPARK_LIB)
 
         from transform import mark_duplicates, transform_file
@@ -93,6 +91,5 @@ def etl_ingestion_pipeline():
         }
 
     persist_transformed_document(transform_document(poll_kafka_signal()))
-
 
 etl_ingestion_pipeline()
