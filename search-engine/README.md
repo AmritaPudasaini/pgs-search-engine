@@ -21,6 +21,16 @@ and query-time normalization/expansion.
   (`pgs_search/retrieval/lexical.py`).
 - **English stemming** — NLTK `PorterStemmer` stems English Latin-script tokens;
   stemmed query added as an additional search variant (`lemmatize_query`).
+- **English ↔ Nepali machine translation** — `facebook/nllb-200-distilled-600M`
+  (NLLB-200) translates a query in either direction, using the `npi_Deva` and
+  `eng_Latn` language codes. The model and tokenizer are loaded once and cached
+  with `functools.lru_cache` (`pgs_search/query/translation.py`).
+- **Cross-language query expansion** — `expand_query_terms` translates the full
+  original query when `detect_language` returns `"en"` or `"ne"` and appends the
+  result as one more search variant, alongside normalization, stemming /
+  lemmatization, and place-name expansion. Mixed and unknown queries are never
+  translated. A translation failure is caught and logged as a warning, so the
+  normal expansion variants are still returned.
 - **Standalone query-vector generation** — `all-MiniLM-L6-v2` via
   `SentenceTransformer`, cached with `functools.lru_cache`
   (`pgs_search/query/embeddings.py`). Not yet integrated into retrieval.
@@ -29,8 +39,11 @@ and query-time normalization/expansion.
 
 ## Known Limitations / Out of Scope
 
-- **Translation is not implemented.** There is no general English-Nepali machine
-  translation; only a fixed place-name dictionary is used for expansion.
+- **Translation only feeds query expansion.** It is not wired into retrieval,
+  ranking, indexing, or result generation; the translated term is just another
+  search variant handed to the existing search path.
+- **Only single-language queries are translated.** `detect_language` returning
+  `"mixed"` or `"unknown"` skips translation entirely.
 - **Nepali lemmatization is not implemented.** The stemmer is English-only and
   leaves Devanagari tokens untouched; Nepali morphological analysis is out of
   scope.
@@ -40,6 +53,9 @@ and query-time normalization/expansion.
   configured host/port/index (see `pgs_search/config.py`).
 - **The first embedding call may download** the `all-MiniLM-L6-v2`
   sentence-transformer model from Hugging Face.
+- **The first translation call downloads** the `facebook/nllb-200-distilled-600M`
+  model (~2.3 GB) from Hugging Face and keeps it in memory for the process
+  lifetime. The test suite mocks the loader, so tests never download it.
 
 ## Quick Start
 

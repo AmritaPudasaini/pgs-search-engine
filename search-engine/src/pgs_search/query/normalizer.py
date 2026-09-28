@@ -1,12 +1,17 @@
 """Query normalization helpers for the search engine."""
 
 import json
+import logging
 import re
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
 from nltk.stem import PorterStemmer
+
+from pgs_search.query.translation import translate_to_english, translate_to_nepali
+
+logger = logging.getLogger(__name__)
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
@@ -162,6 +167,26 @@ def _is_romanized_nepali(text: str) -> bool:
     return bool(tokens) and all(token in get_romanized_ne_words() for token in tokens)
 
 
+def _translate_query(query: str, language: str) -> str:
+    """Translate the full original query into the other language.
+
+    Only unambiguous single-language queries are translated; "mixed" and
+    "unknown" queries are left alone. Each direction is guarded separately so a
+    translation failure degrades to an empty result instead of propagating.
+    """
+    if language == "en":
+        try:
+            return translate_to_nepali(query)
+        except Exception:
+            logger.warning("Nepali translation failed for query: %s", query, exc_info=True)
+    elif language == "ne":
+        try:
+            return translate_to_english(query)
+        except Exception:
+            logger.warning("English translation failed for query: %s", query, exc_info=True)
+    return ""
+
+
 def expand_query_terms(query: str) -> list[str]:
     """Expand a query into search terms and variants."""
     normalized = normalize_query(query)
@@ -176,4 +201,7 @@ def expand_query_terms(query: str) -> list[str]:
         equivalent = place_map.get(candidate) or reverse_place_map.get(candidate)
         if equivalent:
             terms.append(equivalent)
+    translated = _translate_query(query, detect_language(query))
+    if translated:
+        terms.append(translated)
     return list(dict.fromkeys(terms))
