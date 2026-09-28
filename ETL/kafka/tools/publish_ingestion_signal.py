@@ -1,5 +1,4 @@
-"""Publish a dummy 'file ready in DFS' signal, standing in for what the
-scraper will eventually emit once it writes to MinIO."""
+"""Publish a file-ready ingestion signal for the ETL pipeline."""
 
 import json
 from datetime import datetime, timezone
@@ -7,9 +6,11 @@ from datetime import datetime, timezone
 from kafka import KafkaProducer
 
 signal = {
-    "bucket": "dummy-dfs",
-    "object_key": "sample.html",  # must exist in ETL/airflow/data/dummy_dfs/
+    "bucket": "etl-file-store",
+    "object_key": "sample.html",  # must exist in ETL/airflow/data/local_dfs_store/
     "target_domain": "example.gov.np",
+    "source_url": "https://example.gov.np/notices/sample",
+    "title": "Sample Municipality Notice",
     "content_type": "text/html",
     "scraped_at": datetime.now(timezone.utc).isoformat(),
 }
@@ -22,4 +23,4 @@ producer = KafkaProducer(
 
 producer.send("scraped_files_topic", key=signal["target_domain"], value=signal)
 producer.flush()
-print("Sent 1 dummy file-ready signal to topic 'scraped_files_topic'")
+print("Sent 1 file-ready ingestion signal to topic 'scraped_files_topic'")

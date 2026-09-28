@@ -1,4 +1,4 @@
-"""Publish one dummy Document to Kafka, matching the scraper's JSON shape."""
+"""Publish one representative crawler Document to Kafka."""
 
 import hashlib
 import json
@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from kafka import KafkaProducer
 
 text = (
-    "Kathmandu Metropolitan City This is a dummy notice used to test "
+    "Kathmandu Metropolitan City This is a representative notice used to validate "
     "text extraction in Airflow. Contact: info@example.gov.np"
 )
 
@@ -37,4 +37,4 @@ producer = KafkaProducer(
 
 producer.send("crawled-documents", key=document["normalized_url"], value=document)
 producer.flush()
-print("Sent 1 dummy document to topic 'crawled-documents'")
+print("Sent 1 crawler document to topic 'crawled-documents'")
