@@ -37,7 +37,6 @@ def parse_html_file():
     print(clean_text)
     print(f"Word count: {len(clean_text.split())}")
 
-
 def parse_txt_file():
     with open("/opt/airflow/data/sample.txt", "r", encoding="utf-8") as f:
         raw_text = f.read()
@@ -45,7 +44,6 @@ def parse_txt_file():
     print("Contents of sample.txt:")
     print(raw_text)
     print(f"Word count: {len(raw_text.split())}")
-
 
 with DAG(
     dag_id="document_extraction_check",
