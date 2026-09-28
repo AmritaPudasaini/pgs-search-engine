@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from kafka import KafkaProducer
 
 BASE_TEXT = (
-    "Kathmandu Metropolitan City This is a dummy notice used to test "
+    "Kathmandu Metropolitan City This is a representative notice used to validate "
     "text extraction in Airflow. Contact: info@example.gov.np"
 )
 
@@ -52,7 +52,7 @@ send("valid (should be 'loaded')", doc1["normalized_url"], doc1)
 
 # 2. Same document again as a NEW Kafka message (different offset).
 #    Correctly still 'loaded' -- content-level dedup is Spark's job, not
-#    this consumer's. See test_idempotency.py for the real duplicate case.
+#    this consumer's. See validate_consumer_idempotency.py for the real duplicate case.
 send("exact repeat, new offset (should be 'loaded' again)", doc1["normalized_url"], doc1)
 
 # 3. REJECTED — Kafka key doesn't match normalized_url.
