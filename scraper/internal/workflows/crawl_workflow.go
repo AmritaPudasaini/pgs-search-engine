@@ -13,6 +13,7 @@
 package workflows
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -610,6 +611,22 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			RevisitAfter:         in.RevisitAfter,
 			CountryFilter:        in.CountryFilter,
 		})
+	}
+
+	if stats.Fetched > 0 && stats.Failed == stats.Fetched {
+		// Every single page this crawl fetched ended up Failed (fetch/parse
+		// error or activity exhausted its retries) -- not a quiet-but-valid
+		// run (which would show up as Skipped/CountryFiltered instead), but
+		// a real, actionable failure (e.g. the target is entirely
+		// unreachable, or the crawler is badly misconfigured). Without this,
+		// the crawl_runs row for a run like this was indistinguishable from
+		// a healthy one: CrawlWorkflow's only other return statement is the
+		// Continue-As-New one above, so `err` was otherwise never set and
+		// the finishCrawlRun defer's "failed" branch was dead code -- see
+		// docs/TASK-SPLIT-search-engine-scraper.md Person 2 checklist item
+		// 7.
+		err = fmt.Errorf("crawl fetched %d page(s), all %d failed", stats.Fetched, stats.Failed)
+		return CrawlResult{Stats: stats, RunID: runID}, err
 	}
 
 	return CrawlResult{Stats: stats, RunID: runID}, nil

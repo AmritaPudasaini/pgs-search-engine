@@ -667,6 +667,101 @@ func TestCrawlWorkflow_MaxPagesPerDomain(t *testing.T) {
 	}
 }
 
+// TestCrawlWorkflow_AllPagesFailed_FinishesRunAsFailed proves crawl_runs
+// can actually reach "failed" status: before this, CrawlWorkflow's only
+// non-nil terminal error was workflow.NewContinueAsNewError, which the
+// finishCrawlRun defer intercepts before reaching the status check (see
+// crawl_workflow.go's willContinueAsNew branch) -- so every crawl that
+// ever finished, no matter how badly it failed at the page level, was
+// recorded as "completed". A crawl whose every single fetch fails should
+// finish the run as "failed" instead.
+func TestCrawlWorkflow_AllPagesFailed_FinishesRunAsFailed(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		activities.ProcessPageOutput{FetchError: "connection refused"}, nil,
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(42), nil)
+
+	var finishedStatus, finishedError string
+	env.OnActivity(act.FinishCrawlRun, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.FinishCrawlRunInput) error {
+			finishedStatus = in.Status
+			finishedError = in.Error
+			return nil
+		},
+	)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:       []Seed{{URL: "https://example.com/a"}, {URL: "https://example.com/b"}},
+		MaxDepth:    0,
+		MaxPages:    10,
+		Concurrency: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err == nil {
+		t.Fatal("expected the workflow to return an error when every page failed, got nil")
+	}
+
+	if finishedStatus != "failed" {
+		t.Errorf("FinishCrawlRun status = %q, want %q", finishedStatus, "failed")
+	}
+	if finishedError == "" {
+		t.Error("FinishCrawlRun error message was empty, want a description of the failure")
+	}
+}
+
+// TestCrawlWorkflow_PartialFailure_StillFinishesAsCompleted is the control
+// case: a crawl where some (not all) pages fail is a normal, healthy
+// outcome and must still finish "completed" -- guards against a fix for
+// the above that's too aggressive (e.g. failing on Failed > 0 instead of
+// Failed == Fetched).
+func TestCrawlWorkflow_PartialFailure_StillFinishesAsCompleted(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			if in.URL == "https://example.com/bad" {
+				return activities.ProcessPageOutput{FetchError: "connection refused"}, nil
+			}
+			return activities.ProcessPageOutput{
+				URL: in.URL, NormalizedURL: in.URL, Skipped: true, SkipReason: "test",
+			}, nil
+		},
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(42), nil)
+
+	var finishedStatus string
+	env.OnActivity(act.FinishCrawlRun, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.FinishCrawlRunInput) error {
+			finishedStatus = in.Status
+			return nil
+		},
+	)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:       []Seed{{URL: "https://example.com/good"}, {URL: "https://example.com/bad"}},
+		MaxDepth:    0,
+		MaxPages:    10,
+		Concurrency: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error: %v, want nil (partial failure is a healthy outcome)", err)
+	}
+	if finishedStatus != "completed" {
+		t.Errorf("FinishCrawlRun status = %q, want %q", finishedStatus, "completed")
+	}
+}
+
 // TestCrawlWorkflow_NoMaxConcurrentPerHost_AllowsFullConcurrency is the
 // control case: with MaxConcurrentPerHost left at 0 (unlimited), the same 5
 // same-host seeds under Concurrency=5 should run with real overlap -- this
