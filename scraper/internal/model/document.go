@@ -40,7 +40,17 @@ type Document struct {
 	// the snippet a real search engine shows under a result's title, so
 	// it's carried as its own field rather than left buried in Text.
 	MetaDescription string `json:"meta_description,omitempty"`
-	Text            string `json:"text"`
+	// Text is marshalled as "text" here, but internal/api/openapi.yaml's
+	// Document schema calls this field "body_text" -- a pre-existing drift
+	// that didn't matter while the API read from Postgres (its response
+	// JSON was built from sqlc-generated column-named structs, not from
+	// this type directly), but now does: with S3 storage, the JSON this
+	// struct marshals to *is* the object body the API reads back verbatim.
+	// Not renamed here -- NDJSON output and the Kafka stream (ETL's
+	// consumption point) already depend on "text" being the wire name; see
+	// docs/SCHEMA.md for the full list of drifted fields and Person 5's
+	// options for reconciling them without breaking those consumers.
+	Text string `json:"text"`
 	// Headings is the page's h1-h6 outline, in document order -- the part of
 	// the HTML structure a search engine actually uses as a ranking/snippet
 	// signal (section headers), as opposed to the full markup tree, which
@@ -54,8 +64,12 @@ type Document struct {
 	// block found on the page (each element is valid JSON on its own).
 	// Kept raw rather than decoded so the crawler doesn't need to know
 	// about every schema.org type a downstream consumer might care about.
-	JSONLD []string  `json:"json_ld,omitempty"`
-	Geo    *GeoPoint `json:"geo,omitempty"`
+	JSONLD []string `json:"json_ld,omitempty"`
+	// Geo is marshalled as a nested "geo": {"lat":.., "lng":..} object, but
+	// openapi.yaml's Document schema has this flattened into two top-level
+	// properties, geo_lat and geo_lng. See the Text field's comment above
+	// for why this isn't renamed/reshaped here.
+	Geo *GeoPoint `json:"geo,omitempty"`
 	// Country is the page's best-guess origin country, as an ISO 3166-1
 	// alpha-2 code (e.g. "NP", "IN"), or "" if no signal on the page
 	// resolved one. See internal/parser.DetectCountry for the signals
@@ -79,8 +93,23 @@ type Document struct {
 	ContentHash string    `json:"content_hash"`
 	FetchedAt   time.Time `json:"fetched_at"`
 	FetchDurMs  int64     `json:"fetch_duration_ms"`
-	Error       string    `json:"error,omitempty"`
+	// Error is marshalled as "error" here, but openapi.yaml's Document
+	// schema calls this field "fetch_error". See the Text field's comment
+	// above for why this isn't renamed here.
+	Error string `json:"error,omitempty"`
 }
+
+// Fields openapi.yaml's Document schema has that this type deliberately
+// doesn't: `id`, `created_at`, and `updated_at` were Postgres row metadata
+// (a SERIAL primary key and trigger-maintained timestamps), not part of
+// the crawler's own domain model -- this type has no equivalent for "id"
+// under S3 (the object key *is* the identity) or "updated_at" (a document
+// isn't mutated in place; a re-fetch is a new write with its own
+// FetchedAt). Adding fabricated equivalents here would be worse than
+// leaving the gap for Person 5 to resolve at the API layer, e.g. by
+// serving an S3 GetObject response's real LastModified for created_at, or
+// by dropping these three properties from openapi.yaml as no-longer-
+// applicable under S3 storage.
 
 // Heading is one h1-h6 element from a page's outline.
 type Heading struct {
