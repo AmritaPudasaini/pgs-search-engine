@@ -2,9 +2,15 @@ openapi: 3.0.3
 info:
   title: search-engine-scraper documents API
   description: >
-    Read-only API over the `documents` table populated by the Temporal
-    worker (see internal/activities and internal/storage). Use it to
-    preview crawled pages without a direct Postgres connection.
+    Read-only API over crawled documents written by the Temporal worker
+    (see internal/activities and internal/storage). Use it to preview
+    crawled pages without a direct storage connection. Two server
+    implementations currently exist behind this same spec:
+    internal/api/server.go (Postgres) and internal/api/s3_server.go (S3) --
+    see the latter's doc comment and docs/SCHEMA.md for where their
+    behavior differs (crawl_run_id's requiredness on GET
+    /api/v1/documents, and /api/v1/documents/count and
+    /categories returning 501 under S3).
   version: "1.0.0"
 servers:
   - url: /
@@ -149,7 +155,12 @@ paths:
             Narrow the category down to just the documents one specific run
             produced. Check that run's status first via
             GET /api/v1/crawl-runs/{id} -- a "failed" or still-"running" run
-            may mean an incomplete batch.
+            may mean an incomplete batch. **Required under the S3-backed
+            server** (internal/api/s3_server.go): there is no category-only
+            index over S3 storage, so a request without it would mean an
+            unbounded whole-bucket scan; still optional under the
+            Postgres-backed server (server.go), which has an indexed query
+            for it. See docs/SCHEMA.md.
         - name: country
           in: query
           required: false

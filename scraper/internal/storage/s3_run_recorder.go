@@ -21,10 +21,10 @@ type s3RunRecorderAPI interface {
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
-// s3RunManifest is the JSON shape stored at S3RunManifestKey(runID) --
+// S3RunManifest is the JSON shape stored at S3RunManifestKey(runID) --
 // {crawl_run_id}/_run.json -- the run-tracking equivalent of a
 // crawl_runs row.
-type s3RunManifest struct {
+type S3RunManifest struct {
 	RunID        int64     `json:"run_id"`
 	Status       string    `json:"status"` // "running", "completed", or "failed"
 	SeedCount    int       `json:"seed_count"`
@@ -147,7 +147,7 @@ func (r *S3RunRecorder) prefixed(key string) string {
 func (r *S3RunRecorder) StartRun(ctx context.Context, in StartRunInput) (int64, error) {
 	runID := r.newRunID()
 	now := r.now()
-	manifest := s3RunManifest{
+	manifest := S3RunManifest{
 		RunID:     runID,
 		Status:    "running",
 		SeedCount: in.SeedCount,
@@ -182,7 +182,7 @@ func (r *S3RunRecorder) StartRun(ctx context.Context, in StartRunInput) (int64, 
 // stats, retrying on an ETag mismatch (another writer updated the manifest
 // between this call's read and write) up to maxCASRetry times.
 func (r *S3RunRecorder) UpdateRunStats(ctx context.Context, runID int64, stats RunStats) error {
-	return r.updateManifest(ctx, runID, func(m *s3RunManifest) {
+	return r.updateManifest(ctx, runID, func(m *S3RunManifest) {
 		m.Fetched = stats.Fetched
 		m.Succeeded = stats.Succeeded
 		m.Failed = stats.Failed
@@ -194,7 +194,7 @@ func (r *S3RunRecorder) UpdateRunStats(ctx context.Context, runID int64, stats R
 // FinishRun read-modify-writes the run's manifest with its terminal status
 // and final stats, with the same ETag-mismatch retry as UpdateRunStats.
 func (r *S3RunRecorder) FinishRun(ctx context.Context, runID int64, status string, stats RunStats, errMsg string) error {
-	return r.updateManifest(ctx, runID, func(m *s3RunManifest) {
+	return r.updateManifest(ctx, runID, func(m *S3RunManifest) {
 		m.Status = status
 		m.Fetched = stats.Fetched
 		m.Succeeded = stats.Succeeded
@@ -205,7 +205,7 @@ func (r *S3RunRecorder) FinishRun(ctx context.Context, runID int64, status strin
 	})
 }
 
-func (r *S3RunRecorder) updateManifest(ctx context.Context, runID int64, mutate func(*s3RunManifest)) error {
+func (r *S3RunRecorder) updateManifest(ctx context.Context, runID int64, mutate func(*S3RunManifest)) error {
 	key := r.prefixed(S3RunManifestKey(runID))
 
 	var lastErr error
@@ -227,7 +227,7 @@ func (r *S3RunRecorder) updateManifest(ctx context.Context, runID int64, mutate 
 			return fmt.Errorf("read run manifest s3://%s/%s: %w", r.bucket, key, err)
 		}
 
-		var manifest s3RunManifest
+		var manifest S3RunManifest
 		if err := json.Unmarshal(body, &manifest); err != nil {
 			cancel()
 			return fmt.Errorf("unmarshal run manifest s3://%s/%s: %w", r.bucket, key, err)

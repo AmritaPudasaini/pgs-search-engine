@@ -109,7 +109,7 @@ func TestS3RunRecorder_StartRun_WritesManifestAtRunIDKey(t *testing.T) {
 	if !ok {
 		t.Fatalf("no object at key %q", S3RunManifestKey(12345))
 	}
-	var m s3RunManifest
+	var m S3RunManifest
 	if err := json.Unmarshal(body, &m); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestS3RunRecorder_UpdateRunStats_UpdatesFieldsPreservingOthers(t *testing.T
 		t.Fatalf("UpdateRunStats: %v", err)
 	}
 
-	var m s3RunManifest
+	var m S3RunManifest
 	if err := json.Unmarshal(fake.objects[S3RunManifestKey(runID)], &m); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestS3RunRecorder_FinishRun_SetsTerminalStatusAndError(t *testing.T) {
 		t.Fatalf("FinishRun: %v", err)
 	}
 
-	var m s3RunManifest
+	var m S3RunManifest
 	if err := json.Unmarshal(fake.objects[S3RunManifestKey(runID)], &m); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
 	}
