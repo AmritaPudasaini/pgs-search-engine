@@ -170,6 +170,26 @@ Every crawled `Document` gets tagged with the `category` of the seed it
 came from (inherited down the link graph), so you can filter/split results
 by topic afterward even though it was all one crawl.
 
+**Adding a new category** to an existing seed-list file (e.g.
+`configs/seeds.example.txt`) needs no code change, just:
+
+1. Add a `[your-category]` header line, followed by one seed URL per line,
+   anywhere in the file (order between categories doesn't matter).
+2. Optionally give it a default crawl priority: `[your-category 10]` (see
+   "Priority" below). Omit it and the category defaults to priority `0`.
+3. Run the crawl with `--seeds-file` pointed at the file, same as before --
+   no flag names or code paths differ by category, since `internal/seeds`
+   assigns every category the same `Seed{URL, Category, Priority}` shape.
+
+There's no fixed list of valid category names to register anywhere else in
+the repo: whatever string follows `[` in the header becomes that seed's
+`Category` value verbatim (trimmed of surrounding whitespace), and flows
+straight through to `model.Document.Category` for every page crawled under
+it. A typo in a category name (e.g. `[tehc]` instead of `[tech]`) isn't
+rejected by the parser -- it silently becomes its own distinct category,
+so double-check spelling against existing categories in the same file
+rather than relying on a parse error to catch it.
+
 **Priority** controls crawl order, not just grouping. A `[category]`
 header may carry a default priority (`[tech 10]`), and a seed line may
 override it just for that URL (`https://example.com 20`) — higher values
