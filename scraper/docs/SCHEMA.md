@@ -155,8 +155,19 @@ a storage-schema concern too:
 | *(none)* | `id`, `created_at`, `updated_at` | Postgres row metadata with no domain-model equivalent |
 
 Not fixed in `internal/model` (would break NDJSON output and the Kafka
-ETL stream, which already depend on the current names) -- Person 5 owns
-reconciling this at the API layer or in `openapi.yaml` itself.
+ETL stream, which already depend on the current names).
+
+**Resolved (Person 5 checklist item 10)**: this was flagged as a risk by
+Person 4 before `internal/api/s3_server.go` existed. Now that it does,
+confirmed it's real, shipped behavior -- `S3Server.getDocument` returns
+`model.Document` marshalled verbatim, so `GET /api/v1/documents` under
+the S3 backend actually responds with `text`/`error`/nested `geo`, not
+`body_text`/`fetch_error`/flat `geo_lat`+`geo_lng`, and has no `id`/
+`created_at`/`updated_at` at all. Rather than reconcile the shapes,
+`openapi.yaml`'s `Document` schema now documents the divergence
+per-field (see its `body_text`, `fetch_error`, `geo_lat`, and `id`
+property descriptions) so the spec stays honest about what each backend
+actually returns instead of silently describing only one of them.
 
 ## Lifecycle policy recommendation
 

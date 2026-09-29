@@ -267,6 +267,13 @@ components:
         id:
           type: integer
           format: int64
+          description: >-
+            **Drift under the S3 backend**: S3Server's Document objects have
+            no `id` (nor `created_at`/`updated_at`, below) -- these were
+            Postgres row metadata (a SERIAL primary key, trigger-maintained
+            timestamps) with no equivalent in internal/model.Document. The
+            S3 object's own key *is* its identity; `fetched_at` (below) is
+            the closest equivalent to `created_at`. See docs/SCHEMA.md.
         url:
           type: string
         normalized_url:
@@ -297,6 +304,15 @@ components:
             search engine shows under a result's title.
         body_text:
           type: string
+          description: >-
+            **Drift under the S3 backend**: S3Server returns
+            internal/model.Document marshalled verbatim, whose JSON tag for
+            this field is `text`, not `body_text` -- the Postgres-backed
+            Server (which builds this response from sqlc-generated,
+            column-named structs) does return `body_text` as documented
+            here. See docs/SCHEMA.md's "Known drift vs. openapi.yaml" for
+            why this wasn't reconciled by renaming model.Document's tag
+            (would break NDJSON output and the Kafka/ETL stream).
         headings:
           type: array
           items:
@@ -346,6 +362,10 @@ components:
           description: >-
             Latitude resolved from the page (JSON-LD GeoCoordinates, Open
             Graph place tags, or geo.position/ICBM meta tags), if any.
+            **Drift under the S3 backend**: S3Server returns a nested
+            `"geo": {"lat":..,"lng":..}` object instead of these two flat
+            properties -- see body_text's description above and
+            docs/SCHEMA.md.
         geo_lng:
           type: number
           format: double
@@ -380,6 +400,10 @@ components:
           format: int64
         fetch_error:
           type: string
+          description: >-
+            **Drift under the S3 backend**: S3Server returns this field as
+            `error`, not `fetch_error` -- see body_text's description above
+            and docs/SCHEMA.md.
         fetched_at:
           type: string
           format: date-time
