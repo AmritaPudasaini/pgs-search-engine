@@ -608,6 +608,65 @@ func TestCrawlWorkflow_ContinueAsNew_CarriesStateForward(t *testing.T) {
 	}
 }
 
+// TestCrawlWorkflow_MaxPagesPerDomain proves the scheduler actually
+// enforces MaxPagesPerDomain, independent of MaxConcurrentPerHost (which
+// TestCrawlWorkflow_MaxConcurrentPerHost already covers): 10 same-host
+// seeds with MaxPagesPerDomain=4 should fetch exactly 4 of them and count
+// the other 6 as DomainCapped, even though MaxPages=10 leaves budget to
+// fetch them all.
+func TestCrawlWorkflow_MaxPagesPerDomain(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	const seedCount = 10
+	seeds := make([]Seed, seedCount)
+	for i := 0; i < seedCount; i++ {
+		seeds[i] = Seed{URL: fmt.Sprintf("https://same-host.example/%d", i)}
+	}
+
+	var mu sync.Mutex
+	fetchedCount := 0
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			mu.Lock()
+			fetchedCount++
+			mu.Unlock()
+			return activities.ProcessPageOutput{
+				URL: in.URL, NormalizedURL: in.URL, Skipped: true, SkipReason: "test",
+			}, nil
+		},
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(0), nil)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:             seeds,
+		MaxDepth:          0,
+		MaxPages:          seedCount,
+		Concurrency:       4,
+		MaxPagesPerDomain: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error: %v", err)
+	}
+
+	var result CrawlResult
+	if err := env.GetWorkflowResult(&result); err != nil {
+		t.Fatalf("GetWorkflowResult: %v", err)
+	}
+
+	if fetchedCount != 4 {
+		t.Errorf("ProcessPage was called %d times, want 4 (MaxPagesPerDomain)", fetchedCount)
+	}
+	if result.Stats.DomainCapped != 6 {
+		t.Errorf("Stats.DomainCapped = %d, want 6", result.Stats.DomainCapped)
+	}
+}
+
 // TestCrawlWorkflow_NoMaxConcurrentPerHost_AllowsFullConcurrency is the
 // control case: with MaxConcurrentPerHost left at 0 (unlimited), the same 5
 // same-host seeds under Concurrency=5 should run with real overlap -- this
