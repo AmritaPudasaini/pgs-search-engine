@@ -17,6 +17,8 @@ import (
 func reset() {
 	PagesFetched.Reset()
 	RateLimited.Reset()
+	S3PutTotal.Reset()
+	S3ThrottledTotal.Reset()
 }
 
 func TestPagesFetched_IncrementsPerOutcome(t *testing.T) {
@@ -52,6 +54,43 @@ func TestRateLimited_TracksPerHost(t *testing.T) {
 	}
 }
 
+func TestS3PutTotal_TracksOperationAndOutcome(t *testing.T) {
+	reset()
+
+	S3PutTotal.WithLabelValues("document", "success").Inc()
+	S3PutTotal.WithLabelValues("document", "success").Inc()
+	S3PutTotal.WithLabelValues("document", "error").Inc()
+	S3PutTotal.WithLabelValues("manifest", "success").Inc()
+
+	if got := testutil.ToFloat64(S3PutTotal.WithLabelValues("document", "success")); got != 2 {
+		t.Errorf("document/success count = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(S3PutTotal.WithLabelValues("document", "error")); got != 1 {
+		t.Errorf("document/error count = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(S3PutTotal.WithLabelValues("manifest", "success")); got != 1 {
+		t.Errorf("manifest/success count = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(S3PutTotal.WithLabelValues("latest", "success")); got != 0 {
+		t.Errorf("latest/success count = %v, want 0 (never incremented)", got)
+	}
+}
+
+func TestS3ThrottledTotal_TracksPerOperation(t *testing.T) {
+	reset()
+
+	S3ThrottledTotal.WithLabelValues("put").Inc()
+	S3ThrottledTotal.WithLabelValues("put").Inc()
+	S3ThrottledTotal.WithLabelValues("list").Inc()
+
+	if got := testutil.ToFloat64(S3ThrottledTotal.WithLabelValues("put")); got != 2 {
+		t.Errorf("put count = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(S3ThrottledTotal.WithLabelValues("list")); got != 1 {
+		t.Errorf("list count = %v, want 1", got)
+	}
+}
+
 // TestPromhttpHandler_ServesRegisteredMetrics proves the exact wiring
 // cmd/worker/main.go uses (promhttp.Handler() over the default registry
 // promauto registers these metrics against) actually serves them in
@@ -62,6 +101,8 @@ func TestPromhttpHandler_ServesRegisteredMetrics(t *testing.T) {
 	reset()
 	PagesFetched.WithLabelValues(OutcomeSuccess).Inc()
 	RateLimited.WithLabelValues("example.com").Inc()
+	S3PutTotal.WithLabelValues("document", "success").Inc()
+	S3ThrottledTotal.WithLabelValues("put").Inc()
 
 	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
@@ -82,6 +123,8 @@ func TestPromhttpHandler_ServesRegisteredMetrics(t *testing.T) {
 	for _, want := range []string{
 		`crawler_pages_fetched_total{outcome="success"} 1`,
 		`crawler_rate_limited_total{host="example.com"} 1`,
+		`crawler_s3_put_total{operation="document",outcome="success"} 1`,
+		`crawler_s3_throttled_total{operation="put"} 1`,
 	} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("scrape output missing %q\nfull output:\n%s", want, body)
