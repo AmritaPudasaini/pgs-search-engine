@@ -150,6 +150,44 @@ has no bucket-provisioning code, only an S3 client):
   correctness ever becomes security/compliance-relevant (out of scope for
   this crawler today).
 
+## Load-test plan (`ListObjectsV2` pagination at scale)
+
+**Not run against a real or emulated bucket as part of this branch**: no
+AWS CLI or LocalStack binary/image was available in the environment this
+was written in, and `docker-compose.yml` doesn't have a LocalStack service
+yet (Person 1's item 3). Rather than fabricate numbers, `scripts/
+s3_listing_loadtest.go` (build-tag `ignore`, so `go build ./...` skips it)
+is a ready-to-run tool for whoever has bucket access next:
+
+```bash
+# Against LocalStack, once Person 1's docker-compose service exists:
+go run scripts/s3_listing_loadtest.go \
+    -bucket scraper-docs -run-id 999999 -count 10000 \
+    -endpoint http://localhost:4566
+
+# Against a real dev bucket (uses default AWS credential chain):
+go run scripts/s3_listing_loadtest.go \
+    -bucket my-dev-bucket -run-id 999999 -count 10000
+```
+
+It seeds `-count` tiny Document-shaped objects under one `crawl_run_id`
+prefix (concurrent `PutObject`, `-seed-concurrency` in flight), then times
+a full `ListObjectsV2` pagination pass (default `MaxKeys` is 1000, so
+10,000 objects means 10 pages), and prints a linear extrapolation to
+1,000,000 objects (1,000 pages) based on the measured per-page latency.
+
+**Why extrapolate instead of literally running 1M objects**: seeding 1M
+real objects costs real time and, against real AWS S3, real money (PUT
+request pricing), for a number this script can estimate reasonably well
+-- `ListObjectsV2`'s per-page cost is dominated by one HTTP round-trip
+returning up to 1000 keys, which doesn't get slower as the *total* object
+count grows (S3's key-space is not sorted-scan-from-zero per request; each
+page continues from its continuation token). The one thing a 1M-object run
+would catch that a 10K-object extrapolation can't is any degradation
+specific to very large single-prefix listings (undocumented by AWS, but
+worth actually checking before relying on this at production scale) --
+flagged, not verified, here.
+
 ## Known gaps
 
 - **No LocalStack integration test.** `s3_writer_test.go`,
@@ -161,7 +199,6 @@ has no bucket-provisioning code, only an S3 client):
   and `docker-compose.yml` don't yet have a LocalStack service (Person 1's
   item 3) to run such a test against.
 - **`ListObjectsV2` at scale (1M+ objects under one `crawl_run_id`) is
-  untested.** No large bucket exists to test pagination/latency against;
-  this needs to happen once Person 5's API rework and Person 1's LocalStack
-  (or a real dev bucket) both exist. Noted here rather than fabricated.
+  unmeasured**, not just untested -- see "Load-test plan" above for the
+  script and why it wasn't run here.
 - **`category` filtering has no index** -- see "Document objects" above.
