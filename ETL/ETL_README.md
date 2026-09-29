@@ -1,9 +1,9 @@
 # ETL
 
 ETL for a Nepali/English search engine. This folder is self-contained for
-development: it uses local sample files instead of the scraper, JSONL output
-instead of PostgreSQL/OpenSearch, and Kafka signals to simulate the scraper
-handoff.
+development: it uses local sample files instead of the scraper, JSONL as the
+intermediate output instead of PostgreSQL, an optional local OpenSearch index,
+and Kafka signals to simulate the scraper handoff.
 
 ## Current Workflow
 
@@ -12,8 +12,8 @@ manual Kafka signal -> local file store -> transform -> JSONL output
 ```
 
 The implementation follows the text architecture direction: transformation
-logic lives in Spark-facing code, while Airflow is the orchestrator for
-this runnable phase.
+logic lives in Spark-facing code, Airflow is the orchestrator for this
+runnable phase, and the isolated OpenSearch step consumes the resulting JSONL.
 
 ## Run The Stack
 
@@ -45,10 +45,17 @@ status against prior local output, and appends the transformed document to:
 ETL/airflow/data/processed/transformed_documents.jsonl
 ```
 
+To index those transformed records after the DAG succeeds:
+
+```bash
+docker compose up -d opensearch
+docker compose run --rm opensearch-indexer
+```
+
 ## What Is Implemented
 
-- One root Docker Compose stack in `ETL/docker-compose.yml` for Kafka and
-  Airflow.
+- One root Docker Compose stack in `ETL/docker-compose.yml` for Kafka, Airflow,
+  and OpenSearch.
 - Manual Kafka file-ready signal publishing with the
   `ingestion-signal-publisher` compose service.
 - Local DFS stand-in at `airflow/data/local_dfs_store/`.
@@ -63,6 +70,9 @@ ETL/airflow/data/processed/transformed_documents.jsonl
   - Seed geo-tagging rules for Kathmandu, Pokhara, and Janakpur.
   - Exact and fuzzy duplicate marking.
 - Local unit tests for the Kafka receipt consumer and Spark transform logic.
+- OpenSearch indexing from the existing transformed JSONL output with stable
+  document IDs and explicit text/keyword mappings. See
+  [`OpenSearch/OpenSearch.md`](OpenSearch/OpenSearch.md).
 
 ## Tests
 
@@ -85,7 +95,7 @@ Spark Docker image still runs it with PySpark installed.
 - Add ClamAV malware scanning. The current rule-based file scanner is an intake
   guard, not antivirus.
 - Add the final PostgreSQL schema and write path.
-- Add OpenSearch indexing and embeddings.
+- Add embeddings only if a future transform step produces them.
 - Replace the seed geo rules with an official Nepal administrative
   gazetteer.
 - Add production-grade Spark streaming from Kafka once the scraper contract is

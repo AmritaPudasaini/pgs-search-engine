@@ -117,6 +117,37 @@ def scan_file(filename: str, content: bytes) -> ScanResult:
     }
 
 
+def inspect_file(path: str) -> dict[str, Any]:
+    """Return the intake-check contract consumed by transform_file()."""
+    from pathlib import Path
+
+    file_path = Path(path)
+    result = scan_file(file_path.name, file_path.read_bytes())
+    findings: list[str] = []
+    extension = result["extension"]
+    if extension in SUSPICIOUS_EXTENSIONS:
+        findings.append("suspicious_extension")
+    if extension not in EXPECTED_EXTENSIONS:
+        findings.append("unexpected_extension")
+    if result["size_bytes"] == 0:
+        findings.append("empty_file")
+    elif result["size_bytes"] > MAX_SAFE_SIZE_BYTES:
+        findings.append("file_too_large")
+    if len(file_path.name) > MAX_FILENAME_LENGTH:
+        findings.append("filename_too_long")
+    if has_double_extension(file_path.name):
+        findings.append("multiple_extensions")
+
+    return {
+        "accepted": not findings,
+        "filename": result["filename"],
+        "extension": extension,
+        "size_bytes": result["size_bytes"],
+        "sha256": result["sha256"],
+        "findings": findings,
+    }
+
+
 def scan_file_spark(spark: Any, filename: str, content: bytes) -> Any:
     """Same as scan_file(), but wraps the result in a Spark DataFrame -
     matches the pattern used by analyze_text() in transform.py so both

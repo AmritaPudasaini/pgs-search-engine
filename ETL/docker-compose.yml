@@ -21,6 +21,39 @@ services:
       timeout: 10s
       retries: 12
 
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  opensearch-indexer:
+    build:
+      context: ./OpenSearch
+    profiles:
+      - tools
+    environment:
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-pgs_documents}
+      JSONL_PATH: /data/transformed_documents.jsonl
+    volumes:
+      - ./airflow/data/processed:/data:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
   postgres:
     image: postgres:16
     environment:
@@ -165,3 +198,4 @@ services:
 
 volumes:
   airflow-postgres-db:
+  opensearch-data:
