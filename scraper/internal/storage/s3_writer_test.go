@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -200,6 +201,94 @@ func TestS3Writer_WriteFailsIfLatestPutFails(t *testing.T) {
 	}
 	if len(fake.inputs) != 1 {
 		t.Errorf("PutObject recorded %d successful calls, want 1 (the run-scoped PUT that did succeed)", len(fake.inputs))
+	}
+}
+
+// TestS3Writer_WriteHandlesNilSliceFields proves a Document with every
+// slice field left nil (Links, AnchorTexts, JSONLD, Headings, SimHashes --
+// the common case: a page with no links, no JSON-LD, no anchor text)
+// marshals and writes cleanly. Unlike Postgres's nonNilStrings coalescing
+// (needed because pgx sends a nil Go slice as SQL NULL against a NOT NULL
+// TEXT[] column), S3 has no schema to violate here -- this documents that
+// no equivalent coalescing is needed for the S3 path, not that one was
+// added.
+func TestS3Writer_WriteHandlesNilSliceFields(t *testing.T) {
+	fake := &fakeS3PutObjectAPI{}
+	w := &S3Writer{client: fake, bucket: "docs-bucket", putTimeout: time.Second}
+
+	doc := &model.Document{
+		URL: "https://example.com/a", NormalizedURL: "https://example.com/a",
+		Links: nil, AnchorTexts: nil, JSONLD: nil, Headings: nil,
+	}
+	if err := w.Write(doc); err != nil {
+		t.Fatalf("Write with nil slice fields: %v", err)
+	}
+
+	body, err := io.ReadAll(fake.inputs[0].Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if !json.Valid(body) {
+		t.Fatalf("body is not valid JSON: %s", body)
+	}
+}
+
+// TestS3Writer_WriteHandlesEmptyJSONLD is the non-nil counterpart: an
+// empty (but non-nil) JSONLD slice, and one containing an empty JSON
+// object string -- both valid, both should round-trip.
+func TestS3Writer_WriteHandlesEmptyJSONLD(t *testing.T) {
+	fake := &fakeS3PutObjectAPI{}
+	w := &S3Writer{client: fake, bucket: "docs-bucket", putTimeout: time.Second}
+
+	doc := &model.Document{
+		URL: "https://example.com/a", NormalizedURL: "https://example.com/a",
+		JSONLD: []string{"{}"},
+	}
+	if err := w.Write(doc); err != nil {
+		t.Fatalf("Write with empty JSON-LD: %v", err)
+	}
+
+	body, err := io.ReadAll(fake.inputs[0].Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	var got model.Document
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if len(got.JSONLD) != 1 || got.JSONLD[0] != "{}" {
+		t.Errorf("JSONLD = %v, want [\"{}\"]", got.JSONLD)
+	}
+}
+
+// TestS3Writer_WriteHandlesOversizedDocument proves a Document whose Text
+// is much larger than a typical page (several MB) still marshals and PUTs
+// without truncation -- S3's PutObject has no practical size limit for a
+// crawled page's worth of text (single-PUT objects up to 5GB), unlike a
+// hypothetical fixed-size buffer bug.
+func TestS3Writer_WriteHandlesOversizedDocument(t *testing.T) {
+	fake := &fakeS3PutObjectAPI{}
+	w := &S3Writer{client: fake, bucket: "docs-bucket", putTimeout: time.Second}
+
+	bigText := strings.Repeat("a", 5*1024*1024) // 5MB
+	doc := &model.Document{
+		URL: "https://example.com/a", NormalizedURL: "https://example.com/a",
+		Text: bigText,
+	}
+	if err := w.Write(doc); err != nil {
+		t.Fatalf("Write with oversized document: %v", err)
+	}
+
+	body, err := io.ReadAll(fake.inputs[0].Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	var got model.Document
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if len(got.Text) != len(bigText) {
+		t.Errorf("Text length = %d, want %d (no truncation)", len(got.Text), len(bigText))
 	}
 }
 
