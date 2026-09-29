@@ -405,12 +405,15 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			host := normalize.Hostname(item.URL)
 
 			if in.MaxPagesPerDomain > 0 && domainCounts[host] >= in.MaxPagesPerDomain {
+				// bestIdx, if set, always points at an index < i here: this
+				// forward scan only ever sets it from indices already
+				// visited (0..i-1), never from i itself (a capped item
+				// continues before reaching that assignment) or beyond.
+				// Removing index i therefore never invalidates bestIdx, so
+				// no compensating adjustment is needed.
 				queue = append(queue[:i], queue[i+1:]...)
 				stats.DomainCapped++
 				i--
-				if bestIdx >= i+1 {
-					bestIdx--
-				}
 				continue
 			}
 			if in.MaxConcurrentPerHost > 0 && activeHostCounts[host] >= in.MaxConcurrentPerHost {
