@@ -7,6 +7,7 @@ package seeds
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -90,6 +91,16 @@ func ParseFile(path string) ([]Seed, error) {
 			continue
 		}
 		fields := strings.Fields(line)
+		// A line starting with "[" that reaches here (rather than the
+		// category-header branch above) is missing its closing "]" -- a
+		// mistyped section header, not a URL. Without this check it would
+		// silently become a seed whose URL is the literal text "[tech",
+		// which u.Parse can't reject on its own (it has no scheme/host, but
+		// neither does plenty of otherwise-malformed input this loop
+		// should catch as a mistake rather than pass through).
+		if u, err := url.Parse(fields[0]); err != nil || u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("seeds file %s line %d: %q is not an absolute http(s) URL (missing closing \"]\" on a category header?)", path, lineNo, fields[0])
+		}
 		priority := categoryPriority
 		if len(fields) > 1 {
 			p, err := strconv.Atoi(fields[1])
