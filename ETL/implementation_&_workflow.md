@@ -3,9 +3,10 @@
 ## Current Scope
 
 The ETL section is self-contained for development. It does not depend on the
-scraper, real MinIO, PostgreSQL application schemas, or OpenSearch yet. Kafka
-signals are produced manually, files are read from the local ETL file store, and
-transformed records are written to JSONL output for inspection.
+scraper, real MinIO, or PostgreSQL application schemas. Kafka signals are
+produced manually, files are read from the local ETL file store, transformed
+records are written to JSONL, and an isolated OpenSearch service can index that
+output.
 
 ## Implemented Workflow
 
@@ -16,6 +17,7 @@ Kafka file-ready signal
   -> rule-based file intake check
   -> Spark-facing transformation logic
   -> JSONL output: ETL/airflow/data/processed/transformed_documents.jsonl
+  -> OpenSearch ingestion: ETL/OpenSearch/opensearch/index_documents.py
 ```
 
 ## Docker Services
@@ -68,6 +70,18 @@ Implemented in `ETL/spark/transform.py`:
 - Seed geo-tagging rules for Kathmandu, Pokhara, and Janakpur.
 - Duplicate marking using exact SHA256 first, then SimHash distance.
 
+## OpenSearch Step 6
+
+The OpenSearch integration reads the existing transformed JSONL; it
+does not create another transformation pipeline. `document_id` from
+`ETL/spark/transform.py` is used as the OpenSearch `_id`, making repeated
+ingestion idempotent. The index mapping is defined in
+`ETL/OpenSearch/opensearch/create_index.py` and covers the actual transformed
+fields, including text, keyword, numeric, boolean, and object fields.
+
+Start the OpenSearch service and index the output with the Windows commands in
+`ETL/OpenSearch/OpenSearch.md`.
+
 ## File Intake Checks
 
 Implemented in `ETL/spark/security_scanner.py`:
@@ -112,7 +126,7 @@ docker compose exec -T airflow-scheduler airflow dags list-runs -d etl_ingestion
 - Replace the local file store with MinIO once available.
 - Add real ClamAV malware scanning.
 - Add the final PostgreSQL write path.
-- Add OpenSearch indexing and embeddings.
+- Add embeddings only if the existing transformation produces them.
 - Replace seed geo rules with an official Nepal administrative gazetteer.
 - Move from development orchestration to production Spark/Kafka streaming once
   the scraper contract and storage schemas are finalized.
