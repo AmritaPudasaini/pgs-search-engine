@@ -8,7 +8,7 @@ and Kafka signals to simulate the scraper handoff.
 ## Current Workflow
 
 ```text
-manual Kafka signal -> local file store -> transform -> JSONL output
+manual Kafka signal -> local file store -> transform -> duplicate check -> LaBSE embedding -> JSONL output
 ```
 
 The implementation follows the text architecture direction: transformation
@@ -38,8 +38,10 @@ docker compose run --rm ingestion-signal-publisher
 ```
 
 Then trigger the `etl_ingestion_pipeline` DAG in Airflow. The DAG reads
-`airflow/data/local_dfs_store/sample.html`, transforms it, marks duplicate
-status against prior local output, and appends the transformed document to:
+`airflow/data/local_dfs_store/sample.html`, transforms it, checks for duplicates,
+and generates a LaBSE embedding only for a unique document. A duplicate reuses
+the canonical document's embedding when it is available. The result is appended
+to:
 
 ```text
 ETL/airflow/data/processed/transformed_documents.jsonl
@@ -51,6 +53,10 @@ To index those transformed records after the DAG succeeds:
 docker compose up -d opensearch
 docker compose run --rm opensearch-indexer
 ```
+
+The vector is stored in each JSONL record's `embedding` field and in the
+`embedding` `knn_vector` field in OpenSearch. LaBSE is downloaded the first time
+the Airflow task needs it, so that first run needs access to the model source.
 
 ## What Is Implemented
 
@@ -68,7 +74,9 @@ docker compose run --rm opensearch-indexer
   - SHA256 exact content fingerprinting.
   - SimHash fuzzy fingerprinting.
   - Seed geo-tagging rules for Kathmandu, Pokhara, and Janakpur.
-  - Exact and fuzzy duplicate marking.
+- Exact and fuzzy duplicate marking.
+- Normalized LaBSE embeddings for unique documents, with long text split into
+  model-sized chunks before encoding.
 - Local unit tests for the Kafka receipt consumer and Spark transform logic.
 - OpenSearch indexing from the existing transformed JSONL output with stable
   document IDs and explicit text/keyword mappings. See
@@ -95,7 +103,6 @@ Spark Docker image still runs it with PySpark installed.
 - Add ClamAV malware scanning. The current rule-based file scanner is an intake
   guard, not antivirus.
 - Add the final PostgreSQL schema and write path.
-- Add embeddings only if a future transform step produces them.
 - Replace the seed geo rules with an official Nepal administrative
   gazetteer.
 - Add production-grade Spark streaming from Kafka once the scraper contract is
