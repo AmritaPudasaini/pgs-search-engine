@@ -75,6 +75,7 @@ class TransformTests(unittest.TestCase):
                     "target_domain": "pokharamun.gov.np",
                 },
                 root,
+                with_embedding=False,
             )
             self.assertEqual(result["geo_location"]["district"], "Kaski")
             self.assertIn("Local notice", result["searchable_text"])
