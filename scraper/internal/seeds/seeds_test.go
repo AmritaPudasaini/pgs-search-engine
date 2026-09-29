@@ -80,6 +80,17 @@ func TestParseFileInvalidPriority(t *testing.T) {
 	}
 }
 
+func TestParseFileInvalidCategoryPriority(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "seeds.txt")
+	if err := os.WriteFile(path, []byte("[tech not-a-number]\nhttps://a.example\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseFile(path); err == nil {
+		t.Fatal("expected error for invalid category priority")
+	}
+}
+
 func TestParseFileUncategorized(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "seeds.txt")
