@@ -299,6 +299,55 @@ func TestS3Writer_CloseIsANoop(t *testing.T) {
 	}
 }
 
+// TestS3Writer_SameContentDifferentURLsDoNotCollapse proves two Documents
+// with identical Text (and therefore identical SimHash/ContentHash -- the
+// near-duplicate/exact-duplicate signals internal/simhash and the
+// content-hash dedupe use) but different NormalizedURL each get their own
+// S3 key and are both written: the key is derived from the URL, not from
+// the content, so a near-duplicate or exact-duplicate *content* collision
+// (a real, expected case -- e.g. a syndicated article on two different
+// sites) never collapses two genuinely different pages onto one S3 object.
+// That collapsing-by-content-hash behavior is specific to Postgres's
+// (normalized_url, content_hash) unique constraint, which S3Writer
+// deliberately doesn't replicate.
+func TestS3Writer_SameContentDifferentURLsDoNotCollapse(t *testing.T) {
+	fake := &fakeS3PutObjectAPI{}
+	w := &S3Writer{client: fake, bucket: "docs-bucket", putTimeout: time.Second}
+
+	const sharedText = "identical syndicated article body, word for word"
+	const sharedContentHash = "abc123"
+	const sharedSimHash = uint64(0xdeadbeef)
+
+	docA := &model.Document{
+		URL: "https://site-a.example/article", NormalizedURL: "https://site-a.example/article",
+		Text: sharedText, ContentHash: sharedContentHash, SimHash: sharedSimHash,
+	}
+	docB := &model.Document{
+		URL: "https://site-b.example/article", NormalizedURL: "https://site-b.example/article",
+		Text: sharedText, ContentHash: sharedContentHash, SimHash: sharedSimHash,
+	}
+
+	if err := w.Write(docA); err != nil {
+		t.Fatalf("Write docA: %v", err)
+	}
+	if err := w.Write(docB); err != nil {
+		t.Fatalf("Write docB: %v", err)
+	}
+
+	keys := fake.keys()
+	if len(keys) != 4 {
+		t.Fatalf("PutObject called %d times, want 4 (2 keys x 2 documents)", len(keys))
+	}
+	runKeyA, latestKeyA, runKeyB, latestKeyB := keys[0], keys[1], keys[2], keys[3]
+
+	if runKeyA == runKeyB {
+		t.Errorf("run-scoped keys collided despite different URLs: both %q", runKeyA)
+	}
+	if latestKeyA == latestKeyB {
+		t.Errorf("latest keys collided despite different URLs: both %q", latestKeyA)
+	}
+}
+
 func TestS3ObjectKey_DifferentURLsDifferentKeys(t *testing.T) {
 	a := S3ObjectKey(1, "https://example.com/a")
 	b := S3ObjectKey(1, "https://example.com/b")
