@@ -3,21 +3,33 @@
 This documents an actual test run (not a hypothetical) proving the worker
 can crash mid-crawl without losing or duplicating work, thanks to Temporal.
 
+Re-verified 2026-09-29 against the current Temporal-based crawler (Person 2
+checklist item 7 of `docs/TASK-SPLIT-search-engine-scraper.md`) using
+`temporal server start-dev`, a locally built worker/scraper, and a real
+crawl of `https://go.dev`. The crash-recovery mechanism below is unchanged
+from the original run; the command line needed one correction (see
+"Drift found on re-verification").
+
 ## Setup
 
 ```bash
 temporal server start-dev &
 ./bin/worker --output=data/output/documents.ndjson &
-./bin/scraper --seeds=https://go.dev --max-depth=2 --max-pages=60 --concurrency=6 --wait=false
+./bin/scraper --seeds=https://go.dev --max-depth=2 --max-pages=60 --concurrency=6 --wait=false --country-filter=""
 ```
+
+`--country-filter=""` is required now and wasn't when this doc was
+originally written -- see "Drift found on re-verification" below.
 
 ## Steps and results
 
 1. Crawl started against `https://go.dev`, depth 2, budget 60 pages.
-2. After ~2s (11 documents written), the worker process was killed with
-   `kill -9` — a hard crash, not a graceful shutdown (SIGTERM is handled
-   gracefully by `worker.InterruptCh()`; SIGKILL cannot be caught, which is
-   the point of the test).
+2. After ~2s (26 documents written on re-verification; 11 in the original
+   run -- this varies with network conditions, not a meaningful
+   discrepancy), the worker process was killed with `kill -9` — a hard
+   crash, not a graceful shutdown (SIGTERM is handled gracefully by
+   `worker.InterruptCh()`; SIGKILL cannot be caught, which is the point of
+   the test).
 3. `temporal workflow describe` showed the workflow still alive with
    `Pending Activities: 6` — Temporal knew work was outstanding but had no
    worker to run it. This is expected: without `activity.RecordHeartbeat`,
@@ -31,9 +43,29 @@ temporal server start-dev &
    reconstructed by Temporal replaying the workflow's event history — the
    crawl did not restart from the seed URL, it resumed exactly where it had
    left off, continuing through several Continue-As-New segments.
-7. Crawl reached `Status: COMPLETED`. Final result:
-   `{"Failed":3,"Fetched":60,"Skipped":0,"Succeeded":57}`.
-8. Output file: **57 lines, 57 unique URLs, 0 duplicates.**
+7. Crawl reached `Status: COMPLETED`. Final result (original run):
+   `{"Failed":3,"Fetched":60,"Skipped":0,"Succeeded":57}`; re-verification
+   run: `{"Failed":3,"Fetched":60,"Skipped":5,"Succeeded":52}` — same
+   Fetched budget, same Failed count, small Succeeded/Skipped variance from
+   go.dev's live content having changed since the original run.
+8. Output file, re-verification run: **52 lines, 52 unique URLs, 0
+   duplicates** (the pre-crash 26 documents were confirmed present
+   immediately after the `kill -9`, before the worker was ever restarted).
+
+## Drift found on re-verification
+
+`./cmd/scraper`'s `--country-filter` flag now defaults to `"NP"` (per its
+`-help` text). Running this doc's original command line verbatim (no
+`--country-filter` flag) against `https://go.dev` -- a site with no Nepal
+geo signals -- filters out every single fetched page as
+`CountryFiltered`, producing **zero** output documents:
+`{"CountryFiltered":59,"DomainCapped":0,"Failed":1,"Fetched":60,"Skipped":0,"Succeeded":0}`.
+This doesn't affect the crash-recovery mechanism itself (Temporal's replay
+and activity rescheduling are unaffected by CountryFilter, which only
+gates whether a successfully parsed page gets written), but it means the
+exact command line originally documented here no longer reproduces this
+doc's claimed 57-document output on an unrelated-country site. Updated the
+command above to pass `--country-filter=""` explicitly.
 
 ## What this proves
 
