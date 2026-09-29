@@ -37,7 +37,7 @@ func NewServer(queries db.Querier) *Server {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /healthz", handleHealthz)
+	mux.HandleFunc("GET /healthz", s.handleHealthz)
 
 	mux.HandleFunc("GET /api/v1/documents", s.handleListDocuments)
 	mux.HandleFunc("GET /api/v1/documents/count", s.handleCountDocuments)
@@ -54,7 +54,19 @@ func (s *Server) Routes() http.Handler {
 	return mux
 }
 
-func handleHealthz(w http.ResponseWriter, r *http.Request) {
+// handleHealthz previously reported "ok" unconditionally -- process-is-up
+// liveness, not Postgres reachability. Now exercises CountDocuments (an
+// existing, already-cheap Querier method) as a reachability check, mirroring
+// S3Server.handleHealthz's HeadBucket check; NewServer's signature (just a
+// db.Querier, not the underlying pgxpool.Pool cmd/api/main.go holds) has no
+// literal Ping available, so this is the least invasive way to get a real
+// check without changing that constructor and breaking cmd/api/main.go's
+// call site. Person 5 checklist item 9.
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.queries.CountDocuments(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unhealthy", "error": "database unreachable"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
