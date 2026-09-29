@@ -330,10 +330,29 @@ func (s *S3Server) handleListCrawlRuns(w http.ResponseWriter, r *http.Request) {
 	runs := make([]crawlRunResponse, 0, len(runIDs))
 	for _, id := range runIDs {
 		manifest, err := s.getManifest(r.Context(), id)
-		if err != nil {
-			continue // a run whose manifest 404s or fails to fetch is skipped, not a whole-request failure
+		switch {
+		case err == nil:
+			runs = append(runs, toCrawlRunResponse(manifest))
+		case isS3NotFound(err):
+			// The run's prefix showed up in the ListObjectsV2 listing (it
+			// has at least one Document object) but its manifest is gone
+			// -- e.g. a StartCrawlRun that never completed before the
+			// worker crashed, or a lifecycle policy expired the manifest
+			// independently of its documents (see docs/SCHEMA.md's
+			// lifecycle recommendation, which only pins down latest/'s
+			// survival, not this case). Legitimately absent, not a
+			// failure: skip it.
+		default:
+			// Anything else (throttling, a transient network error, ...)
+			// is a real failure, not "this run has no manifest" -- letting
+			// it through as a silent skip would make a systemic S3 outage
+			// indistinguishable from "there are just no runs yet", which
+			// is exactly the kind of misleading "completed" status this
+			// task-split has already caught once (see crawl_workflow.go's
+			// Person 2 fix). Fail the whole request instead.
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get crawl run %d: %v", id, err))
+			return
 		}
-		runs = append(runs, toCrawlRunResponse(manifest))
 	}
 
 	sort.Slice(runs, func(i, j int) bool { return runs[i].StartedAt.After(runs[j].StartedAt) })
