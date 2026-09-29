@@ -232,6 +232,16 @@ Output is newline-delimited JSON, one `model.Document` per line:
 
 ### `cmd/scraper` flags (start a crawl)
 
+Unlike `cmd/worker` (below), **not every flag here supports an
+environment-variable override** -- only `--temporal-address`,
+`--namespace`, `--seeds-file`, and `--country-filter` are registered via
+`internal/envflag` (same upper-case/dashes-to-underscores derivation as
+`cmd/worker`'s); every other flag below is a plain `flag.*` with no env
+var equivalent. This is an inconsistency in `cmd/scraper/main.go` itself,
+not just undocumented -- found while reviewing `internal/envflag`'s
+derivation against this table (`docs/TASK-SPLIT-search-engine-scraper.md`
+Person 5 checklist item 8).
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--seeds` | | Comma-separated starting URLs (use this OR `--seeds-file`) |
