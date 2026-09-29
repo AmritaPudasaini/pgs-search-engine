@@ -15,6 +15,7 @@ WORKDIR /app
 
 # Install Spark and local parser dependencies
 RUN pip install pyspark==3.5.3 pypdf==5.1.0
+RUN pip install --no-cache-dir sentence-transformers==3.3.1
 
 # Copy your ETL code into the container
 COPY . .

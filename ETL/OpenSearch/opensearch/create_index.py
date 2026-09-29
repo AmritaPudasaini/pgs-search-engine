@@ -11,6 +11,7 @@ INDEX_BODY = {
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0,
+        "index.knn": True,
         "analysis": {
             "analyzer": {
                 "document_text": {
@@ -52,6 +53,17 @@ INDEX_BODY = {
             "duplicate": {"type": "boolean"},
             "duplicate_type": {"type": "keyword"},
             "duplicate_of": {"type": "keyword"},
+            "embedding": {
+                "type": "knn_vector",
+                "dimension": 768,
+                "method": {
+                    "name": "hnsw",
+                    "space_type": "cosinesimil",
+                    "engine": "nmslib",
+                },
+            },
+            "embedding_model": {"type": "keyword"},
+            "embedding_dim": {"type": "integer"},
             "security_scan": {"type": "object", "dynamic": True},
         },
     },

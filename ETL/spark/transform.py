@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -141,6 +142,85 @@ def resolve_geo(text: str, domain: str = "") -> dict[str, str] | None:
             }
     return None
 
+
+EMBEDDING_MODEL_NAME = os.environ.get(
+    "EMBEDDING_MODEL_NAME", "sentence-transformers/LaBSE"
+)
+_embedding_model = None
+
+
+def _get_embedding_model():
+    """Load and cache the configured sentence-transformers model."""
+    global _embedding_model
+    if _embedding_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError(
+                "Embeddings require sentence-transformers; install ETL dependencies"
+            ) from exc
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    return _embedding_model
+
+
+def generate_embeddings(
+    texts: list[str], batch_size: int = 32
+) -> list[list[float] | None]:
+    """Generate normalized LaBSE vectors, chunking long inputs to avoid truncation."""
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1")
+
+    results: list[list[float] | None] = [None for _ in texts]
+    if not any(text and text.strip() for text in texts):
+        return results
+
+    model = _get_embedding_model()
+    tokenizer = model.tokenizer
+    chunk_size = model.max_seq_length - tokenizer.num_special_tokens_to_add(pair=False)
+    if chunk_size < 1:
+        raise ValueError("Model max_seq_length must allow at least one text token")
+
+    chunks: list[str] = []
+    owners: list[int] = []
+    for index, text in enumerate(texts):
+        if not text or not text.strip():
+            continue
+        token_ids = tokenizer(text, add_special_tokens=False, truncation=False)["input_ids"]
+        for start in range(0, len(token_ids), chunk_size):
+            chunk = tokenizer.decode(
+                token_ids[start : start + chunk_size], skip_special_tokens=True
+            )
+            if chunk.strip():
+                chunks.append(chunk)
+                owners.append(index)
+
+    if not chunks:
+        return results
+
+    vectors = model.encode(
+        chunks,
+        batch_size=batch_size,
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+    )
+    grouped: list[list] = [[] for _ in texts]
+    for index, vector in zip(owners, vectors):
+        grouped[index].append(vector)
+
+    for index, document_vectors in enumerate(grouped):
+        if document_vectors:
+            mean_vector = sum(document_vectors) / len(document_vectors)
+            norm = float((mean_vector**2).sum() ** 0.5)
+            if norm:
+                results[index] = [float(value) for value in mean_vector / norm]
+    return results
+
+
+def generate_embedding(text: str) -> list[float] | None:
+    """Generate one normalized LaBSE vector, or None for blank text."""
+    return generate_embeddings([text])[0]
+
 def transform_document( # * means, after it, all should be named
     *,
     source_url: str,
@@ -148,11 +228,13 @@ def transform_document( # * means, after it, all should be named
     title: str = "",
     target_domain: str = "",
     object_key: str = "",
+    with_embedding: bool = False,
 ) -> dict:
     normalized = normalize_text(text)
     exact_hash = sha256_text(normalized)
     simhash = simhash_text(normalized)
     tokens = tokenize(normalized)
+    embedding = generate_embedding(normalized) if with_embedding else None
 
     return {
         "document_id": f"doc_{exact_hash[:12]}",
@@ -170,9 +252,29 @@ def transform_document( # * means, after it, all should be named
         "duplicate": False,
         "duplicate_type": None,
         "duplicate_of": None,
+        "embedding": embedding,
+        "embedding_model": EMBEDDING_MODEL_NAME if embedding else None,
+        "embedding_dim": len(embedding) if embedding else 0,
     }
 
-def transform_file(signal: dict, dfs_root: str | Path) -> dict:
+
+def add_embeddings(
+    documents: list[dict], batch_size: int = 32
+) -> list[dict]:
+    """Add LaBSE vectors to transformed documents in batches."""
+    vectors = generate_embeddings(
+        [document["searchable_text"] for document in documents], batch_size
+    )
+    for document, vector in zip(documents, vectors):
+        document["embedding"] = vector
+        document["embedding_model"] = EMBEDDING_MODEL_NAME if vector else None
+        document["embedding_dim"] = len(vector) if vector else 0
+    return documents
+
+
+def transform_file(
+    signal: dict, dfs_root: str | Path, *, with_embedding: bool = True
+) -> dict:
     object_key = signal["object_key"]
     file_path = Path(dfs_root) / object_key
     from security_scanner import inspect_file
@@ -188,6 +290,7 @@ def transform_file(signal: dict, dfs_root: str | Path) -> dict:
         title=signal.get("title", ""),
         target_domain=signal.get("target_domain", ""),
         object_key=object_key,
+        with_embedding=with_embedding,
     )
     transformed["security_scan"] = security_scan
     return transformed
@@ -238,6 +341,8 @@ def analyze_text(spark, text: str):
         StringType,
         StructField,
         StructType,
+        ArrayType,
+        FloatType,
     )
 
     transformed = transform_document(source_url="", text=text)
@@ -258,6 +363,9 @@ def analyze_text(spark, text: str):
             StructField("duplicate", BooleanType(), nullable=False),
             StructField("duplicate_type", StringType(), nullable=True),
             StructField("duplicate_of", StringType(), nullable=True),
+            StructField("embedding", ArrayType(FloatType()), nullable=True),
+            StructField("embedding_model", StringType(), nullable=True),
+            StructField("embedding_dim", IntegerType(), nullable=False),
         ]
     )
     return spark.createDataFrame([transformed], schema=schema)
