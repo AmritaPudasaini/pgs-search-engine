@@ -10,6 +10,17 @@
 // this is real-time, scrape-based, and survives across runs/workers for a
 // dashboard or alert rule, which a database row polled per-run can't give
 // you (e.g. "429 rate spiked in the last 5 minutes").
+//
+// cmd/worker/main.go serves these on promhttp.Handler() in a background
+// goroutine, logging (not exiting) on a bind failure -- verified live
+// (2026-09-29, Person 5 checklist item 6): two worker processes started
+// against the same --metrics-address, real temporal server, real ports.
+// The second logged "metrics server stopped: listen tcp :19199: bind:
+// address already in use" and continued straight into connecting to
+// Temporal and running normally; the first process's /metrics endpoint
+// kept serving scrapes throughout, unaffected. No code change needed --
+// the existing goroutine + log.Printf (not log.Fatalf) already does this
+// correctly.
 package metrics
 
 import (
