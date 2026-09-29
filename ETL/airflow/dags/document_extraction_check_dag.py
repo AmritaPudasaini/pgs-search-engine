@@ -1,10 +1,7 @@
-"""
-Dummy file-parsing DAG.
+"""Document extraction validation DAG.
 
-Simulates the real ETL 'DOM Parsing and Text Extraction' step from the
-architecture (Spark will do this for real later) - reads a dummy HTML
-and TXT file, strips markup, and reports word counts. Proves Airflow
-can run real Python logic on real files, using CeleryExecutor.
+Reads local HTML/TXT fixtures, strips markup, and reports word counts so the
+Airflow worker path can be checked independently of Kafka.
 """
 
 from datetime import datetime
@@ -40,7 +37,6 @@ def parse_html_file():
     print(clean_text)
     print(f"Word count: {len(clean_text.split())}")
 
-
 def parse_txt_file():
     with open("/opt/airflow/data/sample.txt", "r", encoding="utf-8") as f:
         raw_text = f.read()
@@ -49,14 +45,13 @@ def parse_txt_file():
     print(raw_text)
     print(f"Word count: {len(raw_text.split())}")
 
-
 with DAG(
-    dag_id="dummy_file_parser_dag",
-    description="Phase 1 dummy DAG - parses HTML/TXT files, tests CeleryExecutor",
+    dag_id="document_extraction_check",
+    description="Validates local HTML/TXT extraction through Airflow workers",
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["phase1", "dummy", "etl-setup", "celery"],
+    tags=["etl", "validation", "extraction", "celery"],
 ) as dag:
 
     extract_html = PythonOperator(

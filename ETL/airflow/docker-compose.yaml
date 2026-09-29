@@ -9,7 +9,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__WEBSERVER__SECRET_KEY: "dummy_dev_secret_change_me"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "etl_dev_secret_change_me"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs

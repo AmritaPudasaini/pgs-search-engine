@@ -32,7 +32,6 @@ class ScanResult(TypedDict):
     verdict: str
     reasons: list[str]
 
-
 # Extensions we treat as risky to auto-run/auto-open.
 SUSPICIOUS_EXTENSIONS = {
     "exe", "bat", "cmd", "com", "scr",
@@ -123,14 +122,8 @@ def scan_file_spark(spark: Any, filename: str, content: bytes) -> Any:
     matches the pattern used by analyze_text() in transform.py so both
     modules look and behave the same way."""
     result = scan_file(filename, content)
-    spark_result: dict[str, Any] = {
-        "filename": result["filename"],
-        "extension": result["extension"],
-        "size_bytes": result["size_bytes"],
-        "sha256": result["sha256"],
-        "verdict": result["verdict"],
-        "reasons": ", ".join(result["reasons"]),  # flatten list for DataFrame
-    }
+    spark_result: dict[str, Any] = dict(result)
+    spark_result["reasons"] = ", ".join(result["reasons"])  # flatten list for DataFrame
     df = spark.createDataFrame([spark_result])
     # put columns in a sensible reading order (Spark would otherwise sort them A-Z)
     return df.select("filename", "extension", "size_bytes", "sha256", "verdict", "reasons")
