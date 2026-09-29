@@ -67,12 +67,29 @@ def etl_ingestion_pipeline():
         if SPARK_LIB not in sys.path: # to make sure Python can find custom modules/files inside SPARK_LIB
             sys.path.insert(0, SPARK_LIB)
 
-        from transform import mark_duplicates, transform_file
+        from transform import add_embeddings, mark_duplicates, transform_file
 
-        transformed = transform_file(signal, DFS_ROOT)
+        transformed = transform_file(signal, DFS_ROOT, with_embedding=False)
         existing = _load_existing_records(PROCESSED_OUTPUT)
         marked = mark_duplicates([*existing, transformed])
-        return marked[-1]
+        record = marked[-1]
+
+        if record["duplicate"]:
+            canonical = next(
+                (
+                    document
+                    for document in existing
+                    if document.get("document_id") == record["duplicate_of"]
+                ),
+                None,
+            )
+            if canonical and canonical.get("embedding"):
+                for field in ("embedding", "embedding_model", "embedding_dim"):
+                    record[field] = canonical.get(field)
+        else:
+            add_embeddings([record])
+
+        return record
 
     @task
     def persist_transformed_document(record: dict) -> dict:
