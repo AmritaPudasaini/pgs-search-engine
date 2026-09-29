@@ -21,6 +21,17 @@ project demo. Real malware scanning (ClamAV) is separate, later work.
 # Returns one of SAFE, SUSPICIOUS, or UNKNOWN, with reasons.
 
 import hashlib
+from typing import Any, TypedDict
+
+
+class ScanResult(TypedDict):
+    filename: str
+    extension: str
+    size_bytes: int
+    sha256: str
+    verdict: str
+    reasons: list[str]
+
 
 # Extensions we treat as risky to auto-run/auto-open.
 SUSPICIOUS_EXTENSIONS = {
@@ -63,9 +74,9 @@ def has_double_extension(filename: str) -> bool:
     return len(parts) > 2
 
 
-def scan_file(filename: str, content: bytes) -> dict:
-    suspicious_reasons = []
-    unknown_reasons = []
+def scan_file(filename: str, content: bytes) -> ScanResult:
+    suspicious_reasons: list[str] = []
+    unknown_reasons: list[str] = []
 
     ext = get_extension(filename)
     if ext in SUSPICIOUS_EXTENSIONS:
@@ -107,13 +118,20 @@ def scan_file(filename: str, content: bytes) -> dict:
     }
 
 
-def scan_file_spark(spark, filename: str, content: bytes):
+def scan_file_spark(spark: Any, filename: str, content: bytes) -> Any:
     """Same as scan_file(), but wraps the result in a Spark DataFrame -
     matches the pattern used by analyze_text() in transform.py so both
     modules look and behave the same way."""
     result = scan_file(filename, content)
-    result["reasons"] = ", ".join(result["reasons"])  # flatten list for DataFrame
-    df = spark.createDataFrame([result])
+    spark_result: dict[str, Any] = {
+        "filename": result["filename"],
+        "extension": result["extension"],
+        "size_bytes": result["size_bytes"],
+        "sha256": result["sha256"],
+        "verdict": result["verdict"],
+        "reasons": ", ".join(result["reasons"]),  # flatten list for DataFrame
+    }
+    df = spark.createDataFrame([spark_result])
     # put columns in a sensible reading order (Spark would otherwise sort them A-Z)
     return df.select("filename", "extension", "size_bytes", "sha256", "verdict", "reasons")
 
