@@ -6,10 +6,11 @@ introduced in `internal/storage/s3_writer.go`, `s3_freshness.go`, and
 `docs/TASK-SPLIT-search-engine-scraper.md`).
 
 **Status:** implemented and unit-tested (fakes, not LocalStack -- see
-"Known gaps" below). Not yet wired into `cmd/worker`'s `--storage` flag or
-`internal/api` -- see the coordination note in the task-split doc's Person
-4 section for why (`internal/db`/Postgres can't be deleted yet without
-breaking `internal/api`, which is Person 5's rework).
+"Known gaps" below). Not yet wired into `cmd/worker`'s `--storage` flag --
+see the coordination note in the task-split doc's Person 4 section for
+why. `internal/api/s3_server.go` (Person 5) now reads from this schema
+directly; see "Category filtering" below for the tradeoff decision that
+came out of that work.
 
 ## Bucket layout
 
@@ -46,13 +47,8 @@ bucket across environments: `staging/42/<hash>.json` instead of
   `ListObjectsV2` (what `GET /api/v1/documents?crawl_run_id=N` will need to
   become, per Person 5's item 3) doesn't require reading every object's
   body just to filter by run.
-- **`category` filtering has no S3-side index.** `GET
-  /api/v1/documents?category=X` under Postgres was an indexed `WHERE`
-  clause; under S3 it needs either a full prefix scan (read every object
-  under the relevant run(s) and filter client-side) or a second,
-  category-keyed index object analogous to the `latest/` one below. Not
-  built here -- flagged for Person 5's item 3, which already calls this
-  tradeoff out.
+- **`category` filtering has no S3-side index** -- see "Category filtering
+  under S3" below for the decision Person 5 made about this.
 
 ### Latest-index objects: `latest/<sha256(normalized_url)>.json`
 
@@ -108,10 +104,42 @@ bucket across environments: `staging/42/<hash>.json` instead of
 - Listing every run (`GET /api/v1/crawl-runs`) becomes a
   `ListObjectsV2` scoped to `*/​_run.json`-shaped keys at the top level of
   the bucket, i.e. one level of prefixes -- S3 doesn't support that kind of
-  wildcard directly; Person 5's item 2 will need `ListObjectsV2` with
-  `Delimiter: "/"` against the bucket root to enumerate `crawl_run_id`
-  "directories," then a `GetObject` per manifest, or a secondary
-  `_runs_index` object this package doesn't maintain yet.
+  wildcard directly. **Implemented** in `internal/api/s3_server.go`'s
+  `listRunIDs`: `ListObjectsV2` with `Delimiter: "/"` against the bucket
+  root to enumerate `crawl_run_id` "directories" (skipping `latest/`),
+  then a `GetObject` per manifest -- no secondary `_runs_index` object,
+  so this is one extra round-trip per run beyond the listing call itself.
+
+## Category filtering under S3 (Person 5 checklist item 3)
+
+`GET /api/v1/documents?category=X` under Postgres was an indexed `WHERE`
+clause covering every document ever crawled, in any run. Two options
+existed for S3:
+
+1. **A category-keyed secondary index**, analogous to the `latest/`
+   freshness index (e.g. `by-category/<category>/<hash>.json`) -- O(1)
+   lookups, but a third object per `S3Writer.Write` call, and the API
+   would still need to bound *that* listing somehow (a popular category
+   across years of crawls is itself unbounded).
+2. **A full prefix scan, client-side filter**, bounded to one
+   `crawl_run_id` at a time -- what `internal/api/s3_server.go` actually
+   does: `crawl_run_id` is a **required** query parameter under
+   `S3Server` (optional under the Postgres-backed `Server` -- documented
+   as a deliberate per-backend difference in `openapi.yaml`'s parameter
+   description), `listRunDocuments` lists and `GetObject`s every Document
+   under that run's prefix, and `category`/`country` are filtered
+   in-memory before `limit`/`offset` pagination is applied.
+
+**Chose option 2.** Reasoning: option 1 still doesn't solve unbounded
+scope (a category spanning many runs), just moves where the scan happens;
+option 2's `crawl_run_id` requirement gives a real, enforceable upper
+bound (one run's worth of objects, which `--max-pages` already caps at
+crawl time) with no extra write-side cost. The real downside: a caller
+who genuinely wants "every `tech` document ever crawled, across all runs"
+now has to issue one request per `crawl_run_id` (from `GET
+/api/v1/crawl-runs`) and merge results client-side -- a real capability
+loss vs. Postgres, not just a performance tradeoff, and worth flagging to
+whoever consumes this API if that use case actually comes up.
 
 ## Known drift vs. `openapi.yaml`
 
@@ -201,4 +229,6 @@ flagged, not verified, here.
 - **`ListObjectsV2` at scale (1M+ objects under one `crawl_run_id`) is
   unmeasured**, not just untested -- see "Load-test plan" above for the
   script and why it wasn't run here.
-- **`category` filtering has no index** -- see "Document objects" above.
+- **`category` filtering has no index** -- resolved via a documented
+  behavior change (required `crawl_run_id`) rather than left open; see
+  "Category filtering under S3" above.
