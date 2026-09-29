@@ -12,7 +12,6 @@ from .create_index import INDEX_NAME, ensure_index
 
 DEFAULT_JSONL = Path("/data/transformed_documents.jsonl")
 
-
 def make_client() -> OpenSearch:
     url = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
     username = os.getenv("OPENSEARCH_USERNAME")
