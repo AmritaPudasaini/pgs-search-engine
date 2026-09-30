@@ -2,9 +2,15 @@ openapi: 3.0.3
 info:
   title: search-engine-scraper documents API
   description: >
-    Read-only API over the `documents` table populated by the Temporal
-    worker (see internal/activities and internal/storage). Use it to
-    preview crawled pages without a direct Postgres connection.
+    Read-only API over crawled documents written by the Temporal worker
+    (see internal/activities and internal/storage). Use it to preview
+    crawled pages without a direct storage connection. Two server
+    implementations currently exist behind this same spec:
+    internal/api/server.go (Postgres) and internal/api/s3_server.go (S3) --
+    see the latter's doc comment and docs/SCHEMA.md for where their
+    behavior differs (crawl_run_id's requiredness on GET
+    /api/v1/documents, and /api/v1/documents/count and
+    /categories returning 501 under S3).
   version: "1.0.0"
 servers:
   - url: /
@@ -149,7 +155,12 @@ paths:
             Narrow the category down to just the documents one specific run
             produced. Check that run's status first via
             GET /api/v1/crawl-runs/{id} -- a "failed" or still-"running" run
-            may mean an incomplete batch.
+            may mean an incomplete batch. **Required under the S3-backed
+            server** (internal/api/s3_server.go): there is no category-only
+            index over S3 storage, so a request without it would mean an
+            unbounded whole-bucket scan; still optional under the
+            Postgres-backed server (server.go), which has an indexed query
+            for it. See docs/SCHEMA.md.
         - name: country
           in: query
           required: false
@@ -256,6 +267,13 @@ components:
         id:
           type: integer
           format: int64
+          description: >-
+            **Drift under the S3 backend**: S3Server's Document objects have
+            no `id` (nor `created_at`/`updated_at`, below) -- these were
+            Postgres row metadata (a SERIAL primary key, trigger-maintained
+            timestamps) with no equivalent in internal/model.Document. The
+            S3 object's own key *is* its identity; `fetched_at` (below) is
+            the closest equivalent to `created_at`. See docs/SCHEMA.md.
         url:
           type: string
         normalized_url:
@@ -286,6 +304,15 @@ components:
             search engine shows under a result's title.
         body_text:
           type: string
+          description: >-
+            **Drift under the S3 backend**: S3Server returns
+            internal/model.Document marshalled verbatim, whose JSON tag for
+            this field is `text`, not `body_text` -- the Postgres-backed
+            Server (which builds this response from sqlc-generated,
+            column-named structs) does return `body_text` as documented
+            here. See docs/SCHEMA.md's "Known drift vs. openapi.yaml" for
+            why this wasn't reconciled by renaming model.Document's tag
+            (would break NDJSON output and the Kafka/ETL stream).
         headings:
           type: array
           items:
@@ -335,6 +362,10 @@ components:
           description: >-
             Latitude resolved from the page (JSON-LD GeoCoordinates, Open
             Graph place tags, or geo.position/ICBM meta tags), if any.
+            **Drift under the S3 backend**: S3Server returns a nested
+            `"geo": {"lat":..,"lng":..}` object instead of these two flat
+            properties -- see body_text's description above and
+            docs/SCHEMA.md.
         geo_lng:
           type: number
           format: double
@@ -369,6 +400,10 @@ components:
           format: int64
         fetch_error:
           type: string
+          description: >-
+            **Drift under the S3 backend**: S3Server returns this field as
+            `error`, not `fetch_error` -- see body_text's description above
+            and docs/SCHEMA.md.
         fetched_at:
           type: string
           format: date-time
