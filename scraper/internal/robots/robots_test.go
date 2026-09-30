@@ -1,6 +1,9 @@
 package robots
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestParseLongestMatchWins(t *testing.T) {
 	body := `
@@ -79,5 +82,48 @@ Disallow: /private
 	rs := parse(body, "mybot")
 	if len(rs.sitemaps) != 0 {
 		t.Errorf("sitemaps = %v, want none", rs.sitemaps)
+	}
+}
+
+func TestParseCrawlDelayFractionalSeconds(t *testing.T) {
+	body := `
+User-agent: *
+Crawl-delay: 0.5
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 500*time.Millisecond {
+		t.Fatalf("crawlDelay = %v, want 500ms", rs.crawlDelay)
+	}
+}
+
+// TestParseCrawlDelayInvalidValueIsIgnored proves a Crawl-delay line that
+// doesn't parse as a number is dropped rather than left at some corrupted
+// value or fatally rejecting the whole robots.txt -- consistent with the
+// package's fetch-failure/parse-failure behavior elsewhere (see
+// Guard.rulesFor and DiscoverSitemapURLs), where a malformed
+// robots.txt degrades to "no extra rules" rather than blocking the crawl.
+func TestParseCrawlDelayInvalidValueIsIgnored(t *testing.T) {
+	body := `
+User-agent: *
+Crawl-delay: not-a-number
+Disallow: /private
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 0 {
+		t.Fatalf("crawlDelay = %v, want 0 (invalid value should be ignored)", rs.crawlDelay)
+	}
+	if len(rs.disallow) != 1 || rs.disallow[0] != "/private" {
+		t.Fatalf("an invalid Crawl-delay line shouldn't affect other directives in the same group: disallow = %v", rs.disallow)
+	}
+}
+
+func TestParseCrawlDelayAbsentDefaultsToZero(t *testing.T) {
+	body := `
+User-agent: *
+Disallow: /private
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 0 {
+		t.Fatalf("crawlDelay = %v, want 0 (no Crawl-delay directive present)", rs.crawlDelay)
 	}
 }

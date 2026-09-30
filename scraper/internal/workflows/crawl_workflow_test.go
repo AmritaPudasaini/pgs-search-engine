@@ -2,12 +2,16 @@ package workflows
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/workflow"
 
 	"search-engine-scraper/internal/activities"
 	"search-engine-scraper/internal/simhash"
@@ -523,6 +527,238 @@ func TestCrawlWorkflow_PriorityOrdersFrontier(t *testing.T) {
 			t.Errorf("ProcessPage order = %v, want %v", order, want)
 			break
 		}
+	}
+}
+
+// TestCrawlWorkflow_ContinueAsNew_CarriesStateForward proves the
+// Continue-As-New handoff's payload actually carries Seen, DomainCounts,
+// SimHashes, Stats and the remaining Frontier forward, not just enough to
+// avoid re-fetching: 60 same-host seeds with pagesPerRun=50 forces exactly
+// one Continue-As-New boundary mid-crawl. The Temporal test environment
+// doesn't auto-follow Continue-As-New, so this decodes the
+// *workflow.ContinueAsNewError's own Input -- the literal payload the next
+// segment would resume from -- rather than exercising a second segment.
+func TestCrawlWorkflow_ContinueAsNew_CarriesStateForward(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	const seedCount = 60
+	seeds := make([]Seed, seedCount)
+	for i := 0; i < seedCount; i++ {
+		seeds[i] = Seed{URL: fmt.Sprintf("https://same-host.example/%d", i)}
+	}
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			// Text intentionally left empty: shorter than
+			// minTextLenForNearDupCheck, so every page takes the
+			// "succeeded" path below (near-dup check skipped) and appends
+			// to simHashes, instead of colliding with each other as
+			// near-duplicates of the same empty fingerprint.
+			return activities.ProcessPageOutput{URL: in.URL, NormalizedURL: in.URL}, nil
+		},
+	)
+	env.OnActivity(act.WriteDocument, mock.Anything, mock.Anything).Return(nil)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(0), nil)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:       seeds,
+		MaxDepth:    0,
+		MaxPages:    seedCount,
+		Concurrency: 1, // deterministic: pagesThisRun hits pagesPerRun exactly at seed 50
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	// The test environment doesn't auto-follow Continue-As-New: it surfaces
+	// the *workflow.ContinueAsNewError as this (completed) run's terminal
+	// error instead of transparently starting a new run.
+	var canErr *workflow.ContinueAsNewError
+	if !errors.As(env.GetWorkflowError(), &canErr) {
+		t.Fatalf("workflow error = %v, want a ContinueAsNewError", env.GetWorkflowError())
+	}
+
+	var next CrawlWorkflowInput
+	if err := converter.GetDefaultDataConverter().FromPayloads(canErr.Input, &next); err != nil {
+		t.Fatalf("decode continuation input: %v", err)
+	}
+
+	if next.PagesProcessed != pagesPerRun {
+		t.Errorf("PagesProcessed = %d, want %d", next.PagesProcessed, pagesPerRun)
+	}
+	if len(next.Seen) != seedCount {
+		// All 60 seeds are marked seen up front at crawl start (that's
+		// their dedupe identity, independent of fetch order), not
+		// incrementally as each is processed -- so Seen carries every
+		// discovered URL, not just the pagesPerRun already fetched.
+		t.Errorf("len(Seen) = %d, want %d", len(next.Seen), seedCount)
+	}
+	if got := next.DomainCounts["same-host.example"]; got != pagesPerRun {
+		t.Errorf("DomainCounts[same-host.example] = %d, want %d -- a fresh segment needs this to keep enforcing MaxPagesPerDomain correctly", got, pagesPerRun)
+	}
+	if next.Stats.Succeeded != pagesPerRun {
+		t.Errorf("carried Stats.Succeeded = %d, want %d", next.Stats.Succeeded, pagesPerRun)
+	}
+	if len(next.SimHashes) != pagesPerRun {
+		t.Errorf("len(SimHashes) = %d, want %d", len(next.SimHashes), pagesPerRun)
+	}
+	if len(next.Frontier) != seedCount-pagesPerRun {
+		t.Errorf("len(Frontier) = %d, want %d (remaining unfetched seeds)", len(next.Frontier), seedCount-pagesPerRun)
+	}
+}
+
+// TestCrawlWorkflow_MaxPagesPerDomain proves the scheduler actually
+// enforces MaxPagesPerDomain, independent of MaxConcurrentPerHost (which
+// TestCrawlWorkflow_MaxConcurrentPerHost already covers): 10 same-host
+// seeds with MaxPagesPerDomain=4 should fetch exactly 4 of them and count
+// the other 6 as DomainCapped, even though MaxPages=10 leaves budget to
+// fetch them all.
+func TestCrawlWorkflow_MaxPagesPerDomain(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	const seedCount = 10
+	seeds := make([]Seed, seedCount)
+	for i := 0; i < seedCount; i++ {
+		seeds[i] = Seed{URL: fmt.Sprintf("https://same-host.example/%d", i)}
+	}
+
+	var mu sync.Mutex
+	fetchedCount := 0
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			mu.Lock()
+			fetchedCount++
+			mu.Unlock()
+			return activities.ProcessPageOutput{
+				URL: in.URL, NormalizedURL: in.URL, Skipped: true, SkipReason: "test",
+			}, nil
+		},
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(0), nil)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:             seeds,
+		MaxDepth:          0,
+		MaxPages:          seedCount,
+		Concurrency:       4,
+		MaxPagesPerDomain: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error: %v", err)
+	}
+
+	var result CrawlResult
+	if err := env.GetWorkflowResult(&result); err != nil {
+		t.Fatalf("GetWorkflowResult: %v", err)
+	}
+
+	if fetchedCount != 4 {
+		t.Errorf("ProcessPage was called %d times, want 4 (MaxPagesPerDomain)", fetchedCount)
+	}
+	if result.Stats.DomainCapped != 6 {
+		t.Errorf("Stats.DomainCapped = %d, want 6", result.Stats.DomainCapped)
+	}
+}
+
+// TestCrawlWorkflow_AllPagesFailed_FinishesRunAsFailed proves crawl_runs
+// can actually reach "failed" status: before this, CrawlWorkflow's only
+// non-nil terminal error was workflow.NewContinueAsNewError, which the
+// finishCrawlRun defer intercepts before reaching the status check (see
+// crawl_workflow.go's willContinueAsNew branch) -- so every crawl that
+// ever finished, no matter how badly it failed at the page level, was
+// recorded as "completed". A crawl whose every single fetch fails should
+// finish the run as "failed" instead.
+func TestCrawlWorkflow_AllPagesFailed_FinishesRunAsFailed(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		activities.ProcessPageOutput{FetchError: "connection refused"}, nil,
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(42), nil)
+
+	var finishedStatus, finishedError string
+	env.OnActivity(act.FinishCrawlRun, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.FinishCrawlRunInput) error {
+			finishedStatus = in.Status
+			finishedError = in.Error
+			return nil
+		},
+	)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:       []Seed{{URL: "https://example.com/a"}, {URL: "https://example.com/b"}},
+		MaxDepth:    0,
+		MaxPages:    10,
+		Concurrency: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err == nil {
+		t.Fatal("expected the workflow to return an error when every page failed, got nil")
+	}
+
+	if finishedStatus != "failed" {
+		t.Errorf("FinishCrawlRun status = %q, want %q", finishedStatus, "failed")
+	}
+	if finishedError == "" {
+		t.Error("FinishCrawlRun error message was empty, want a description of the failure")
+	}
+}
+
+// TestCrawlWorkflow_PartialFailure_StillFinishesAsCompleted is the control
+// case: a crawl where some (not all) pages fail is a normal, healthy
+// outcome and must still finish "completed" -- guards against a fix for
+// the above that's too aggressive (e.g. failing on Failed > 0 instead of
+// Failed == Fetched).
+func TestCrawlWorkflow_PartialFailure_StillFinishesAsCompleted(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			if in.URL == "https://example.com/bad" {
+				return activities.ProcessPageOutput{FetchError: "connection refused"}, nil
+			}
+			return activities.ProcessPageOutput{
+				URL: in.URL, NormalizedURL: in.URL, Skipped: true, SkipReason: "test",
+			}, nil
+		},
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(42), nil)
+
+	var finishedStatus string
+	env.OnActivity(act.FinishCrawlRun, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.FinishCrawlRunInput) error {
+			finishedStatus = in.Status
+			return nil
+		},
+	)
+
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds:       []Seed{{URL: "https://example.com/good"}, {URL: "https://example.com/bad"}},
+		MaxDepth:    0,
+		MaxPages:    10,
+		Concurrency: 4,
+	})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error: %v, want nil (partial failure is a healthy outcome)", err)
+	}
+	if finishedStatus != "completed" {
+		t.Errorf("FinishCrawlRun status = %q, want %q", finishedStatus, "completed")
 	}
 }
 
