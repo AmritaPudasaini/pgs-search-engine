@@ -7,11 +7,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
+	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/time/rate"
 )
 
@@ -20,17 +21,18 @@ const (
 	// (or a misbehaving server) can't blow up memory.
 	MaxBodyBytes = 5 << 20 // 5MB
 	userAgent    = "search-engine-scraper/0.1 (+https://github.com/example/search-engine-scraper)"
+
+	// dnsCacheTTL is how long a resolved host's IP addresses are reused
+	// before being looked up again. A crawl fetches many pages from the
+	// same host in a row (a domain's whole site, or many links back to the
+	// same seed), so caching avoids paying a DNS round-trip per page for a
+	// name that essentially never changes mid-crawl.
+	dnsCacheTTL = 5 * time.Minute
 )
 
 // Fetcher performs polite HTTP GETs.
 type Fetcher struct {
 	client *http.Client
-
-	domainRequestsPerSecond rate.Limit
-	domainBurst             int
-	defaultPolitenessDelay  time.Duration
-	domainsMu               sync.Mutex
-	domains                 map[string]*domainState
 	// bandwidth throttles total bytes/sec read across every Get() call on
 	// this Fetcher (shared, so it caps one worker process's aggregate
 	// download rate regardless of how many fetches run concurrently), nil
@@ -45,22 +47,6 @@ type Fetcher struct {
 	bandwidthChunk int
 }
 
-type domainState struct {
-	limiter *rate.Limiter
-	mu      sync.Mutex
-	next    time.Time
-	delay   time.Duration
-}
-
-// Options controls request safety and per-domain politeness.
-type Options struct {
-	Timeout                 time.Duration
-	MaxBandwidthBPS         int
-	DomainRequestsPerSecond float64
-	DomainBurst             int
-	PolitenessDelay         time.Duration
-}
-
 // redirectChainKey is the context key Get() uses to give its CheckRedirect
 // invocations somewhere to record each hop's target -- a pointer to a
 // slice, since context values are immutable but the pointee isn't. This is
@@ -72,38 +58,56 @@ type Options struct {
 // that Get() created for it, never another concurrent call's.
 type redirectChainKey struct{}
 
+// Option configures optional Fetcher behavior beyond New's required
+// timeout/bandwidth arguments.
+type Option func(*options)
+
+type options struct {
+	http3 bool
+}
+
+// WithHTTP3 makes the Fetcher attempt HTTP/3 (QUIC) first on every https
+// request, falling back to the normal TCP-based transport (HTTP/1.1 or
+// HTTP/2, whichever the server negotiates) when the target doesn't speak
+// HTTP/3 -- which is still most of the web, so this is opt-in rather than
+// the default.
+func WithHTTP3() Option {
+	return func(o *options) { o.http3 = true }
+}
+
 // New builds a Fetcher with the given per-request timeout. maxBandwidthBPS
 // caps this Fetcher's aggregate download rate in bytes/sec across every
 // concurrent Get() call; 0 means unlimited.
-func New(timeout time.Duration, maxBandwidthBPS int) *Fetcher {
-	return NewWithOptions(Options{
-		Timeout:         timeout,
-		MaxBandwidthBPS: maxBandwidthBPS,
-	})
-}
+func New(timeout time.Duration, maxBandwidthBPS int, opts ...Option) *Fetcher {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 
-// NewWithOptions builds a Fetcher with independent rate and delay state for
-// each hostname. A zero request rate or delay disables that control.
-func NewWithOptions(opts Options) *Fetcher {
 	var limiter *rate.Limiter
 	chunk := 0
-	if opts.MaxBandwidthBPS > 0 {
-		chunk = opts.MaxBandwidthBPS
-		limiter = rate.NewLimiter(rate.Limit(opts.MaxBandwidthBPS), chunk)
+	if maxBandwidthBPS > 0 {
+		chunk = maxBandwidthBPS
+		limiter = rate.NewLimiter(rate.Limit(maxBandwidthBPS), chunk)
 	}
-	burst := opts.DomainBurst
-	if burst <= 0 {
-		burst = 1
+
+	transport := &http.Transport{
+		DialContext: newDNSCache(dnsCacheTTL).dialContext(&net.Dialer{Timeout: timeout}),
 	}
+	var roundTripper http.RoundTripper = transport
+	if o.http3 {
+		roundTripper = &http3FallbackTransport{
+			h3:       &http3.Transport{},
+			fallback: transport,
+		}
+	}
+
 	return &Fetcher{
-		bandwidth:              limiter,
-		bandwidthChunk:         chunk,
-		domainRequestsPerSecond: rate.Limit(opts.DomainRequestsPerSecond),
-		domainBurst:             burst,
-		defaultPolitenessDelay:  opts.PolitenessDelay,
-		domains:                 make(map[string]*domainState),
+		bandwidth:      limiter,
+		bandwidthChunk: chunk,
 		client: &http.Client{
-			Timeout: opts.Timeout,
+			Timeout:   timeout,
+			Transport: roundTripper,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 10 {
 					return fmt.Errorf("stopped after 10 redirects")
@@ -117,65 +121,104 @@ func NewWithOptions(opts Options) *Fetcher {
 	}
 }
 
-// SetDomainDelay applies a robots.txt Crawl-delay to one hostname. Existing
-// limiter state is retained so changing the delay cannot reset rate limits.
-func (f *Fetcher) SetDomainDelay(rawURL string, delay time.Duration) error {
-	u, err := url.Parse(rawURL)
-	if err != nil || u.Hostname() == "" {
-		return fmt.Errorf("invalid domain URL %q", rawURL)
-	}
-	state := f.domainState(u.Hostname())
-	state.mu.Lock()
-	state.delay = delay
-	state.mu.Unlock()
-	return nil
+// dnsCacheEntry is one host's cached resolution.
+type dnsCacheEntry struct {
+	addrs  []string
+	expiry time.Time
 }
 
-func (f *Fetcher) domainState(host string) *domainState {
-	f.domainsMu.Lock()
-	defer f.domainsMu.Unlock()
-	if state, ok := f.domains[host]; ok {
-		return state
-	}
-	state := &domainState{delay: f.defaultPolitenessDelay}
-	if f.domainRequestsPerSecond > 0 {
-		state.limiter = rate.NewLimiter(f.domainRequestsPerSecond, f.domainBurst)
-	}
-	f.domains[host] = state
-	return state
+// dnsCache is a small in-memory, TTL-based DNS cache shared across every
+// Get() call on one Fetcher. A crawl typically fetches many pages from the
+// same host back-to-back, so reusing a recent resolution instead of asking
+// the resolver again on every single request cuts per-request latency and
+// load on upstream DNS without risking a stale IP for long (dnsCacheTTL).
+type dnsCache struct {
+	mu      sync.Mutex
+	entries map[string]dnsCacheEntry
+	ttl     time.Duration
+	// resolve is a seam for tests; production code always uses
+	// net.DefaultResolver.LookupHost.
+	resolve func(ctx context.Context, host string) ([]string, error)
 }
 
-func (f *Fetcher) waitForDomain(ctx context.Context, rawURL string) error {
-	u, err := url.Parse(rawURL)
-	if err != nil || u.Hostname() == "" {
-		return fmt.Errorf("invalid fetch URL %q", rawURL)
+func newDNSCache(ttl time.Duration) *dnsCache {
+	return &dnsCache{
+		entries: make(map[string]dnsCacheEntry),
+		ttl:     ttl,
+		resolve: net.DefaultResolver.LookupHost,
 	}
-	state := f.domainState(u.Hostname())
-	if state.limiter != nil {
-		if err := state.limiter.Wait(ctx); err != nil {
-			return fmt.Errorf("domain rate limiter: %w", err)
-		}
+}
+
+// lookup returns host's IP addresses, reusing a cached, unexpired result
+// when one exists.
+func (c *dnsCache) lookup(ctx context.Context, host string) ([]string, error) {
+	c.mu.Lock()
+	if e, ok := c.entries[host]; ok && time.Now().Before(e.expiry) {
+		c.mu.Unlock()
+		return e.addrs, nil
+	}
+	c.mu.Unlock()
+
+	addrs, err := c.resolve(ctx, host)
+	if err != nil {
+		return nil, err
 	}
 
-	state.mu.Lock()
-	now := time.Now()
-	startAt := state.next
-	if startAt.Before(now) {
-		startAt = now
-	}
-	state.next = startAt.Add(state.delay)
-	state.mu.Unlock()
+	c.mu.Lock()
+	c.entries[host] = dnsCacheEntry{addrs: addrs, expiry: time.Now().Add(c.ttl)}
+	c.mu.Unlock()
+	return addrs, nil
+}
 
-	if wait := time.Until(startAt); wait > 0 {
-		timer := time.NewTimer(wait)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
+// dialContext returns an http.Transport.DialContext that resolves the
+// target host through this cache before handing dialer the literal IP to
+// connect to, instead of letting dialer re-resolve on every call. Falls
+// back to dialer's own resolution (addr as given) for anything the cache
+// can't help with -- an address that's already an IP literal, or a lookup
+// failure -- so a cache bug can never make a host unreachable that plain
+// dialing would have reached.
+func (c *dnsCache) dialContext(dialer *net.Dialer) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil || net.ParseIP(host) != nil {
+			return dialer.DialContext(ctx, network, addr)
 		}
+
+		addrs, err := c.lookup(ctx, host)
+		if err != nil || len(addrs) == 0 {
+			return dialer.DialContext(ctx, network, addr)
+		}
+
+		var lastErr error
+		for _, ip := range addrs {
+			conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip, port))
+			if err == nil {
+				return conn, nil
+			}
+			lastErr = err
+		}
+		return nil, lastErr
 	}
-	return nil
+}
+
+// http3FallbackTransport tries HTTP/3 first on https requests and falls
+// back to the standard transport when the server doesn't answer over QUIC.
+// Safe to retry the same *http.Request on the fallback: Fetcher.Get always
+// sends a nil body, so there's no request body to worry about consuming
+// twice.
+type http3FallbackTransport struct {
+	h3       http.RoundTripper // *http3.Transport in production; a stub in tests
+	fallback http.RoundTripper
+}
+
+func (t *http3FallbackTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Scheme != "https" {
+		return t.fallback.RoundTrip(req)
+	}
+	if resp, err := t.h3.RoundTrip(req); err == nil {
+		return resp, nil
+	}
+	return t.fallback.RoundTrip(req)
 }
 
 // Result is the outcome of fetching a single URL.
@@ -203,9 +246,6 @@ type Result struct {
 // MaxBodyBytes of the body.
 func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
 	start := time.Now()
-	if err := f.waitForDomain(ctx, url); err != nil {
-		return nil, err
-	}
 
 	var chain []string
 	ctx = context.WithValue(ctx, redirectChainKey{}, &chain)

@@ -1,0 +1,42 @@
+# Automatically creates a fresh scraper Job pod every 15 minutes -- the
+# scheduled-crawl equivalent of `make k8s-crawl`, without a human running it
+# each time. Each firing is an independent, one-shot pod (Kubernetes deletes
+# it once it completes, per successfulJobsHistoryLimit/failedJobsHistoryLimit
+# below); the *worker* Deployment's HorizontalPodAutoscaler
+# (k8s/03-worker.yaml) is what actually scales out to absorb the resulting
+# load -- this CronJob only triggers the crawl, it doesn't do any fetching
+# itself.
+#
+# Edit --seeds (or switch to --seeds-file with a mounted ConfigMap) before
+# applying; the placeholder below is a stand-in. `make k8s-apply` applies
+# this file like any other plain manifest in k8s/ (unlike scraper-job.yaml.tmpl,
+# which is rendered per one-off invocation, this one is meant to be applied
+# once and then run itself on schedule).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crawl-every-15-min
+  namespace: search-engine-scraper
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid # don't start the next scheduled crawl while one is still running
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: scraper
+              image: search-engine-scraper-scraper:latest # build & push with your own registry; see README
+              args:
+                - "--seeds=https://example.com"
+                - "--max-depth=2"
+                - "--max-pages=200"
+                - "--max-pages-per-domain=50"
+                - "--same-host-only=false"
+              envFrom:
+                - configMapRef:
+                    name: worker-config

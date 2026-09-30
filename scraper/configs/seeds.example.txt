@@ -1,0 +1,38 @@
+# Example seed list for search-engine-scraper.
+#
+# Lines starting with # are comments. A [category] line starts a new
+# category; every URL after it belongs to that category until the next
+# [category] line. Run with:
+#
+#   ./bin/scraper --seeds-file=configs/seeds.example.txt --same-host-only=false --max-depth=3 --max-pages=2000
+#
+# Priority (optional, higher = crawled first, default 0):
+#   - a category header may set a default for every seed under it:
+#       [tech 10]
+#   - a seed line may override that default for just that one URL:
+#       https://news.ycombinator.com 20
+# Every link discovered from a seed inherits that seed's priority, so a
+# high-priority seed's whole branch is favored over a low-priority one's.
+#
+# --concurrency (on the scraper CLI) defaults to auto-scaling with how many
+# seed URLs are listed here (numSeeds*4, clamped to [8,256]) -- a bigger
+# seed file automatically asks the workflow for more in-flight fetches.
+# Pass --concurrency explicitly to override that.
+#
+# Worker-side bandwidth: --max-bandwidth-bytes-per-sec on the worker caps
+# that worker process's aggregate download rate regardless of concurrency.
+
+[tech 10]
+https://go.dev
+https://news.ycombinator.com 20
+https://techcrunch.com
+https://cnet.com
+https://www.theverge.com
+https://ekantipur.com
+https://www.onlinekhabar.com
+
+[reference]
+https://en.wikipedia.org/wiki/Web_crawler
+
+[docs]
+https://developer.mozilla.org/en-US/

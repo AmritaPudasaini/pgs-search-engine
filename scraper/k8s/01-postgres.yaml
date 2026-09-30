@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: search-engine-scraper
+type: Opaque
+stringData:
+  # Example credentials for a self-contained demo deployment. Replace with
+  # a real secret (sealed-secrets, external-secrets, etc.) before using
+  # this outside a course project.
+  POSTGRES_USER: scraper
+  POSTGRES_PASSWORD: scraper
+  POSTGRES_DB: scraper
+  DATABASE_URL: "postgres://scraper:scraper@postgres:5432/scraper?sslmode=disable"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: search-engine-scraper
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None # headless: StatefulSet gets a stable DNS name, postgres:5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: search-engine-scraper
+spec:
+  serviceName: postgres
+  replicas: 1 # a single Postgres instance is enough for this project's scope; see README for scaling notes
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "scraper"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

@@ -1,0 +1,1 @@
+ALTER TABLE documents ADD COLUMN final_url TEXT NOT NULL DEFAULT '';

@@ -52,6 +52,8 @@ func main() {
 		userAgent      = envflag.String("user-agent", "search-engine-scraper", "User-Agent / robots.txt group name to identify as")
 		metricsAddress = envflag.String("metrics-address", ":9090", "address to serve Prometheus metrics on (GET /metrics); empty disables it")
 		maxBandwidth   = envflag.Int("max-bandwidth-bytes-per-sec", 0, "cap this worker process's aggregate download rate in bytes/sec across all concurrent fetches (0 = unlimited)")
+		enableHTTP3    = envflag.Bool("http3", false, "attempt HTTP/3 (QUIC) first on https requests, falling back to HTTP/1.1 or HTTP/2 for sites that don't support it")
+		saveHTMLDir    = envflag.String("save-html-dir", "", "directory to save each crawled page's raw HTML body to, named by content hash (empty = don't save raw HTML)")
 	)
 	flag.Parse()
 
@@ -98,9 +100,21 @@ func main() {
 	}
 	defer c.Close()
 
-	f := fetcher.New(*requestTimeout, *maxBandwidth)
+	var fetcherOpts []fetcher.Option
+	if *enableHTTP3 {
+		fetcherOpts = append(fetcherOpts, fetcher.WithHTTP3())
+	}
+	f := fetcher.New(*requestTimeout, *maxBandwidth, fetcherOpts...)
 	guard := robots.New(f, *userAgent)
 	act := activities.New(f, guard, writer, runs, freshness)
+
+	if *saveHTMLDir != "" {
+		htmlWriter, err := storage.NewDirHTMLWriter(*saveHTMLDir)
+		if err != nil {
+			log.Fatalf("open html output dir: %v", err)
+		}
+		act.HTML = htmlWriter
+	}
 
 	w := worker.New(c, workflows.TaskQueueName, worker.Options{
 		MaxConcurrentActivityExecutionSize: *maxConcurrent,
@@ -114,8 +128,8 @@ func main() {
 	w.RegisterActivity(act.UpdateCrawlRunStats)
 	w.RegisterActivity(act.FinishCrawlRun)
 
-	log.Printf("worker started: task_queue=%s temporal=%s storage=%s gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d",
-		workflows.TaskQueueName, *hostPort, *storageKind, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth)
+	log.Printf("worker started: task_queue=%s temporal=%s storage=%s gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d http3=%v save_html_dir=%q",
+		workflows.TaskQueueName, *hostPort, *storageKind, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth, *enableHTTP3, *saveHTMLDir)
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		log.Fatalf("worker stopped: %v", err)

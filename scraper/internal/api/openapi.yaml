@@ -1,0 +1,385 @@
+openapi: 3.0.3
+info:
+  title: search-engine-scraper documents API
+  description: >
+    Read-only API over the `documents` table populated by the Temporal
+    worker (see internal/activities and internal/storage). Use it to
+    preview crawled pages without a direct Postgres connection.
+  version: "1.0.0"
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      operationId: healthz
+      tags: [meta]
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /api/v1/crawl-runs:
+    get:
+      summary: List crawl runs (validation summaries)
+      description: >
+        Newest-started-first. Check a run's `status` and stats here before
+        consuming documents from the same time window/category -- a
+        "failed" or still-"running" run may mean incomplete data.
+      operationId: listCrawlRuns
+      tags: [crawl-runs]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: A page of crawl runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CrawlRun"
+  /api/v1/crawl-runs/{id}:
+    get:
+      summary: Get one crawl run's validation summary
+      operationId: getCrawlRun
+      tags: [crawl-runs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: The crawl run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlRun"
+        "404":
+          description: No crawl run with that ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/documents/categories:
+    get:
+      summary: List categories with document counts
+      description: Use this to discover valid values for the `category` filter on GET /api/v1/documents.
+      operationId: listCategories
+      tags: [documents]
+      responses:
+        "200":
+          description: One row per category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryCount"
+  /api/v1/documents/count:
+    get:
+      summary: Total document count across all categories
+      operationId: countDocuments
+      tags: [documents]
+      responses:
+        "200":
+          description: Total count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    format: int64
+  /api/v1/documents:
+    get:
+      summary: List crawled documents for one category
+      description: >
+        Paginated, newest-fetched-first. `category` is required -- call
+        GET /api/v1/documents/categories first to see what's available.
+      operationId: listDocuments
+      tags: [documents]
+      parameters:
+        - name: category
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Category label to filter on (see GET /api/v1/documents/categories).
+        - name: crawl_run_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: >-
+            Narrow the category down to just the documents one specific run
+            produced. Check that run's status first via
+            GET /api/v1/crawl-runs/{id} -- a "failed" or still-"running" run
+            may mean an incomplete batch.
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >-
+            Narrow the category down to documents detected as this ISO
+            3166-1 alpha-2 origin country (e.g. "NP" for Nepal). See the
+            Document schema's `country` field for how it's resolved.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: A page of documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  category:
+                    type: string
+                  country:
+                    type: string
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                  count:
+                    type: integer
+                    description: Number of items in this page.
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing or invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    CrawlRun:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [running, completed, failed]
+        seed_count:
+          type: integer
+        max_depth:
+          type: integer
+        max_pages:
+          type: integer
+        fetched:
+          type: integer
+        succeeded:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+        domain_capped:
+          type: integer
+        error:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          type: string
+        total:
+          type: integer
+          format: int64
+    Document:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        url:
+          type: string
+        normalized_url:
+          type: string
+          description: >-
+            This document's dedupe identity: the fetched URL's canonical
+            form, or wherever it redirected to (final_url), or its declared
+            canonical_url -- in that ascending order of precedence.
+        final_url:
+          type: string
+          description: >-
+            Where the response actually came from after following any
+            redirects, or "" if the request wasn't redirected at all.
+        canonical_url:
+          type: string
+          description: >-
+            The page's declared <link rel="canonical"> target, or "" if it
+            didn't declare one or it matched normalized_url already.
+        category:
+          type: string
+        title:
+          type: string
+        meta_description:
+          type: string
+          description: >-
+            <meta name="description"> content, falling back to
+            og:description if the page only declares that -- the snippet a
+            search engine shows under a result's title.
+        body_text:
+          type: string
+        headings:
+          type: array
+          items:
+            type: object
+            properties:
+              level:
+                type: integer
+                description: 1-6, from <h1> through <h6>.
+              text:
+                type: string
+          description: The page's heading outline, in document order.
+        host:
+          type: string
+          description: The fetched page's hostname.
+        country:
+          type: string
+          description: >-
+            Best-guess origin country as an ISO 3166-1 alpha-2 code (e.g.
+            "NP", "IN"), or "" if undetected. Resolved from, in priority
+            order: JSON-LD PostalAddress.addressCountry, og:locale's
+            territory subtag, the geo.region meta tag, <html lang>, and
+            finally the page's host ccTLD.
+        links:
+          type: array
+          items:
+            type: string
+        anchor_texts:
+          type: array
+          items:
+            type: string
+          description: >-
+            Parallel to `links` (same index, same length): the visible
+            anchor text used to link to each URL, or "" if none.
+        json_ld:
+          type: array
+          items:
+            type: string
+          description: >-
+            Raw text of each <script type="application/ld+json"> block
+            found on the page. Each element is independently valid JSON;
+            not decoded here since consumers care about different
+            schema.org types.
+        geo_lat:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            Latitude resolved from the page (JSON-LD GeoCoordinates, Open
+            Graph place tags, or geo.position/ICBM meta tags), if any.
+        geo_lng:
+          type: number
+          format: double
+          nullable: true
+        sim_hash:
+          type: integer
+          format: int64
+          description: >-
+            64-bit near-duplicate fingerprint of body_text (see
+            internal/simhash), stored as its bit pattern reinterpreted as a
+            signed integer. Two documents whose sim_hash values differ in
+            only a few bits (Hamming distance) are likely near-duplicates.
+        crawl_run_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            The crawl_runs row that produced this document (see
+            GET /api/v1/crawl-runs/{id}), or null if it predates run
+            tracking or was crawled with no run-tracking backend
+            configured.
+        depth:
+          type: integer
+        status_code:
+          type: integer
+        content_type:
+          type: string
+        content_hash:
+          type: string
+        fetch_duration_ms:
+          type: integer
+          format: int64
+        fetch_error:
+          type: string
+        fetched_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        error:
+          type: string

@@ -39,22 +39,14 @@ type Document struct {
 	// og:description when the page declares only the Open Graph variant --
 	// the snippet a real search engine shows under a result's title, so
 	// it's carried as its own field rather than left buried in Text.
-	MetaDescription string            `json:"meta_description,omitempty"`
-	MetaKeywords    []string          `json:"meta_keywords,omitempty"`
-	OpenGraph       map[string]string `json:"open_graph,omitempty"`
-	ContactInfo     ContactInfo       `json:"contact_info,omitempty"`
-	SocialLinks     []string          `json:"social_links,omitempty"`
-	Text            string            `json:"text"`
+	MetaDescription string `json:"meta_description,omitempty"`
+	Text            string `json:"text"`
 	// Headings is the page's h1-h6 outline, in document order -- the part of
 	// the HTML structure a search engine actually uses as a ranking/snippet
 	// signal (section headers), as opposed to the full markup tree, which
 	// has no ranking value and would bloat every document for no benefit.
-	Headings      []Heading `json:"headings,omitempty"`
-	Links         []string  `json:"links"`
-	InternalLinks []string  `json:"internal_links,omitempty"`
-	ExternalLinks []string  `json:"external_links,omitempty"`
-	ImageLinks    []string  `json:"image_links,omitempty"`
-	VideoLinks    []string  `json:"video_links,omitempty"`
+	Headings []Heading `json:"headings,omitempty"`
+	Links    []string  `json:"links"`
 	// AnchorTexts is parallel to Links (same index, same length): the
 	// visible anchor text used to link to each URL, or "" if none.
 	AnchorTexts []string `json:"anchor_texts,omitempty"`
@@ -88,13 +80,6 @@ type Document struct {
 	FetchedAt   time.Time `json:"fetched_at"`
 	FetchDurMs  int64     `json:"fetch_duration_ms"`
 	Error       string    `json:"error,omitempty"`
-}
-
-// ContactInfo contains public contact details extracted from a page.
-type ContactInfo struct {
-	Emails  []string `json:"emails,omitempty"`
-	Phones  []string `json:"phones,omitempty"`
-	Address string   `json:"address,omitempty"`
 }
 
 // Heading is one h1-h6 element from a page's outline.
