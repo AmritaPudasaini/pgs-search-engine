@@ -63,7 +63,8 @@ func main() {
 		sameHost      = flag.Bool("same-host-only", true, "keep each seed's discovered links on that seed's own host; false = open crawl, follow links anywhere")
 		countryFilter = envflag.String("country-filter", "NP", "ISO 3166-1 alpha-2 country code: only pages detected as this country are written as documents (others are still fetched and followed for links, just not stored); empty = no filter, store every page regardless of detected country")
 		workflowID    = flag.String("workflow-id", "", "Temporal workflow ID (default: derived from seeds + timestamp)")
-		wait          = flag.Bool("wait", true, "block until the crawl finishes and print final stats")
+		wait          = flag.Bool("wait", true, "block until the crawl finishes and print final stats (ignored when --cron is set)")
+		cron          = flag.String("cron", "", `Temporal cron schedule (standard 5-field crontab syntax, e.g. "*/15 * * * *" for every 15 minutes) to run this crawl automatically and repeatedly instead of once; Temporal itself durably fires each occurrence, so no external scheduler is needed and the crawl keeps recurring even if this client process exits`)
 	)
 	flag.Parse()
 
@@ -122,16 +123,30 @@ func main() {
 		CountryFilter:        strings.ToUpper(strings.TrimSpace(*countryFilter)),
 	}
 
-	run, err := c.ExecuteWorkflow(context.Background(), client.StartWorkflowOptions{
+	startOpts := client.StartWorkflowOptions{
 		ID:        id,
 		TaskQueue: workflows.TaskQueueName,
-	}, workflows.CrawlWorkflow, input)
+	}
+	if *cron != "" {
+		startOpts.CronSchedule = *cron
+	}
+
+	run, err := c.ExecuteWorkflow(context.Background(), startOpts, workflows.CrawlWorkflow, input)
 	if err != nil {
 		log.Fatalf("start workflow: %v", err)
 	}
 
 	log.Printf("crawl started: workflow_id=%s run_id=%s seed_count=%d", run.GetID(), run.GetRunID(), len(crawlSeeds))
 	log.Printf("inspect with: temporal workflow describe --workflow-id %s", run.GetID())
+
+	if *cron != "" {
+		// A cron workflow recurs indefinitely -- Get() would block until the
+		// schedule itself is terminated, which defeats "runs automatically
+		// in the background." Worker capacity (replicas/HPA) scales
+		// independently of how this client exits.
+		log.Printf("cron schedule active: %q -- Temporal will start a new CrawlWorkflow run on this schedule; this client can exit, the schedule persists on the Temporal server", *cron)
+		return
+	}
 
 	if !*wait {
 		return

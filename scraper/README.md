@@ -243,11 +243,9 @@ Output is newline-delimited JSON, one `model.Document` per line:
 | `--concurrency` | 0 (auto) | Max pages one workflow run has in flight at once. `0` auto-scales with seed count: `numSeeds*4`, clamped to `[8,256]` — a bigger seed file requests more parallelism without a manual flag per file size. Pass a positive value to override. |
 | `--same-host-only` | true | `true` = stay on each seed's own host; `false` = open crawl, follow links anywhere |
 | `--max-pages-per-domain` | 0 | Cap pages fetched from any single host (0 = unlimited); prevents one fast domain crowding out the rest of `--max-pages` |
-| `--max-concurrent-per-host` | 0 | Cap concurrent in-flight fetches to any single host (0 = unlimited; `--concurrency` alone governs total in-flight fetches) |
-| `--revisit-after` | 0 | Skip (re-)fetching a URL already crawled more recently than this duration (0 = disabled, always fetch; requires `--storage=postgres` on the worker to have any effect) |
-| `--country-filter` | NP | ISO 3166-1 alpha-2 country code: only pages detected as this country are written as documents (others are still fetched and followed for links, just not stored); empty = no filter |
 | `--workflow-id` | derived | Temporal workflow ID (override to control dedup/re-runs) |
-| `--wait` | true | Block until the crawl finishes and print stats |
+| `--wait` | true | Block until the crawl finishes and print stats (ignored when `--cron` is set) |
+| `--cron` | | Crontab expression (e.g. `*/15 * * * *`) to run this crawl automatically and repeatedly on a Temporal-managed schedule instead of once — see "Scheduled (cron) crawls" below |
 | `--temporal-address` | localhost:7233 | Temporal frontend address |
 | `--namespace` | default | Temporal namespace |
 
@@ -260,16 +258,15 @@ manifests configure it without a wrapper script.
 
 | Flag | Env var | Default | Meaning |
 |---|---|---|---|
-| `--storage` | `STORAGE` | ndjson | `ndjson` (local file), `postgres`, or `kafka` |
+| `--storage` | `STORAGE` | ndjson | `ndjson` (local file) or `postgres` |
 | `--output` | `OUTPUT` | data/output/documents.ndjson | NDJSON output path (used when `--storage=ndjson`) |
 | `--database-url` | `DATABASE_URL` | | Postgres connection string (required when `--storage=postgres`) |
-| `--kafka-brokers` | `KAFKA_BROKERS` | | Comma-separated Kafka broker addresses (required when `--storage=kafka`) |
-| `--kafka-topic` | `KAFKA_TOPIC` | crawled-documents | Kafka topic crawled documents are published to (used when `--storage=kafka`) — the hand-off point to the ETL pipeline |
 | `--max-concurrent-activities` | `MAX_CONCURRENT_ACTIVITIES` | `NumCPU * 100` | Concurrent activity goroutines in this process |
 | `--max-bandwidth-bytes-per-sec` | `MAX_BANDWIDTH_BYTES_PER_SEC` | 0 (unlimited) | Caps this worker process's aggregate download rate in bytes/sec, across every concurrent fetch it's running |
+| `--http3` | `HTTP3` | false | Attempt HTTP/3 (QUIC) first on https requests, falling back to HTTP/1.1/2 for sites that don't support it |
+| `--save-html-dir` | `SAVE_HTML_DIR` | | Directory to save each page's raw HTML body to, named by content hash (empty = don't save raw HTML) |
 | `--timeout` | `TIMEOUT` | 10s | Per-request HTTP timeout |
 | `--user-agent` | `USER_AGENT` | search-engine-scraper | UA string + robots.txt group to obey |
-| `--metrics-address` | `METRICS_ADDRESS` | :9090 | Address to serve Prometheus metrics on (`GET /metrics`); empty disables it |
 | `--temporal-address` | `TEMPORAL_ADDRESS` | localhost:7233 | Temporal frontend address |
 | `--namespace` | `NAMESPACE` | default | Temporal namespace |
 
@@ -312,10 +309,67 @@ proportionally, same as `--max-concurrent-activities`.
 
 With `--storage=postgres`
 that scaling is safe by construction: every replica upserts into the same
-table keyed by `normalized_url`, so N workers writing
+table keyed by `(normalized_url, content_hash)`, so N workers writing
 concurrently can't produce duplicate rows (see "Database" below) — the
 NDJSON writer, by contrast, is one file per worker process and isn't
 meant to be run with multiple replicas pointed at the same path.
+
+## DNS caching
+
+`internal/fetcher` resolves each host through a small in-memory, TTL-based
+DNS cache (5 minutes) shared across every fetch a worker process makes,
+instead of asking the resolver again on every single request. A crawl
+routinely fetches many pages from the same host back-to-back (a whole site,
+or many links pointing back to a seed), so this cuts per-request latency and
+resolver load with no flag to set — it's always on. A cache entry that
+outlives its TTL is re-resolved automatically, so a host's IP change still
+propagates within a few minutes rather than being stuck for the life of the
+process.
+
+## HTTP/3
+
+Pass `--http3` (env `HTTP3`) to `cmd/worker` to have the fetcher attempt
+HTTP/3 (QUIC) first on every `https://` request, falling back to HTTP/1.1 or
+HTTP/2 (whichever the server negotiates) when the target doesn't answer over
+QUIC — still most of the web today, which is why this is opt-in rather than
+the default. `Fetcher.Get` never sends a request body, so retrying the same
+request on the fallback transport after an HTTP/3 attempt fails is always
+safe.
+
+## Raw HTML document downloads
+
+By default only the parsed `model.Document` (title, text, links, ...) is
+persisted — the raw HTML body itself isn't kept once a page is parsed. Pass
+`--save-html-dir=<path>` (env `SAVE_HTML_DIR`) to `cmd/worker` to also save
+every crawled page's raw HTML body to that directory, one file per page,
+named `<content-hash>.html`. Naming by content hash rather than URL dedupes
+identical content reached via different URLs (redirects, tracking-param
+variants) for free, and makes a second save of the same content a no-op
+(the file already exists) — which is also what makes it safe under a
+Temporal activity retry. This save happens directly inside the `ProcessPage`
+activity, not through workflow history, since the raw body is deliberately
+never carried through Temporal (see `ProcessPageOutput`'s doc comment) to
+keep workflow history size bounded.
+
+## Scheduled (cron) crawls
+
+Pass `--cron` to `cmd/scraper` with a standard 5-field crontab expression,
+e.g. `--cron="*/15 * * * *"` to (re-)crawl every 15 minutes, and Temporal
+itself durably fires a fresh `CrawlWorkflow` run on that schedule — no
+external scheduler (cron daemon, Kubernetes CronJob) is required, and the
+schedule keeps recurring on the Temporal server even after this client
+process exits. `--wait` is ignored when `--cron` is set, since a cron
+workflow runs indefinitely rather than completing once. Worker capacity to
+handle the resulting recurring load scales independently, via the same
+knobs as any other crawl (more worker replicas, or the Kubernetes
+`HorizontalPodAutoscaler` in `k8s/03-worker.yaml`).
+
+`k8s/05-crawl-cronjob.yaml` is the Kubernetes-native alternative: a
+`CronJob` that creates a fresh one-off scraper `Job` pod every 15 minutes
+(`make k8s-apply` picks it up like any other manifest in `k8s/`) — useful if
+you'd rather have the cluster's scheduler own triggering crawls, with each
+occurrence an independently-observable pod, instead of one long-lived
+Temporal cron schedule.
 
 ## Database
 
@@ -324,9 +378,7 @@ is simplest. For anything with more than one worker replica — Docker
 Compose's `--scale`, or a Kubernetes Deployment — use Postgres
 (`--storage=postgres --database-url=...`) instead: every replica writes to
 the same table, and `WriteDocument` is a real upsert keyed on
-`normalized_url` (see `migrations/0009_fix_unique_constraint_and_revisit.up.sql`,
-which replaced the original `(normalized_url, content_hash)` constraint —
-see that migration's comment for why),
+`(normalized_url, content_hash)` (see `migrations/0001_create_documents.up.sql`),
 so it's genuinely idempotent under Temporal's at-least-once activity
 retries across the whole fleet — not just within one process's lifetime,
 which is the most the NDJSON writer's in-memory dedupe could ever offer
@@ -406,7 +458,7 @@ make down                 # stop + wipe volumes
 ```
 
 `Dockerfile.worker` and `Dockerfile.scraper` are both multi-stage: a
-`golang:1.25-alpine` build stage produces a static binary
+`golang:1.26-alpine` build stage produces a static binary
 (`CGO_ENABLED=0`), copied into a `gcr.io/distroless/static-debian12`
 runtime stage — no shell, no package manager, just the binary and CA
 certificates (needed for the worker's outbound HTTPS crawling). Smaller
@@ -442,6 +494,7 @@ course project) for everything this repo owns:
 | `02-migrate-job.yaml` | One-shot `Job` applying `migrations/*.sql` before the worker starts |
 | `03-worker.yaml` | Worker `Deployment` (3 replicas) + `HorizontalPodAutoscaler` (2–10 replicas on 70% CPU) |
 | `04-migrations-configmap.yaml` | Generated from `migrations/*.sql` — regenerate with `make k8s-migrations-configmap` after editing a migration |
+| `05-crawl-cronjob.yaml` | `CronJob` that creates a fresh scraper `Job` pod every 15 minutes — see "Scheduled (cron) crawls" above |
 | `scraper-job.yaml.tmpl` | Template for one-off crawl `Job`s, rendered by `make k8s-crawl` |
 
 **Temporal server itself is not hand-rolled here.** Run it via the

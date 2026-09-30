@@ -55,12 +55,6 @@ services:
   # pipeline. Run the worker with STORAGE=kafka to publish crawled
   # documents here instead of/alongside Postgres; the ETL side consumes the
   # `crawled-documents` topic (see internal/storage/kafka_writer.go).
-  #
-  # Starts by default with `docker compose up`/`make run`, but the `worker`
-  # service below does NOT pass KAFKA_BROKERS, so it stays idle unless you
-  # add it to `worker`'s environment (or run cmd/worker with
-  # --kafka-brokers=kafka:9092 yourself) -- it's not wired into the
-  # out-of-the-box Postgres-only path.
   kafka:
     image: redpandadata/redpanda:v24.2.7
     command:

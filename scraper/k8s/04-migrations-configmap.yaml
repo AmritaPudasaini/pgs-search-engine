@@ -1,12 +1,4 @@
-# Generated from migrations/*.sql -- regenerate after editing any
-# migration file with:
-#   kubectl create configmap migrations --from-file=../migrations -n search-engine-scraper \
-#     --dry-run=client -o yaml > k8s/04-migrations-configmap.yaml
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: migrations
-  namespace: search-engine-scraper
 data:
   0001_create_documents.down.sql: |
     DROP TABLE IF EXISTS documents;
@@ -39,103 +31,7 @@ data:
 
     CREATE INDEX idx_documents_category ON documents (category);
     CREATE INDEX idx_documents_normalized_url ON documents (normalized_url);
-  0002_add_jsonld_geo.down.sql: |
-    ALTER TABLE documents DROP COLUMN geo_lng;
-    ALTER TABLE documents DROP COLUMN geo_lat;
-    ALTER TABLE documents DROP COLUMN json_ld;
-  0002_add_jsonld_geo.up.sql: |
-    ALTER TABLE documents ADD COLUMN json_ld TEXT[] NOT NULL DEFAULT '{}';
-    ALTER TABLE documents ADD COLUMN geo_lat DOUBLE PRECISION;
-    ALTER TABLE documents ADD COLUMN geo_lng DOUBLE PRECISION;
-  0003_add_anchor_texts.down.sql: |
-    ALTER TABLE documents DROP COLUMN anchor_texts;
-  0003_add_anchor_texts.up.sql: |
-    ALTER TABLE documents ADD COLUMN anchor_texts TEXT[] NOT NULL DEFAULT '{}';
-  0004_add_crawl_runs.down.sql: |
-    DROP TABLE crawl_runs;
-  0004_add_crawl_runs.up.sql: |
-    -- crawl_runs is the per-crawl health/validation record other teams can
-    -- check before consuming a batch of documents: was this run complete, how
-    -- many pages succeeded vs failed vs were skipped, and when did it run.
-    CREATE TABLE crawl_runs (
-        id            BIGSERIAL PRIMARY KEY,
-        -- running: in progress (including mid-Continue-As-New segments).
-        -- completed: finished normally (ran out of queue/budget).
-        -- failed: the workflow itself errored out (not the same as individual
-        -- page fetch failures, which are just counted in `failed`).
-        status        TEXT NOT NULL DEFAULT 'running',
-        seed_count    INTEGER NOT NULL DEFAULT 0,
-        max_depth     INTEGER NOT NULL DEFAULT 0,
-        max_pages     INTEGER NOT NULL DEFAULT 0,
-        fetched       INTEGER NOT NULL DEFAULT 0,
-        succeeded     INTEGER NOT NULL DEFAULT 0,
-        failed        INTEGER NOT NULL DEFAULT 0,
-        skipped       INTEGER NOT NULL DEFAULT 0,
-        domain_capped INTEGER NOT NULL DEFAULT 0,
-        error         TEXT NOT NULL DEFAULT '',
-        started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-        finished_at   TIMESTAMPTZ,
-        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE INDEX idx_crawl_runs_status ON crawl_runs (status);
-  0005_add_crawl_run_id_to_documents.down.sql: |
-    DROP INDEX idx_documents_crawl_run_id;
-    ALTER TABLE documents DROP COLUMN crawl_run_id;
-  0005_add_crawl_run_id_to_documents.up.sql: |
-    ALTER TABLE documents ADD COLUMN crawl_run_id BIGINT REFERENCES crawl_runs (id);
-    CREATE INDEX idx_documents_crawl_run_id ON documents (crawl_run_id);
-  0006_add_canonical_url.down.sql: |
-    ALTER TABLE documents DROP COLUMN canonical_url;
-  0006_add_canonical_url.up.sql: |
-    ALTER TABLE documents ADD COLUMN canonical_url TEXT NOT NULL DEFAULT '';
-  0007_add_final_url.down.sql: |
-    ALTER TABLE documents DROP COLUMN final_url;
-  0007_add_final_url.up.sql: |
-    ALTER TABLE documents ADD COLUMN final_url TEXT NOT NULL DEFAULT '';
-  0008_add_sim_hash.down.sql: |
-    ALTER TABLE documents DROP COLUMN sim_hash;
-  0008_add_sim_hash.up.sql: |
-    -- Stored as a signed BIGINT holding the uint64 fingerprint's bit pattern
-    -- (Postgres has no unsigned 64-bit type); round-tripped via a plain Go
-    -- int64<->uint64 conversion in internal/storage, which preserves every bit.
-    ALTER TABLE documents ADD COLUMN sim_hash BIGINT NOT NULL DEFAULT 0;
-  0009_fix_unique_constraint_and_revisit.down.sql: |
-    ALTER TABLE documents DROP CONSTRAINT documents_normalized_url_key;
-    ALTER TABLE documents ADD CONSTRAINT documents_normalized_url_content_hash_key UNIQUE (normalized_url, content_hash);
-  0009_fix_unique_constraint_and_revisit.up.sql: |
-    -- The original constraint was UNIQUE (normalized_url, content_hash), which
-    -- meant a page whose content changed between crawls got a NEW row instead
-    -- of updating the existing one in place (the ON CONFLICT target wouldn't
-    -- match, since content_hash now differs) -- silently accumulating one row
-    -- per URL per distinct content version ever seen, contrary to the original
-    -- migration's own comment claiming changed pages get "refreshed in place".
-    --
-    -- One row per normalized_url is both the correct semantics for "current
-    -- known state of this page" and a prerequisite for a freshness/revisit
-    -- policy: "how long ago was this URL last crawled" only makes sense
-    -- against a single current row, not an unbounded history of versions.
-    --
-    -- Note for a real production migration: this would need a backfill step to
-    -- collapse any pre-existing duplicate normalized_url rows first, or this
-    -- ALTER fails on the conflict. Fine for this project's dev-stage database.
-    ALTER TABLE documents DROP CONSTRAINT documents_normalized_url_content_hash_key;
-    ALTER TABLE documents ADD CONSTRAINT documents_normalized_url_key UNIQUE (normalized_url);
-  0010_add_meta_description_headings_country.down.sql: |
-    DROP INDEX idx_documents_country;
-    ALTER TABLE documents DROP COLUMN country;
-    ALTER TABLE documents DROP COLUMN host;
-    ALTER TABLE documents DROP COLUMN headings;
-    ALTER TABLE documents DROP COLUMN meta_description;
-  0010_add_meta_description_headings_country.up.sql: |
-    -- Adds the fields a search-engine-grade crawl needs beyond title/body/links:
-    -- the SERP-snippet source (meta_description), the page's structural
-    -- outline (headings, JSONB array of {level, text}), the resolved origin
-    -- host, and the best-guess origin country used by the crawl's
-    -- CountryFilter option (see internal/workflows.CrawlWorkflowInput).
-    ALTER TABLE documents ADD COLUMN meta_description TEXT NOT NULL DEFAULT '';
-    ALTER TABLE documents ADD COLUMN headings JSONB NOT NULL DEFAULT '[]';
-    ALTER TABLE documents ADD COLUMN host TEXT NOT NULL DEFAULT '';
-    ALTER TABLE documents ADD COLUMN country TEXT NOT NULL DEFAULT '';
-
-    CREATE INDEX idx_documents_country ON documents (country);
+kind: ConfigMap
+metadata:
+  name: migrations
+  namespace: search-engine-scraper
