@@ -21,6 +21,13 @@ services:
       timeout: 10s
       retries: 12
 
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: pgs-etl-clamav
+    ports:
+      - "3310:3310"
+    restart: unless-stopped
+
   opensearch:
     image: opensearchproject/opensearch:2.17.1
     environment:
