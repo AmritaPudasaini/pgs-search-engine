@@ -28,7 +28,11 @@ TextArray = ARRAY(Text)
 
 
 class CrawlRun(IdMixin, TimestampMixin, Base):
-    """One crawl batch (Document.crawl_run_id points here). Counts = CrawlStats."""
+    """One crawl batch (Document.crawl_run_id points here). Counts = CrawlStats.
+
+    `status` is stored upper case; a trigger upper-cases what writers send, so the
+    Temporal scraper's "running" / "completed" / "failed" are accepted as they are.
+    """
 
     __tablename__ = "crawl_runs"
 
@@ -39,11 +43,19 @@ class CrawlRun(IdMixin, TimestampMixin, Base):
     temporal_workflow_id: Mapped[str | None] = mapped_column(String(255))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The run's configuration.
+    seed_count: Mapped[int | None] = mapped_column(Integer)
+    max_depth: Mapped[int | None] = mapped_column(Integer)
+    max_pages: Mapped[int | None] = mapped_column(Integer)
     fetched_count: Mapped[int] = mapped_column(Integer, default=0)
     succeeded_count: Mapped[int] = mapped_column(Integer, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
     skipped_count: Mapped[int] = mapped_column(Integer, default=0)
     unique_url_count: Mapped[int] = mapped_column(Integer, default=0)
+    # URLs skipped because their domain hit its page cap.
+    domain_capped_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Why the run itself failed (not per-page fetch errors, which are counted above).
+    error: Mapped[str | None] = mapped_column(Text)
 
     documents: Mapped[list["CrawledDocument"]] = relationship(back_populates="crawl_run")
 

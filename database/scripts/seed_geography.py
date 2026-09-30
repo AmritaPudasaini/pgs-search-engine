@@ -40,10 +40,11 @@ def upsert(
 def main() -> None:
     data: dict[str, list[dict[str, Any]]] = json.loads(DATA_FILE.read_text(encoding="utf-8"))
 
-    # `wards` is reference data the schema has no column for yet; drop it, and turn the
-    # type string into the enum so an unknown value fails here rather than in Postgres.
+    # `wards` is stored as `ward_count`; the type string becomes the enum so an unknown
+    # value fails here rather than in Postgres.
     local_bodies = [
-        {k: v for k, v in row.items() if k != "wards"} | {"type": LocalBodyType(row["type"])}
+        {k: v for k, v in row.items() if k != "wards"}
+        | {"type": LocalBodyType(row["type"]), "ward_count": row.get("wards")}
         for row in data["local_bodies"]
     ]
 
@@ -56,7 +57,7 @@ def main() -> None:
             session,
             LocalBody,
             local_bodies,
-            ["district_code", "type", "name_en", "name_ne", "website"],
+            ["district_code", "type", "name_en", "name_ne", "website", "ward_count"],
         )
 
     # Devanagari is deliberately kept out of stdout: Windows consoles default to cp1252

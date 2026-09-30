@@ -110,6 +110,7 @@ class LocalBodyBase(SchemaBase):
     phone: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=255)
     address: str | None = Field(default=None, max_length=255)
+    ward_count: int | None = Field(default=None, gt=0)
 
 
 class LocalBodyCreate(LocalBodyBase):
@@ -130,6 +131,7 @@ class LocalBodyUpdate(SchemaBase):
     phone: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=255)
     address: str | None = Field(default=None, max_length=255)
+    ward_count: int | None = Field(default=None, gt=0)
 
 
 class LocalBodyRead(LocalBodyBase, ReadSchema):

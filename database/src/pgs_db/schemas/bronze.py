@@ -87,6 +87,9 @@ class CrawlRunBase(SchemaBase):
     category: str | None = Field(default=None, max_length=64)
     temporal_workflow_id: str | None = Field(default=None, max_length=255)
     started_at: datetime
+    seed_count: int | None = Field(default=None, ge=0)
+    max_depth: int | None = Field(default=None, ge=0)
+    max_pages: int | None = Field(default=None, ge=0)
 
 
 class CrawlRunCreate(CrawlRunBase):
@@ -105,6 +108,7 @@ class CrawlRunStats(SchemaBase):
     failed_count: int = Field(default=0, ge=0)
     skipped_count: int = Field(default=0, ge=0)
     unique_url_count: int = Field(default=0, ge=0)
+    domain_capped_count: int = Field(default=0, ge=0)
 
 
 class CrawlRunFinish(SchemaBase):
@@ -113,6 +117,7 @@ class CrawlRunFinish(SchemaBase):
     status: CrawlRunStatus = CrawlRunStatus.COMPLETED
     finished_at: datetime
     stats: CrawlRunStats | None = None
+    error: str | None = None
 
     @model_validator(mode="after")
     def _must_be_terminal(self) -> "CrawlRunFinish":
@@ -126,6 +131,7 @@ class CrawlRunRead(CrawlRunBase, CrawlRunStats, ReadSchema):
 
     status: CrawlRunStatus
     finished_at: datetime | None = None
+    error: str | None = None
 
 
 # --------------------------------------------------------------------- documents

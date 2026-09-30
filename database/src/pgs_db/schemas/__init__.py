@@ -1,6 +1,7 @@
 """Pydantic request/response schemas.
 
-Bronze, reference (provinces, districts, local bodies) and Silver. Gold is still to come.
+Bronze, reference (provinces, districts, local bodies), Silver, Gold and ops (admin users,
+error logs).
 """
 
 from .base import ReadSchema, SchemaBase
@@ -21,6 +22,24 @@ from .bronze import (
     StoredFileCreate,
     StoredFileRead,
 )
+from .gold import (
+    DashboardSummary,
+    DomainCounts,
+    DomainOverview,
+    DomainStatsRead,
+    ErrorCounts,
+    GeoContentCount,
+    PageScoreRead,
+    RelevanceJudgmentCreate,
+    RelevanceJudgmentRead,
+    SearchClickCreate,
+    SearchClickRead,
+    SearchQueryCreate,
+    SearchQueryRead,
+    SearchTraffic,
+    LinkCounts,
+    StorageMetrics,
+)
 from .geography import (
     DistrictBase,
     DistrictCreate,
@@ -34,6 +53,27 @@ from .geography import (
     ProvinceCreate,
     ProvinceRead,
     ProvinceUpdate,
+)
+from .ops import (
+    AdminUserCreate,
+    AdminUserRead,
+    AdminUserUpdate,
+    ErrorLogCreate,
+    ErrorLogRead,
+)
+from .search import (
+    DistrictNode,
+    FileInfo,
+    LocalBodyNode,
+    ProvinceNode,
+    QuickLink,
+    RegionalCard,
+    RegionContact,
+    RegionLinkCreate,
+    RegionLinkRead,
+    RegionRef,
+    SearchDocumentOut,
+    VectorHit,
 )
 from .silver import (
     QuarantinedFileRead,
@@ -126,4 +166,40 @@ __all__ = [
     "LocalBodyCreate",
     "LocalBodyRead",
     "LocalBodyUpdate",
+    # gold
+    "DomainStatsRead",
+    "DomainOverview",
+    "DomainCounts",
+    "LinkCounts",
+    "StorageMetrics",
+    "ErrorCounts",
+    "DashboardSummary",
+    "GeoContentCount",
+    "PageScoreRead",
+    "RelevanceJudgmentCreate",
+    "RelevanceJudgmentRead",
+    "SearchClickCreate",
+    "SearchClickRead",
+    "SearchQueryCreate",
+    "SearchQueryRead",
+    "SearchTraffic",
+    # search, map and regional card
+    "SearchDocumentOut",
+    "FileInfo",
+    "VectorHit",
+    "ProvinceNode",
+    "DistrictNode",
+    "LocalBodyNode",
+    "RegionalCard",
+    "RegionContact",
+    "RegionRef",
+    "QuickLink",
+    "RegionLinkCreate",
+    "RegionLinkRead",
+    # ops
+    "AdminUserCreate",
+    "AdminUserUpdate",
+    "AdminUserRead",
+    "ErrorLogCreate",
+    "ErrorLogRead",
 ]

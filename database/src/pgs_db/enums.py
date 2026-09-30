@@ -102,3 +102,36 @@ class QuarantineStatus(enum.StrEnum):
 
     QUARANTINED = "QUARANTINED"  # isolated in the quarantine bucket
     DELETED = "DELETED"  # an admin erased the object; the row stays as the audit record
+
+
+class AdminRole(enum.StrEnum):
+    """What an `admin_users` row may do in the admin API (see api/README.md §2.1)."""
+
+    SUPER_ADMIN = "SUPER_ADMIN"  # everything, including managing admin users
+    SYSTEM_OPERATOR = "SYSTEM_OPERATOR"  # domains, crawls, quarantine actions
+    AUDITOR = "AUDITOR"  # read-only
+
+
+class ServiceName(enum.StrEnum):
+    """Which service wrote an `error_logs` row: the API's `service` filter values."""
+
+    SCRAPER = "SCRAPER"
+    ETL = "ETL"
+    SECURITY = "SECURITY"  # the ClamAV scan
+    SEARCH = "SEARCH"
+    API = "API"
+
+
+class LogSeverity(enum.StrEnum):
+    """Severity of an `error_logs` row. INFO and DEBUG belong in service logs, not here."""
+
+    WARN = "WARN"
+    ERROR = "ERROR"
+    FATAL = "FATAL"
+
+
+class JudgmentSource(enum.StrEnum):
+    """Where a `relevance_judgments` label came from."""
+
+    HUMAN = "HUMAN"  # an admin graded it
+    CLICK_MODEL = "CLICK_MODEL"  # inferred from search_clicks

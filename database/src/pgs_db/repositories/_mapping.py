@@ -155,4 +155,6 @@ def crawl_stats_columns(stats: Mapping[str, Any] | None) -> dict[str, int]:
         "failed_count": int(stats.get("failed") or 0),
         "skipped_count": int(stats.get("skipped") or 0),
         "unique_url_count": int(stats.get("unique_urls") or 0),
+        # URLs dropped by the per-domain page cap (the Temporal scraper's run recorder).
+        "domain_capped_count": int(stats.get("domain_capped") or 0),
     }

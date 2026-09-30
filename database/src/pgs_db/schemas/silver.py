@@ -23,7 +23,6 @@ from ..enums import (
     ProcessingStatus,
     QuarantineStatus,
 )
-from ..models.silver import EMBEDDING_DIM
 from .base import ReadSchema, SchemaBase
 from .bronze import SHA256_PATTERN
 
@@ -203,6 +202,7 @@ class PageMediaBase(SchemaBase):
     media_type: MediaType
     alt_text: str | None = None
     extracted_text: str | None = Field(default=None, description="OCR or parsed text")
+    context_text: str | None = Field(default=None, description="Caption / nearby text")
     stored_file_id: int | None = None
 
 
@@ -264,7 +264,8 @@ class PageEmbeddingBase(SchemaBase):
     model_version: str | None = Field(default=None, max_length=64)
     chunk_index: int = Field(ge=0)
     chunk_text: str = Field(min_length=1)
-    embedding: list[float] = Field(min_length=EMBEDDING_DIM, max_length=EMBEDDING_DIM)
+    # The size is the model's (embedding_models.dimensions), checked on save.
+    embedding: list[float] = Field(min_length=1, max_length=2000)
 
 
 class PageEmbeddingCreate(PageEmbeddingBase):
@@ -275,6 +276,7 @@ class PageEmbeddingRead(PageEmbeddingBase, ReadSchema):
     """Embedded chunk returned by the application."""
 
     page_id: int
+    dimensions: int
     content_hash: str = Field(pattern=SHA256_PATTERN)
     embedded_at: datetime
 

@@ -30,6 +30,10 @@ def include_object(
     """
     if type_ == "table" and reflected and name not in target_metadata.tables:
         return False
+    # One HNSW index per embedding model, created by migrations and
+    # SilverRepository.register_embedding_model rather than declared on the model.
+    if type_ == "index" and reflected and (name or "").startswith("ix_page_embeddings_hnsw_"):
+        return False
     return True
 
 

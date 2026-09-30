@@ -23,15 +23,19 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Computed,
     DateTime,
     Float,
     func,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -53,9 +57,9 @@ from .geography import District, LocalBody, Province
 
 TextArray = ARRAY(Text)
 
-# Fixed by the search team's query model (`all-MiniLM-L6-v2`, pgs_search.query.
-# embeddings). Changing models to another size needs a migration.
-EMBEDDING_DIM = 384
+# The model the ETL writes and search queries with (embedding_models.is_default).
+# LaBSE: multilingual, so Nepali and English land in one space. 768 dimensions.
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/LaBSE"
 
 
 class Page(IdMixin, TimestampMixin, Base):
@@ -312,6 +316,8 @@ class PageMedia(IdMixin, TimestampMixin, Base):
     media_type: Mapped[MediaType] = mapped_column(str_enum(MediaType, "media_type"))
     alt_text: Mapped[str | None] = mapped_column(Text)
     extracted_text: Mapped[str | None] = mapped_column(Text)
+    # Text around the media on its page (caption, nearby paragraph): search context.
+    context_text: Mapped[str | None] = mapped_column(Text)
 
     page: Mapped[Page] = relationship(back_populates="media")
     stored_file: Mapped[StoredFile | None] = relationship()
@@ -359,13 +365,49 @@ class PageEntity(IdMixin, TimestampMixin, Base):
     entity: Mapped[Entity] = relationship()
 
 
+class EmbeddingModel(IdMixin, TimestampMixin, Base):
+    """A sentence-embedding model the pipeline may store vectors for.
+
+    Documents and queries must be embedded by the same model to be comparable, so
+    every `page_embeddings` row names one of these, and its vector must have exactly
+    this model's `dimensions` (a composite foreign key enforces both). Each model has
+    its own HNSW index; `SilverRepository.register_embedding_model` adds one.
+
+    `is_default` marks the model the ETL writes and search queries with. Seeded:
+    LaBSE (768, default; multilingual, good for Nepali) and two 384-dimension MiniLM
+    models the search branches used first.
+    """
+
+    __tablename__ = "embedding_models"
+    __table_args__ = (
+        # HNSW indexes vectors of up to 2000 dimensions.
+        CheckConstraint("dimensions BETWEEN 1 AND 2000", name="dimensions_range"),
+        UniqueConstraint("name", "dimensions", name="uq_embedding_models_name_dimensions"),
+        Index(
+            "uq_embedding_models_one_default",
+            "is_default",
+            unique=True,
+            postgresql_where=text("is_default"),
+        ),
+    )
+
+    name: Mapped[str] = mapped_column(String(128), unique=True)
+    dimensions: Mapped[int] = mapped_column(SmallInteger)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    description: Mapped[str | None] = mapped_column(Text)
+
+
 class PageEmbedding(IdMixin, TimestampMixin, Base):
     """One embedded chunk of a page's text, for vector (semantic) search.
 
-    A page is split into chunks; each chunk has one vector per model. The vector
-    size is fixed at EMBEDDING_DIM. `content_hash` records which version of the
-    page was embedded, so a page whose text changed shows up in
-    `SilverRepository.pages_missing_embeddings` until it is re-embedded.
+    A page is split into chunks; each chunk has one vector per model. The vector's
+    size is the model's (`embedding_models.dimensions`): `dimensions` is computed from
+    the vector and the (model_name, dimensions) pair must match a registered model.
+    `content_hash` records which version of the page was embedded, so a page whose
+    text changed shows up in `SilverRepository.pages_missing_embeddings`.
+
+    The per-model HNSW indexes are partial expression indexes, created by migrations
+    and `register_embedding_model`, not declared here.
     """
 
     __tablename__ = "page_embeddings"
@@ -374,13 +416,12 @@ class PageEmbedding(IdMixin, TimestampMixin, Base):
             "page_id", "model_name", "chunk_index", name="uq_page_embeddings_page_model_chunk"
         ),
         CheckConstraint("chunk_index >= 0", name="chunk_index_non_negative"),
-        # Approximate nearest-neighbour search by cosine distance (`<=>`).
-        Index(
-            "ix_page_embeddings_embedding_hnsw",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ForeignKeyConstraint(
+            ["model_name", "dimensions"],
+            ["embedding_models.name", "embedding_models.dimensions"],
+            name="fk_page_embeddings_model_name_embedding_models",
         ),
+        Index("ix_page_embeddings_model_name_dimensions", "model_name", "dimensions"),
     )
 
     page_id: Mapped[int] = mapped_column(
@@ -390,7 +431,10 @@ class PageEmbedding(IdMixin, TimestampMixin, Base):
     model_version: Mapped[str | None] = mapped_column(String(64))
     chunk_index: Mapped[int] = mapped_column(Integer)
     chunk_text: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    embedding: Mapped[list[float]] = mapped_column(Vector())
+    dimensions: Mapped[int] = mapped_column(
+        SmallInteger, Computed("vector_dims(embedding)", persisted=True)
+    )
     content_hash: Mapped[str] = mapped_column(String(64))
     embedded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -454,7 +498,7 @@ class QuarantinedFile(IdMixin, TimestampMixin, Base):
         server_default=QuarantineStatus.QUARANTINED.value,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # Free text until admin_users exists: the admin's username or email.
+    # The admin's username. Free text, not an FK, so the audit record outlives the account.
     deleted_by: Mapped[str | None] = mapped_column(String(255))
 
     domain: Mapped[Domain | None] = relationship()

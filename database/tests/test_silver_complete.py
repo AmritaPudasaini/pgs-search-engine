@@ -15,7 +15,6 @@ from pgs_db import BronzeRepository, ReferenceRepository, SilverRepository, make
 from pgs_db.enums import EntityType, MediaType, ProcessingStatus
 from pgs_db.etl import process_bronze_batch, process_stored_file_batch
 from pgs_db.models import (
-    EMBEDDING_DIM,
     CrawledDocument,
     Entity,
     Page,
@@ -69,9 +68,14 @@ def payload(**overrides: Any) -> dict[str, Any]:
     return body
 
 
+# Registered models (migration f6a7b8c9d0e1).
+MINI = "sentence-transformers/all-MiniLM-L6-v2"
+MULTI = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MINI_DIM = 384
+
 def vec(*hot: int) -> list[float]:
     """A unit-ish vector with 1.0 at the given positions."""
-    v = [0.0] * EMBEDDING_DIM
+    v = [0.0] * MINI_DIM
     for i in hot:
         v[i] = 1.0
     return v
@@ -343,7 +347,7 @@ class TestEntities:
 
 
 class TestEmbeddings:
-    def _embed(self, silver: SilverRepository, page_id: int, *hots: int, model: str = "m") -> int:
+    def _embed(self, silver: SilverRepository, page_id: int, *hots: int, model: str = MINI) -> int:
         return silver.replace_embeddings(
             page_id, model, [{"text": f"chunk {h}", "vector": vec(h)} for h in hots]
         )
@@ -367,15 +371,17 @@ class TestEmbeddings:
         ).all()
         assert [(r.chunk_index, r.chunk_text) for r in rows] == [(0, "first"), (1, "second")]
         assert rows[0].content_hash == "a" * 64
-        assert len(rows[0].embedding) == EMBEDDING_DIM
+        assert len(rows[0].embedding) == MINI_DIM
+        # The short Hugging Face name resolves to the registered one.
+        assert (rows[0].model_name, rows[0].dimensions) == (MINI, MINI_DIM)
 
-    @pytest.mark.parametrize("vector", [[0.1] * 10, [math.nan] * EMBEDDING_DIM])
+    @pytest.mark.parametrize("vector", [[0.1] * 10, [math.nan] * MINI_DIM])
     def test_bad_vectors_are_rejected(
         self, silver: SilverRepository, bronze: BronzeRepository, vector: list[float]
     ) -> None:
         page_id, _ = save(silver, bronze)
         with pytest.raises(ValueError, match="embedding"):
-            silver.replace_embeddings(page_id, "m", [{"text": "t", "vector": vector}])
+            silver.replace_embeddings(page_id, MINI, [{"text": "t", "vector": vector}])
 
     def test_nearest_chunks_are_ordered_by_cosine_distance(
         self, silver: SilverRepository, bronze: BronzeRepository
@@ -385,7 +391,7 @@ class TestEmbeddings:
         self._embed(silver, near_page, 5)
         self._embed(silver, far_page, 200)
 
-        found = silver.nearest_chunks(vec(5), "m", limit=2)
+        found = silver.nearest_chunks(vec(5), MINI, limit=2)
         assert [c.page_id for c, _ in found] == [near_page, far_page]
         assert found[0][1] == pytest.approx(0.0)
         assert found[1][1] == pytest.approx(1.0)
@@ -397,7 +403,7 @@ class TestEmbeddings:
         copy, _ = save(silver, bronze, 2)
         self._embed(silver, copy, 5)
         silver.mark_duplicate_of(copy, original)
-        assert silver.nearest_chunks(vec(5), "m") == []
+        assert silver.nearest_chunks(vec(5), MINI) == []
 
     def test_pages_missing_embeddings_tracks_content_changes(
         self, silver: SilverRepository, bronze: BronzeRepository
@@ -405,12 +411,12 @@ class TestEmbeddings:
         page_id, _ = save(silver, bronze, 1)
 
         def missing() -> list[int]:
-            return [p.id for p in silver.pages_missing_embeddings("m", limit=1000)]
+            return [p.id for p in silver.pages_missing_embeddings(MINI, limit=1000)]
 
         assert page_id in missing()
         self._embed(silver, page_id, 1)
         assert page_id not in missing()
-        assert page_id in [p.id for p in silver.pages_missing_embeddings("other", limit=1000)]
+        assert page_id in [p.id for p in silver.pages_missing_embeddings("sentence-transformers/LaBSE", limit=1000)]
 
         # New content: the old vectors no longer describe the page.
         url = f"https://{HOST}/notice/1"
@@ -422,20 +428,20 @@ class TestEmbeddings:
         self, silver: SilverRepository, bronze: BronzeRepository
     ) -> None:
         page_id, _ = save(silver, bronze)
-        self._embed(silver, page_id, 1, 2, model="a")
-        self._embed(silver, page_id, 3, model="b")
-        self._embed(silver, page_id, 4, model="a")
+        self._embed(silver, page_id, 1, 2, model=MINI)
+        self._embed(silver, page_id, 3, model=MULTI)
+        self._embed(silver, page_id, 4, model=MINI)
         by_model = silver.session.execute(
             select(PageEmbedding.model_name, func.count())
             .where(PageEmbedding.page_id == page_id)
             .group_by(PageEmbedding.model_name)
             .order_by(PageEmbedding.model_name)
         ).all()
-        assert [tuple(r) for r in by_model] == [("a", 1), ("b", 1)]
+        assert [tuple(r) for r in by_model] == [(MINI, 1), (MULTI, 1)]
 
     def test_missing_page_raises(self, silver: SilverRepository) -> None:
         with pytest.raises(LookupError):
-            silver.replace_embeddings(9_999_999, "m", [])
+            silver.replace_embeddings(9_999_999, MINI, [])
 
 
 class TestSchemas:

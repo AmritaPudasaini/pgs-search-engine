@@ -15,11 +15,13 @@ and friends), since the ETL is the only consumer of `processing_status` on
 """
 
 import math
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, TypeVar
 
-from sqlalchemy import ColumnElement, and_, case, delete, func, or_, select, text, update
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import ColumnElement, and_, case, cast, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import BIT, insert
 from sqlalchemy.orm import Session
 
@@ -33,8 +35,9 @@ from ..enums import (
     QuarantineStatus,
 )
 from ..models import (
-    EMBEDDING_DIM,
     CrawledDocument,
+    EmbeddingModel,
+    LocalBody,
     Entity,
     Page,
     PageContact,
@@ -46,8 +49,9 @@ from ..models import (
     QuarantinedFile,
     StoredFile,
 )
-from ._mapping import blank_to_none, parse_timestamp
+from ._mapping import blank_to_none, parse_timestamp, signed_simhash
 from .bronze import SaveResult
+from .reference import ReferenceRepository
 
 # The two Bronze tables that carry an ETL work queue.
 _QueueRow = TypeVar("_QueueRow", CrawledDocument, StoredFile)
@@ -94,6 +98,9 @@ def _media_rows(media: Any) -> list[dict[str, Any]]:
             "media_type": MediaType[raw_type],
             "alt_text": blank_to_none(item.get("alt_text")),
             "extracted_text": blank_to_none(item.get("extracted_text")),
+            # The image indexer calls it surrounding_context.
+            "context_text": blank_to_none(item.get("context_text"))
+            or blank_to_none(item.get("surrounding_context")),
             "stored_file_id": item.get("stored_file_id"),
         }
     return list(by_url.values())
@@ -144,11 +151,36 @@ def _entity_rows(entities: Any) -> list[dict[str, Any]]:
     return list(merged.values())
 
 
-def _check_vector(vector: Any) -> None:
-    if not isinstance(vector, Sequence) or len(vector) != EMBEDDING_DIM:
-        raise ValueError(f"an embedding must have exactly {EMBEDDING_DIM} numbers")
+def _check_vector(vector: Any, dimensions: int | None = None) -> None:
+    if not isinstance(vector, Sequence) or isinstance(vector, str) or not vector:
+        raise ValueError("an embedding must be a non-empty list of numbers")
+    if dimensions is not None and len(vector) != dimensions:
+        raise ValueError(
+            f"an embedding for this model must have exactly {dimensions} numbers, "
+            f"got {len(vector)}"
+        )
     if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in vector):
         raise ValueError("an embedding must contain only finite numbers")
+
+
+def _payload_simhash(payload: Mapping[str, Any]) -> int | None:
+    """`sim_hash` (int) or the ETL's `simhash` (16 hex digits), as the signed BIGINT stored.
+
+    Both are the 64-bit fingerprint; unsigned values are reinterpreted, not truncated.
+    """
+    raw = payload.get("sim_hash", payload.get("simhash"))
+    if raw is None or raw == "":
+        return None
+    value = int(raw, 16) if isinstance(raw, str) else int(raw)
+    if not -(2**63) <= value < 2**64:
+        raise ValueError("simhash must be a 64-bit fingerprint")
+    return signed_simhash(value)
+
+
+def hnsw_index_name(model_name: str) -> str:
+    """`ix_page_embeddings_hnsw_<model>`, within Postgres's 63-character limit."""
+    slug = re.sub(r"[^a-z0-9]+", "_", model_name.lower()).strip("_")
+    return f"ix_page_embeddings_hnsw_{slug}"[:63]
 
 
 def _embedding_block(block: Any) -> tuple[str, str | None, list[dict[str, Any]]]:
@@ -274,7 +306,7 @@ class SilverRepository:
             else None
         )
         embedding_block = (
-            _embedding_block(payload["embeddings"])
+            self._checked_embedding_block(_embedding_block(payload["embeddings"]))
             if replace_children and "embeddings" in payload
             else None
         )
@@ -432,11 +464,14 @@ class SilverRepository:
             "stored_file_id": stored_file_id,
             "domain_id": domain_id,
             "canonical_url": str(canonical_url),
-            "title": blank_to_none(meta.get("title")),
-            "description": blank_to_none(meta.get("description")),
+            # §5.2 nests these in extracted_metadata; the ETL's transform.py sends
+            # them top-level. Either is accepted.
+            "title": blank_to_none(meta.get("title")) or blank_to_none(payload.get("title")),
+            "description": blank_to_none(meta.get("description"))
+            or blank_to_none(payload.get("description")),
             "body_text": body_text,
             "word_count": int(word_count),
-            "keywords": meta.get("keywords") or None,
+            "keywords": meta.get("keywords") or payload.get("keywords") or None,
             # §5.2 calls it language_detected; SearchDocument calls it language.
             "language": to_language(
                 payload.get("language_detected") or payload.get("language")
@@ -450,7 +485,7 @@ class SilverRepository:
             "published_at": published_at,
             "quality_flags": list(payload.get("quality_flags") or []) or None,
             "content_hash": str(resolved_hash),
-            "sim_hash": sim_hash if sim_hash is not None else payload.get("sim_hash"),
+            "sim_hash": sim_hash if sim_hash is not None else _payload_simhash(payload),
             # New or changed content has to be (re)indexed.
             "processing_status": ProcessingStatus.UNPROCESSED,
             "processing_error": None,
@@ -462,8 +497,9 @@ class SilverRepository:
         """Replace a page's images, videos and linked documents (with OCR/parsed text).
 
         Each item: `url`, `media_type` (image / video / document), and optional
-        `alt_text`, `extracted_text`, `stored_file_id`. Without `stored_file_id` the
-        newest stored file with that `document_url` is linked, if there is one.
+        `alt_text`, `extracted_text`, `context_text` (or `surrounding_context`),
+        `stored_file_id`. Without `stored_file_id` the newest stored file with that
+        `document_url` is linked, if there is one.
         """
         return self._replace_media_rows(page_id, _media_rows(media))
 
@@ -547,7 +583,7 @@ class SilverRepository:
     ) -> int:
         """Replace one model's vectors for a page. Returns the number of chunks stored.
 
-        Each chunk: `text` and `vector` (EMBEDDING_DIM floats), optional
+        Each chunk: `text` and `vector` (the model's dimensions), optional
         `chunk_index` (defaults to its position). Other models' vectors are kept.
         The page's current `content_hash` is recorded, which is how
         `pages_missing_embeddings` spots vectors made from older text.
@@ -555,10 +591,90 @@ class SilverRepository:
         page_hash = self.session.scalar(select(Page.content_hash).where(Page.id == page_id))
         if page_hash is None:
             raise LookupError(f"page {page_id} does not exist")
-        name, version, rows = _embedding_block(
-            {"model_name": model_name, "model_version": model_version, "chunks": chunks}
+        name, version, rows = self._checked_embedding_block(
+            _embedding_block(
+                {"model_name": model_name, "model_version": model_version, "chunks": chunks}
+            )
         )
         return self._replace_embedding_rows(page_id, name, version, rows, page_hash)
+
+    # --------------------------------------------------------- embedding models
+
+    def embedding_model(self, name: str | None = None) -> EmbeddingModel:
+        """A registered model by name, or the default model when `name` is None.
+
+        A bare Hugging Face name (`all-MiniLM-L6-v2`) also finds its
+        `sentence-transformers/` entry. Raises ValueError for an unknown model.
+        """
+        if name is None:
+            model = self.session.scalar(
+                select(EmbeddingModel).where(EmbeddingModel.is_default.is_(True))
+            )
+            if model is None:
+                raise ValueError("no default embedding model is registered")
+            return model
+        candidates = [name] if "/" in name else [name, f"sentence-transformers/{name}"]
+        model = self.session.scalar(
+            select(EmbeddingModel)
+            .where(EmbeddingModel.name.in_(candidates))
+            .order_by(EmbeddingModel.name != name)
+            .limit(1)
+        )
+        if model is None:
+            raise ValueError(
+                f"unknown embedding model {name!r}: register it with register_embedding_model"
+            )
+        return model
+
+    def register_embedding_model(
+        self,
+        name: str,
+        dimensions: int,
+        *,
+        description: str | None = None,
+        make_default: bool = False,
+    ) -> EmbeddingModel:
+        """Register a model and create its HNSW index. Needs the schema owner's rights.
+
+        Safe to re-run. `make_default` moves the default to this model: the ETL and
+        search should switch together, or queries won't match documents.
+        """
+        if not 1 <= dimensions <= 2000:
+            raise ValueError("dimensions must be between 1 and 2000 (HNSW's limit)")
+        existing = self.session.scalar(select(EmbeddingModel).where(EmbeddingModel.name == name))
+        if existing is not None and existing.dimensions != dimensions:
+            raise ValueError(f"{name} is registered with {existing.dimensions} dimensions")
+        if make_default:
+            self.session.execute(
+                update(EmbeddingModel)
+                .where(EmbeddingModel.is_default.is_(True))
+                .values(is_default=False)
+            )
+            self.session.flush()
+        if existing is None:
+            existing = EmbeddingModel(name=name, dimensions=dimensions, description=description)
+            self.session.add(existing)
+        existing.is_default = existing.is_default or make_default
+        self.session.flush()
+        literal_name = name.replace("'", "''")
+        self.session.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS {hnsw_index_name(name)} ON page_embeddings "
+                f"USING hnsw ((embedding::vector({int(dimensions)})) vector_cosine_ops) "
+                f"WHERE model_name = '{literal_name}'"
+            )
+        )
+        return existing
+
+    def _checked_embedding_block(
+        self, block: tuple[str, str | None, list[dict[str, Any]]]
+    ) -> tuple[str, str | None, list[dict[str, Any]]]:
+        """Resolve the block's model and check every vector has its dimensions."""
+        name, version, rows = block
+        model = self.embedding_model(name)
+        for row in rows:
+            _check_vector(row["embedding"], model.dimensions)
+        return model.name, version, rows
 
     def _replace_embedding_rows(
         self,
@@ -597,6 +713,7 @@ class SilverRepository:
         changed since they were embedded. Duplicates are skipped -- search shows
         their canonical page.
         """
+        model_name = self.embedding_model(model_name).name
         current = (
             select(PageEmbedding.id)
             .where(
@@ -620,15 +737,17 @@ class SilverRepository:
     ) -> list[tuple[PageEmbedding, float]]:
         """The chunks closest to `vector` by cosine distance (0 = identical), nearest first.
 
-        Uses the HNSW index. Only canonical pages are searched. The query vector
-        must come from the same model as `model_name`.
+        Uses the model's HNSW index (the cast below matches its expression). Only
+        canonical pages are searched. The query vector must come from the same model.
         """
-        _check_vector(vector)
-        distance = PageEmbedding.embedding.cosine_distance(list(vector)).label("distance")
+        model = self.embedding_model(model_name)
+        _check_vector(vector, model.dimensions)
+        typed = cast(PageEmbedding.embedding, Vector(model.dimensions))
+        distance = typed.cosine_distance(list(vector)).label("distance")
         rows = self.session.execute(
             select(PageEmbedding, distance)
             .join(Page, Page.id == PageEmbedding.page_id)
-            .where(PageEmbedding.model_name == model_name, Page.duplicate_of_id.is_(None))
+            .where(PageEmbedding.model_name == model.name, Page.duplicate_of_id.is_(None))
             .order_by(distance)
             .limit(limit)
         ).all()
@@ -698,6 +817,20 @@ class SilverRepository:
         local_body_code = blank_to_none(block.get("local_body_code")) or blank_to_none(
             block.get("municipality_id")
         )
+        mention_text = blank_to_none(block.get("mention_text"))
+        if province_code is None and district_code is None and local_body_code is None:
+            # Place names instead of codes (the ETL's resolve_geo): look them up.
+            names = {
+                level: blank_to_none(block.get(level))
+                for level in ("province", "district", "municipality")
+            }
+            if any(names.values()):
+                codes = ReferenceRepository(self.session).codes_for_names(**names)
+                if codes is not None:
+                    province_code = codes["province_code"]
+                    district_code = codes["district_code"]
+                    local_body_code = codes["municipality_id"]
+                    mention_text = mention_text or next(v for v in names.values() if v)
         if province_code is None and district_code is None and local_body_code is None:
             # Nothing resolved -- the CHECK would reject it, so skip rather than fail:
             # an untagged page is normal, not an error.
@@ -706,6 +839,8 @@ class SilverRepository:
         # A resolved tag must say how it was resolved and how sure the ETL is.
         # No defaults: a silently-invented confidence would poison ranking.
         raw_method = blank_to_none(block.get("method"))
+        if raw_method is None and block.get("source") == "seed_gazetteer":
+            raw_method = GeoTagMethod.GAZETTEER.value  # the ETL's resolve_geo says so
         if raw_method is None:
             raise ValueError("geo tag is missing required field 'method'")
         try:
@@ -720,15 +855,23 @@ class SilverRepository:
         if not 0.0 <= confidence <= 1.0:
             raise ValueError(f"geo tag confidence must be within 0..1, got {confidence}")
 
-        ward = block.get("ward_number")
+        ward = int(block["ward_number"]) if block.get("ward_number") is not None else None
+        if ward is not None and local_body_code is not None:
+            ward_count = self.session.scalar(
+                select(LocalBody.ward_count).where(LocalBody.code == local_body_code)
+            )
+            if ward_count is not None and not 1 <= ward <= ward_count:
+                raise ValueError(
+                    f"ward {ward} does not exist in {local_body_code} ({ward_count} wards)"
+                )
         return {
             "province_code": province_code,
             "district_code": district_code,
             "local_body_code": local_body_code,
-            "ward_number": int(ward) if ward is not None else None,
+            "ward_number": ward,
             "method": method,
             "confidence": confidence,
-            "mention_text": blank_to_none(block.get("mention_text")),
+            "mention_text": mention_text,
         }
 
     # --------------------------------------------------------------- contacts
@@ -794,16 +937,21 @@ class SilverRepository:
         return self._claim(StoredFile, StoredFile.stored_at, limit)
 
     def _claim(self, model: type[_QueueRow], order: Any, limit: int) -> list[_QueueRow]:
+        # A MATERIALIZED CTE runs exactly once. As `WHERE id IN (subquery)`, the
+        # planner may re-run the LIMIT ... SKIP LOCKED subquery per row and claim
+        # more than `limit` rows.
         candidates = (
             select(model.id)
             .where(model.processing_status == ProcessingStatus.UNPROCESSED)
             .order_by(order, model.id)
             .limit(limit)
             .with_for_update(skip_locked=True)
+            .cte("candidates")
+            .prefix_with("MATERIALIZED")
         )
         claimed = self.session.scalars(
             update(model)
-            .where(model.id.in_(candidates.scalar_subquery()))
+            .where(model.id == candidates.c.id)
             .values(
                 processing_status=ProcessingStatus.PROCESSING,
                 processing_error=None,

@@ -21,7 +21,7 @@ crawled_documents          stored_files
  ├──────────────┬───────────────┬──────────────┬──────────────┬───────────────┐
  ▼              ▼               ▼              ▼              ▼               ▼
 page_geo_tags  page_contacts  page_sources   page_media    page_entities   page_embeddings
-                              (history)      (OCR text)    → entities      (pgvector 384)
+                              (history)      (OCR text)    → entities      (pgvector)
 ```
 
 **Fastest route for the ETL:** `pgs_db.etl.process_bronze_batch(Session, transform)`
@@ -169,13 +169,21 @@ in one payload is merged (mention counts added, highest salience kept).
 
 ```json
 "embeddings": {
-  "model_name": "all-MiniLM-L6-v2", "model_version": "2",
+  "model_name": "sentence-transformers/LaBSE", "model_version": "2",
   "chunks": [{"text": "first chunk ...", "vector": [0.013, -0.07, ...]}]
 }
 ```
 
-- **384 numbers per vector** (`EMBEDDING_DIM`), matching the search team's query model
-  `all-MiniLM-L6-v2`. Another size needs a migration.
+- **The model must be registered** in `embedding_models`, and every vector must have
+  that model's size. Registered: `sentence-transformers/LaBSE` (768, **the default**:
+  multilingual, what the ETL uses), `sentence-transformers/all-MiniLM-L6-v2` (384) and
+  `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384). The short name
+  (`all-MiniLM-L6-v2`) also works. The database enforces it too: a composite foreign
+  key on (`model_name`, `dimensions`), so a Go or Spark writer can't slip in a wrong size.
+- **Documents and queries must use the same model.** Search embeds the query with the
+  default model (`SilverRepository.embedding_model()`); moving the default is
+  `register_embedding_model(name, dims, make_default=True)`, done together with a
+  re-embed.
 - One row per chunk; `chunk_index` defaults to the chunk's position.
 - Writing one model's chunks replaces only that model's rows for the page.
 - Each row records the page's `content_hash`. `pages_missing_embeddings(model)` lists
@@ -183,13 +191,33 @@ in one payload is merged (mention counts added, highest salience kept).
   run instead of embedding inside the transform:
 
 ```python
-for page in repo.pages_missing_embeddings("all-MiniLM-L6-v2", limit=500):
+for page in repo.pages_missing_embeddings("sentence-transformers/LaBSE", limit=500):
     chunks = [{"text": c, "vector": model.encode(c).tolist()} for c in split(page.body_text)]
-    repo.replace_embeddings(page.id, "all-MiniLM-L6-v2", chunks)
+    repo.replace_embeddings(page.id, "sentence-transformers/LaBSE", chunks)
 ```
 
-- `nearest_chunks(vector, model_name, limit)` searches by cosine distance with the
-  HNSW index, canonical pages only.
+- `nearest_chunks(vector, model_name, limit)` searches by cosine distance with that
+  model's HNSW index, canonical pages only.
+
+### Records from `ETL/spark/transform.py`, as they are
+
+The current pipeline (Kafka signal → `transform_file` → record) needs no reshaping:
+
+```python
+from pgs_db.etl import save_transformed
+
+record = transform_file(signal, dfs_root)             # the ETL's own function
+save_transformed(Session, record, geo_confidence=0.6)  # finds the Bronze row, saves, marks it
+```
+
+- The Bronze row is found by the record's `object_key` (`stored_files.storage_path`
+  or `crawled_documents.minio_path`), else by `source_url`. No Bronze row → `LookupError`.
+- Top-level `title`, hex `simhash`, `content_sha256`, the LaBSE `embedding` and
+  `geo_location` **place names** are all accepted. Names resolve through the gazetteer
+  (`ReferenceRepository.codes_for_names`), inside the district when one is given.
+- `resolve_geo` states no confidence, so the caller passes `geo_confidence`: how much
+  it trusts its rules. A guessed default would skew ranking.
+- A PDF keeps its own URL as its identity, not the page that linked it.
 
 ### When optional blocks are replaced
 
@@ -512,11 +540,11 @@ codes in the shape the `geo_location` block expects.
    from `gazetteer()`.
 7. **The Kafka consumer writes SQLite** (`ETL/kafka/consumer.py`), not PostgreSQL, and its
    `documents` table duplicates Bronze. Nothing currently bridges it to this layer.
-8. **`page_embeddings` is built with the search team's choices:** pgvector in
-   Postgres, 384 dimensions (`all-MiniLM-L6-v2`), one row per chunk; either inside
-   the payload or by a separate job using `pages_missing_embeddings`. Note that
-   `all-MiniLM-L6-v2` is English-only: Nepali text will embed poorly. A multilingual
-   384-dimension model (`paraphrase-multilingual-MiniLM-L12-v2`) keeps the same column.
+8. **Embedding model: LaBSE (768) is the default** (migration `f6a7b8c9d0e1`), since
+   `etl/workflow_saurav` embeds with it and it handles Nepali. The search branches
+   embed queries with `all-MiniLM-L6-v2` (384), which is registered too, but a LaBSE
+   document and a MiniLM query are not comparable: **the search team must embed
+   queries with LaBSE** (or both switch together).
 9. **Where the ClamAV scan runs.** `ETL/spark/README.md` Stage 2 puts it before MinIO and
    Kafka (scraper side), so infected files would never reach the ETL. `quarantined_files`
    is written by the ETL instead, scanning each payload as it claims it. Update Stage 2

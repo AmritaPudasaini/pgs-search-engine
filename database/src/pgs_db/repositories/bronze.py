@@ -114,13 +114,23 @@ class BronzeRepository:
         category: str | None = None,
         temporal_workflow_id: str | None = None,
         started_at: datetime | None = None,
+        seed_count: int | None = None,
+        max_depth: int | None = None,
+        max_pages: int | None = None,
     ) -> int:
-        """Open a crawl run and return its id (the scraper's ``Document.crawl_run_id``)."""
+        """Open a crawl run and return its id (the scraper's ``Document.crawl_run_id``).
+
+        `seed_count` / `max_depth` / `max_pages` record the run's configuration, so a
+        short run can be told apart from a run that was configured small.
+        """
         run = CrawlRun(
             category=category,
             temporal_workflow_id=temporal_workflow_id,
             started_at=started_at or _utcnow(),
             status=CrawlRunStatus.RUNNING,
+            seed_count=seed_count,
+            max_depth=max_depth,
+            max_pages=max_pages,
             **crawl_stats_columns(None),
         )
         self.session.add(run)
@@ -140,14 +150,16 @@ class BronzeRepository:
         status: CrawlRunStatus = CrawlRunStatus.COMPLETED,
         stats: Mapping[str, Any] | None = None,
         finished_at: datetime | None = None,
+        error: str | None = None,
     ) -> None:
-        """Close the run with final counters. Pass status=FAILED for a crashed crawl."""
+        """Close the run with final counters. Pass status=FAILED and `error` for a crashed crawl."""
         run = self._require_run(run_id)
         if stats is not None:
             for column, value in crawl_stats_columns(stats).items():
                 setattr(run, column, value)
         run.status = status
         run.finished_at = finished_at or _utcnow()
+        run.error = error or None
 
     def _require_run(self, run_id: int) -> CrawlRun:
         run = self.session.get(CrawlRun, run_id)

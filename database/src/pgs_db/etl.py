@@ -13,6 +13,11 @@ PROCESSED or FAILED -- is done here, the same way every time:
         print(result)
     process_stored_file_batch(Session, transform_pdf)   # PDFs / images in MinIO
 
+The ETL's current pipeline (Kafka signal -> `transform_file` -> record) plugs in
+without rewriting its transform: `save_transformed(Session, record,
+geo_confidence=...)` finds the record's Bronze row by its MinIO `object_key` and
+saves it; `payload_from_transform` does just the conversion.
+
 A transform that raises marks just that row FAILED with the error; the batch
 carries on. A transform whose virus scan flags the payload raises `Infected`
 instead, after moving the object to the quarantine bucket: the row is recorded in
@@ -24,9 +29,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import CrawledDocument, Page, StoredFile
+from .models import DEFAULT_EMBEDDING_MODEL, CrawledDocument, Page, StoredFile
 from .repositories.reference import ReferenceRepository
 from .repositories.silver import SilverRepository
 
@@ -176,6 +182,137 @@ def process_stored_file_batch(
             domain_geo=domain_geo,
         )
     return result
+
+
+# ------------------------------------------------- the ETL's transform.py output
+
+
+def payload_from_transform(document: Mapping[str, Any], *, geo_confidence: float) -> dict[str, Any]:
+    """Turn one record of `ETL/spark/transform.py` (`transform_document` /
+    `transform_file`) into a `save_page` payload.
+
+    - `content_sha256` -> `content_hash`; `simhash` (hex) is read by `save_page`.
+    - `geo_location`'s place names are kept: `save_page` resolves them to codes
+      through the gazetteer. `resolve_geo` gives no confidence, so the caller says
+      how much it trusts it (`geo_confidence`, 0..1) -- a guessed default would
+      skew ranking.
+    - A document-level `embedding` (LaBSE, the mean of its chunks) becomes one
+      chunk under its `embedding_model`.
+    - `duplicate` / `duplicate_of` are dropped: Silver deduplicates on save.
+    """
+    if not 0.0 <= geo_confidence <= 1.0:
+        raise ValueError("geo_confidence must be within 0..1")
+    text = document.get("searchable_text") or ""
+    payload: dict[str, Any] = {
+        "source_url": document.get("source_url") or None,
+        "title": document.get("title") or None,
+        "searchable_text": text,
+        "language_detected": document.get("language_detected"),
+        "word_count": document.get("word_count"),
+        "content_hash": document.get("content_sha256") or document.get("content_hash"),
+        "simhash": document.get("simhash"),
+    }
+    for passthrough in ("content_type", "category", "published_at", "description", "keywords"):
+        if document.get(passthrough) is not None:
+            payload[passthrough] = document[passthrough]
+    geo = document.get("geo_location")
+    if geo:
+        payload["geo_location"] = {
+            **geo,
+            "method": geo.get("method") or "GAZETTEER",
+            "confidence": geo.get("confidence", geo_confidence),
+        }
+    embedding = document.get("embedding")
+    if embedding:
+        payload["embeddings"] = {
+            "model_name": document.get("embedding_model") or DEFAULT_EMBEDDING_MODEL,
+            "chunks": [{"chunk_index": 0, "text": text[:2000] or "(empty)", "vector": embedding}],
+        }
+    return payload
+
+
+@dataclass
+class TransformedSave:
+    """Where one transform.py record landed."""
+
+    page_id: int
+    crawled_document_id: int | None
+    stored_file_id: int | None
+    duplicate: bool
+
+
+def save_transformed(
+    session_factory: sessionmaker[Session],
+    document: Mapping[str, Any],
+    *,
+    geo_confidence: float,
+    dedup: bool = True,
+    domain_geo: bool = True,
+) -> TransformedSave:
+    """Save one transform.py record for the Kafka-signal pipeline, in one transaction.
+
+    The Bronze row is found by the record's MinIO `object_key` (a stored file's
+    `storage_path`, or a crawled page's `minio_path`), else by `source_url` (the
+    newest crawl of it). That row is marked PROCESSED. Raises LookupError when the
+    scraper never wrote the row: Silver never holds a page without its Bronze source.
+    """
+    payload = payload_from_transform(document, geo_confidence=geo_confidence)
+    object_key = document.get("object_key") or None
+    source_url = document.get("source_url") or None
+    with session_factory() as s, s.begin():
+        repo = SilverRepository(s)
+        stored = (
+            s.scalars(select(StoredFile).where(StoredFile.storage_path == object_key)).first()
+            if object_key
+            else None
+        )
+        crawled = None
+        if stored is None:
+            conditions = []
+            if object_key:
+                conditions.append(CrawledDocument.minio_path == object_key)
+            if source_url:
+                conditions.append(CrawledDocument.normalized_url == source_url)
+                conditions.append(CrawledDocument.url == source_url)
+            if conditions:
+                crawled = s.scalars(
+                    select(CrawledDocument)
+                    .where(or_(*conditions))
+                    .order_by(CrawledDocument.fetched_at.desc(), CrawledDocument.id.desc())
+                    .limit(1)
+                ).first()
+        if stored is None and crawled is None:
+            raise LookupError(
+                f"no Bronze row for object_key={object_key!r} / source_url={source_url!r}"
+            )
+        domain_id = (
+            crawled.domain_id
+            if crawled is not None
+            else (stored.crawled_document.domain_id if stored and stored.crawled_document else None)
+        )
+        if domain_geo and payload.get("geo_location") is None:
+            geo = ReferenceRepository(s).geo_for_domain(domain_id)
+            if geo is not None:
+                payload["geo_location"] = geo
+        if stored is not None:
+            # A file's source_url is the page that linked it; as the canonical URL it
+            # would overwrite that page. The file keeps its own document_url.
+            payload.pop("source_url", None)
+            payload["content_hash"] = payload.get("content_hash") or stored.sha256
+            saved = repo.save_page(payload, stored_file_id=stored.id, domain_id=domain_id)
+            repo.mark_stored_files_processed([stored.id])
+        else:
+            assert crawled is not None
+            payload["content_hash"] = payload.get("content_hash") or crawled.content_hash
+            saved = repo.save_page(payload, crawled_document_id=crawled.id, domain_id=domain_id)
+            repo.mark_bronze_processed([crawled.id])
+        duplicate = dedup and _fold_duplicate(repo, saved.id)
+        return TransformedSave(
+            page_id=saved.id,
+            crawled_document_id=crawled.id if crawled is not None else None,
+            stored_file_id=stored.id if stored is not None else None,
+            duplicate=duplicate,
+        )
 
 
 def _save_one(

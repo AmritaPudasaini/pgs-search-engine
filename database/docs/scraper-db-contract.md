@@ -37,7 +37,14 @@ of them wrong produces either a constraint violation or a silently wrong row.
 `processing_status` defaults to `UNPROCESSED` on both document tables and may be omitted.
 
 Status values are plain strings validated by `CHECK` constraints, never Postgres enums, so no
-casts are needed. The permitted values live in `src/pgs_db/enums.py`.
+casts are needed. The permitted values live in `src/pgs_db/enums.py`. `crawl_runs.status` is
+upper-cased by a trigger, so the Temporal scraper's `'running'` / `'completed'` / `'failed'`
+are accepted as written.
+
+The Temporal scraper (`person1/search-engine-scaffold`, `omprakash/discovery-frontier-workflow`)
+sends `links` but not `internal_links` / `external_links`: that is fine, same-host `links` are
+counted as the domain's discovered links. It sends no contacts and no stored files, so
+municipality contacts and PDF/image search stay empty until it does.
 
 ---
 
@@ -49,11 +56,15 @@ Returns the id that every document from this crawl carries as `crawl_run_id`.
 
 ```sql
 INSERT INTO crawl_runs (category, temporal_workflow_id, status, started_at,
+                        seed_count, max_depth, max_pages,        -- optional run config
                         fetched_count, succeeded_count, failed_count,
                         skipped_count, unique_url_count)
-VALUES ($1, $2, 'RUNNING', $3, 0, 0, 0, 0, 0)
+VALUES ($1, $2, 'RUNNING', $3, $4, $5, $6, 0, 0, 0, 0, 0)
 RETURNING id;
 ```
+
+These replace the scraper's own `crawl_runs` (migration 0004): `fetched` → `fetched_count`,
+`domain_capped` → `domain_capped_count`, `error` → `error`; its other columns map one to one.
 
 ### 3.2 Resolve the domain
 
@@ -129,11 +140,12 @@ the file; pass `NULL` if it is not to hand.
 
 ```sql
 UPDATE crawl_runs SET fetched_count = $2, succeeded_count = $3, failed_count = $4,
-                      skipped_count = $5, unique_url_count = $6, updated_at = now()
+                      skipped_count = $5, unique_url_count = $6, domain_capped_count = $7
 WHERE id = $1;
 
-UPDATE crawl_runs SET status = $2,          -- 'COMPLETED' or 'FAILED'
-                      finished_at = $3, updated_at = now()
+UPDATE crawl_runs SET status = $2,          -- 'COMPLETED' or 'FAILED' (any case)
+                      finished_at = $3,
+                      error = $4             -- why the run failed; NULL when it completed
 WHERE id = $1;
 ```
 
