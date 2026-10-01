@@ -1,0 +1,7284 @@
+{
+ "_source": "https://github.com/sagautam5/local-states-nepal (dataset/{districts,municipalities,categories}/{en,np}.json)",
+ "_note": "codes are assigned by this project: D<dataset id>, MUN<dataset id>. 'wards' is reference only - local_bodies has no ward-count column yet.",
+ "provinces": [
+  {
+   "code": "P1",
+   "name_en": "Koshi",
+   "name_ne": "कोशी"
+  },
+  {
+   "code": "P2",
+   "name_en": "Madhesh",
+   "name_ne": "मधेश"
+  },
+  {
+   "code": "P3",
+   "name_en": "Bagmati",
+   "name_ne": "बागमती"
+  },
+  {
+   "code": "P4",
+   "name_en": "Gandaki",
+   "name_ne": "गण्डकी"
+  },
+  {
+   "code": "P5",
+   "name_en": "Lumbini",
+   "name_ne": "लुम्बिनी"
+  },
+  {
+   "code": "P6",
+   "name_en": "Karnali",
+   "name_ne": "कर्णाली"
+  },
+  {
+   "code": "P7",
+   "name_en": "Sudurpashchim",
+   "name_ne": "सुदूरपश्चिम"
+  }
+ ],
+ "districts": [
+  {
+   "code": "D01",
+   "province_code": "P1",
+   "name_en": "Bhojpur",
+   "name_ne": "भोजपुर"
+  },
+  {
+   "code": "D02",
+   "province_code": "P1",
+   "name_en": "Dhankuta",
+   "name_ne": "धनकुटा"
+  },
+  {
+   "code": "D03",
+   "province_code": "P1",
+   "name_en": "Ilam",
+   "name_ne": "इलाम"
+  },
+  {
+   "code": "D04",
+   "province_code": "P1",
+   "name_en": "Jhapa",
+   "name_ne": "झापा"
+  },
+  {
+   "code": "D05",
+   "province_code": "P1",
+   "name_en": "Khotang",
+   "name_ne": "खोटाँग"
+  },
+  {
+   "code": "D06",
+   "province_code": "P1",
+   "name_en": "Morang",
+   "name_ne": "मोरंग"
+  },
+  {
+   "code": "D07",
+   "province_code": "P1",
+   "name_en": "Okhaldhunga",
+   "name_ne": "ओखलढुंगा"
+  },
+  {
+   "code": "D08",
+   "province_code": "P1",
+   "name_en": "Pachthar",
+   "name_ne": "पांचथर"
+  },
+  {
+   "code": "D09",
+   "province_code": "P1",
+   "name_en": "Sankhuwasabha",
+   "name_ne": "संखुवासभा"
+  },
+  {
+   "code": "D10",
+   "province_code": "P1",
+   "name_en": "Solukhumbu",
+   "name_ne": "सोलुखुम्बू"
+  },
+  {
+   "code": "D11",
+   "province_code": "P1",
+   "name_en": "Sunsari",
+   "name_ne": "सुनसरी"
+  },
+  {
+   "code": "D12",
+   "province_code": "P1",
+   "name_en": "Taplejung",
+   "name_ne": "ताप्लेजुंग"
+  },
+  {
+   "code": "D13",
+   "province_code": "P1",
+   "name_en": "Terhathum",
+   "name_ne": "तेह्रथुम"
+  },
+  {
+   "code": "D14",
+   "province_code": "P1",
+   "name_en": "Udayapur",
+   "name_ne": "उदयपुर"
+  },
+  {
+   "code": "D15",
+   "province_code": "P2",
+   "name_en": "Parsa",
+   "name_ne": "पर्सा"
+  },
+  {
+   "code": "D16",
+   "province_code": "P2",
+   "name_en": "Bara",
+   "name_ne": "बारा"
+  },
+  {
+   "code": "D17",
+   "province_code": "P2",
+   "name_en": "Rautahat",
+   "name_ne": "रौतहट"
+  },
+  {
+   "code": "D18",
+   "province_code": "P2",
+   "name_en": "Sarlahi",
+   "name_ne": "सर्लाही"
+  },
+  {
+   "code": "D19",
+   "province_code": "P2",
+   "name_en": "Siraha",
+   "name_ne": "सिराहा"
+  },
+  {
+   "code": "D20",
+   "province_code": "P2",
+   "name_en": "Dhanusha",
+   "name_ne": "धनुषा"
+  },
+  {
+   "code": "D21",
+   "province_code": "P2",
+   "name_en": "Saptari",
+   "name_ne": "सप्तरी"
+  },
+  {
+   "code": "D22",
+   "province_code": "P2",
+   "name_en": "Mahottari",
+   "name_ne": "महोत्तरी"
+  },
+  {
+   "code": "D23",
+   "province_code": "P3",
+   "name_en": "Bhaktapur",
+   "name_ne": "भक्तपुर"
+  },
+  {
+   "code": "D24",
+   "province_code": "P3",
+   "name_en": "Chitwan",
+   "name_ne": "चितवन"
+  },
+  {
+   "code": "D25",
+   "province_code": "P3",
+   "name_en": "Dhading",
+   "name_ne": "धादिंङ्ग"
+  },
+  {
+   "code": "D26",
+   "province_code": "P3",
+   "name_en": "Dolakha",
+   "name_ne": "दोलखा"
+  },
+  {
+   "code": "D27",
+   "province_code": "P3",
+   "name_en": "Kathmandu",
+   "name_ne": "काठमाडौँ"
+  },
+  {
+   "code": "D28",
+   "province_code": "P3",
+   "name_en": "Kavrepalanchok",
+   "name_ne": "काभ्रेपलान्चोक"
+  },
+  {
+   "code": "D29",
+   "province_code": "P3",
+   "name_en": "Lalitpur",
+   "name_ne": "ललितपुर"
+  },
+  {
+   "code": "D30",
+   "province_code": "P3",
+   "name_en": "Makwanpur",
+   "name_ne": "मकवानपुर"
+  },
+  {
+   "code": "D31",
+   "province_code": "P3",
+   "name_en": "Nuwakot",
+   "name_ne": "नुवाकोट"
+  },
+  {
+   "code": "D32",
+   "province_code": "P3",
+   "name_en": "Ramechap",
+   "name_ne": "रामेछाप"
+  },
+  {
+   "code": "D33",
+   "province_code": "P3",
+   "name_en": "Rasuwa",
+   "name_ne": "रसुवा"
+  },
+  {
+   "code": "D34",
+   "province_code": "P3",
+   "name_en": "Sindhuli",
+   "name_ne": "सिन्धुली"
+  },
+  {
+   "code": "D35",
+   "province_code": "P3",
+   "name_en": "Sindhupalchok",
+   "name_ne": "सिन्धुपाल्चोक"
+  },
+  {
+   "code": "D36",
+   "province_code": "P4",
+   "name_en": "Baglung",
+   "name_ne": "बागलुङ"
+  },
+  {
+   "code": "D37",
+   "province_code": "P4",
+   "name_en": "Gorkha",
+   "name_ne": "गोरखा"
+  },
+  {
+   "code": "D38",
+   "province_code": "P4",
+   "name_en": "Kaski",
+   "name_ne": "कास्की"
+  },
+  {
+   "code": "D39",
+   "province_code": "P4",
+   "name_en": "Lamjung",
+   "name_ne": "लमजुङ"
+  },
+  {
+   "code": "D40",
+   "province_code": "P4",
+   "name_en": "Manang",
+   "name_ne": "मनाङ"
+  },
+  {
+   "code": "D41",
+   "province_code": "P4",
+   "name_en": "Mustang",
+   "name_ne": "मुस्ताङ"
+  },
+  {
+   "code": "D42",
+   "province_code": "P4",
+   "name_en": "Myagdi",
+   "name_ne": "म्याग्दी"
+  },
+  {
+   "code": "D43",
+   "province_code": "P4",
+   "name_en": "Nawalpur",
+   "name_ne": "नवलपुर"
+  },
+  {
+   "code": "D44",
+   "province_code": "P4",
+   "name_en": "Parwat",
+   "name_ne": "पर्वत"
+  },
+  {
+   "code": "D45",
+   "province_code": "P4",
+   "name_en": "Syangja",
+   "name_ne": "स्याङग्जा"
+  },
+  {
+   "code": "D46",
+   "province_code": "P4",
+   "name_en": "Tanahun",
+   "name_ne": "तनहुँ"
+  },
+  {
+   "code": "D47",
+   "province_code": "P5",
+   "name_en": "Kapilvastu",
+   "name_ne": "कपिलवस्तु"
+  },
+  {
+   "code": "D48",
+   "province_code": "P5",
+   "name_en": "Parasi",
+   "name_ne": "परासी"
+  },
+  {
+   "code": "D49",
+   "province_code": "P5",
+   "name_en": "Rupandehi",
+   "name_ne": "रुपन्देही"
+  },
+  {
+   "code": "D50",
+   "province_code": "P5",
+   "name_en": "Arghakhanchi",
+   "name_ne": "अर्घाखाँची"
+  },
+  {
+   "code": "D51",
+   "province_code": "P5",
+   "name_en": "Gulmi",
+   "name_ne": "गुल्मी"
+  },
+  {
+   "code": "D52",
+   "province_code": "P5",
+   "name_en": "Palpa",
+   "name_ne": "पाल्पा"
+  },
+  {
+   "code": "D53",
+   "province_code": "P5",
+   "name_en": "Dang",
+   "name_ne": "दाङ"
+  },
+  {
+   "code": "D54",
+   "province_code": "P5",
+   "name_en": "Pyuthan",
+   "name_ne": "प्युठान"
+  },
+  {
+   "code": "D55",
+   "province_code": "P5",
+   "name_en": "Rolpa",
+   "name_ne": "रोल्पा"
+  },
+  {
+   "code": "D56",
+   "province_code": "P5",
+   "name_en": "Eastern Rukum",
+   "name_ne": "पूर्वी रूकुम"
+  },
+  {
+   "code": "D57",
+   "province_code": "P5",
+   "name_en": "Banke",
+   "name_ne": "बाँके"
+  },
+  {
+   "code": "D58",
+   "province_code": "P5",
+   "name_en": "Bardiya",
+   "name_ne": "बर्दिया"
+  },
+  {
+   "code": "D59",
+   "province_code": "P6",
+   "name_en": "Western Rukum",
+   "name_ne": "रुकुम पश्चिम"
+  },
+  {
+   "code": "D60",
+   "province_code": "P6",
+   "name_en": "Salyan",
+   "name_ne": "सल्यान"
+  },
+  {
+   "code": "D61",
+   "province_code": "P6",
+   "name_en": "Dolpa",
+   "name_ne": "डोल्पा"
+  },
+  {
+   "code": "D62",
+   "province_code": "P6",
+   "name_en": "Humla",
+   "name_ne": "हुम्ला"
+  },
+  {
+   "code": "D63",
+   "province_code": "P6",
+   "name_en": "Jumla",
+   "name_ne": "जुम्ला"
+  },
+  {
+   "code": "D64",
+   "province_code": "P6",
+   "name_en": "Kalikot",
+   "name_ne": "कालिकोट"
+  },
+  {
+   "code": "D65",
+   "province_code": "P6",
+   "name_en": "Mugu",
+   "name_ne": "मुगु"
+  },
+  {
+   "code": "D66",
+   "province_code": "P6",
+   "name_en": "Surkhet",
+   "name_ne": "सुर्खेत"
+  },
+  {
+   "code": "D67",
+   "province_code": "P6",
+   "name_en": "Dailekh",
+   "name_ne": "दैलेख"
+  },
+  {
+   "code": "D68",
+   "province_code": "P6",
+   "name_en": "Jajarkot",
+   "name_ne": "जाजरकोट"
+  },
+  {
+   "code": "D69",
+   "province_code": "P7",
+   "name_en": "Darchula",
+   "name_ne": "दार्चुला"
+  },
+  {
+   "code": "D70",
+   "province_code": "P7",
+   "name_en": "Bajhang",
+   "name_ne": "बझाङ"
+  },
+  {
+   "code": "D71",
+   "province_code": "P7",
+   "name_en": "Bajura",
+   "name_ne": "बाजुरा"
+  },
+  {
+   "code": "D72",
+   "province_code": "P7",
+   "name_en": "Baitadi",
+   "name_ne": "बैतडी"
+  },
+  {
+   "code": "D73",
+   "province_code": "P7",
+   "name_en": "Doti",
+   "name_ne": "डोटी"
+  },
+  {
+   "code": "D74",
+   "province_code": "P7",
+   "name_en": "Acham",
+   "name_ne": "अछाम"
+  },
+  {
+   "code": "D75",
+   "province_code": "P7",
+   "name_en": "Dadeldhura",
+   "name_ne": "डडेलधुरा"
+  },
+  {
+   "code": "D76",
+   "province_code": "P7",
+   "name_en": "Kanchanpur",
+   "name_ne": "कञ्चनपुर"
+  },
+  {
+   "code": "D77",
+   "province_code": "P7",
+   "name_en": "Kailali",
+   "name_ne": "कैलाली"
+  }
+ ],
+ "local_bodies": [
+  {
+   "code": "MUN001",
+   "district_code": "D01",
+   "type": "MUNICIPALITY",
+   "name_en": "Shadanand",
+   "name_ne": "षडानन्द",
+   "website": "http://www.shadanandamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN002",
+   "district_code": "D01",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhojpur",
+   "name_ne": "भोजपुर",
+   "website": "http://www.bhojpurmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN003",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Hatuwagadhi",
+   "name_ne": "हतुवागढी",
+   "website": "http://www.hatuwagadhimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN004",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ramprasad Rai",
+   "name_ne": "रामप्रसाद राई",
+   "website": "http://www.ramprasadraimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN005",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aamchok",
+   "name_ne": "आमचोक",
+   "website": "http://www.aamchowkmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN006",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tyamke Maiyum",
+   "name_ne": "टेम्केमैयुङ",
+   "website": "http://www.tyamkemaiyummun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN007",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Arun",
+   "name_ne": "अरुण",
+   "website": "http://www.arunmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN008",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pauwadungma",
+   "name_ne": "पौवादुङमा",
+   "website": "http://www.pauwadungmamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN009",
+   "district_code": "D01",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Salpasilichho",
+   "name_ne": "साल्पासिलिछो",
+   "website": "http://www.salpasilichhomun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN010",
+   "district_code": "D02",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhankuta",
+   "name_ne": "धनकुटा",
+   "website": "http://www.dhankutamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN011",
+   "district_code": "D02",
+   "type": "MUNICIPALITY",
+   "name_en": "Pakhribas",
+   "name_ne": "पाख्रिबास",
+   "website": "https://pakhribasmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN012",
+   "district_code": "D02",
+   "type": "MUNICIPALITY",
+   "name_en": "Mahalaxmi",
+   "name_ne": "महालक्ष्मी",
+   "website": "https://mahalaxmimundhankuta.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN013",
+   "district_code": "D02",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sangurigadhi",
+   "name_ne": "साँगुरीगढी",
+   "website": "https://sangurigadhimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN014",
+   "district_code": "D02",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chaubise",
+   "name_ne": "चौविसे",
+   "website": "https://choubisemun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN015",
+   "district_code": "D02",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sahidbhumi",
+   "name_ne": "सहिदभूमि",
+   "website": "https://shahidbhumimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN016",
+   "district_code": "D02",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhathar Jorpati",
+   "name_ne": "छथर जोरपाटी",
+   "website": "https://chhatharjorpatimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN017",
+   "district_code": "D03",
+   "type": "MUNICIPALITY",
+   "name_en": "Suryodaya",
+   "name_ne": "सूर्योदय",
+   "website": "http://www.suryodayamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN018",
+   "district_code": "D03",
+   "type": "MUNICIPALITY",
+   "name_en": "Ilam",
+   "name_ne": "ईलाम",
+   "website": "http://www.ilammun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN019",
+   "district_code": "D03",
+   "type": "MUNICIPALITY",
+   "name_en": "Deumai",
+   "name_ne": "देउमाई",
+   "website": "http://www.deumaimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN020",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Maijogmai",
+   "name_ne": "माईजोगमाई",
+   "website": "http://www.maijogmaimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN021",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phakphokthum",
+   "name_ne": "फाकफोकथुम",
+   "website": "फाकफोकथुम",
+   "wards": 7
+  },
+  {
+   "code": "MUN022",
+   "district_code": "D03",
+   "type": "MUNICIPALITY",
+   "name_en": "Mai",
+   "name_ne": "माई",
+   "website": "http://www.maimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN023",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chulachuli",
+   "name_ne": "चुलाचुली",
+   "website": "http://www.chulachulimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN024",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rong",
+   "name_ne": "रोङ",
+   "website": "http://www.rongmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN025",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mangsebung",
+   "name_ne": "माङसेबुङ",
+   "website": "http://www.mansebungmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN026",
+   "district_code": "D03",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sandakpur",
+   "name_ne": "सन्दकपुर",
+   "website": "http://www.sandakpurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN027",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Mechinagar",
+   "name_ne": "मेचीनगर",
+   "website": "http://www.mechinagarmun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN028",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Birtamod",
+   "name_ne": "विर्तामोड",
+   "website": "http://www.birtamodmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN029",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Damak",
+   "name_ne": "दमक",
+   "website": "http://www.damakmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN030",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhadrapur",
+   "name_ne": "भद्रपुर",
+   "website": "http://www.bhadrapurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN031",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Shivasatakshi",
+   "name_ne": "शिवशताक्षी",
+   "website": "http://www.shivasatakshimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN032",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Arjundhara",
+   "name_ne": "अर्जुनधारा",
+   "website": "http://www.arjundharamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN033",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Gauradaha",
+   "name_ne": "गौरादह",
+   "website": "http://www.gauradahamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN034",
+   "district_code": "D04",
+   "type": "MUNICIPALITY",
+   "name_en": "Kankai",
+   "name_ne": "कन्काई",
+   "website": "http://www.kankaimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN035",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kamal",
+   "name_ne": "कमल",
+   "website": "http://www.kamalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN036",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Buddha Shanti",
+   "name_ne": "बुद्धशान्ति",
+   "website": "http://www.buddhashantimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN037",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kachankawal",
+   "name_ne": "कचनकवल",
+   "website": "http://www.kachankawalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN038",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jhapa",
+   "name_ne": "झापा",
+   "website": "http://www.jhapamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN039",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barhadashi",
+   "name_ne": "बाह्रदशी",
+   "website": "http://www.bahradashimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN040",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gaurigunj",
+   "name_ne": "गौरीगंज",
+   "website": "http://www.gaurigunjmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN041",
+   "district_code": "D04",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Haldibari",
+   "name_ne": "हल्दिवारी",
+   "website": "http://www.haldibarimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN042",
+   "district_code": "D05",
+   "type": "MUNICIPALITY",
+   "name_en": "Diktel Rupakot Majhuwagadhi",
+   "name_ne": "दिक्तेल रुपाकोट मझुवागढी",
+   "website": "http://www.rupakotmajhuwagadhimun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN043",
+   "district_code": "D05",
+   "type": "MUNICIPALITY",
+   "name_en": "Halesi Tuwachung",
+   "name_ne": "हलेसी तुवाचुङ",
+   "website": "http://www.halesituwachungmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN044",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khotehang",
+   "name_ne": "खोटेहाङ",
+   "website": "http://www.khotehangmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN045",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Diprung Chuichumma",
+   "name_ne": "दिप्रुङ चुइचुम्मा",
+   "website": "http://www.diprungmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN046",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aiselukharka",
+   "name_ne": "ऐसेलुखर्क",
+   "website": "http://www.aiselukharkamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN047",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jantedhunga",
+   "name_ne": "जन्तेढुंगा",
+   "website": "http://www.jantedhungamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN048",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kepilasgadhi",
+   "name_ne": "केपिलासगढी",
+   "website": "http://www.kepilasgadhimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN049",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barahpokhari",
+   "name_ne": "वराहपोखरी",
+   "website": "http://www.barahapokharimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN050",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rawa Besi",
+   "name_ne": "रावा बेसी",
+   "website": "http://www.lamidandamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN051",
+   "district_code": "D05",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sakela",
+   "name_ne": "साकेला",
+   "website": "http://www.sakelamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN052",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Sundar Haraicha",
+   "name_ne": "सुन्दरहरैचा",
+   "website": "http://www.sundarharaichamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN053",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Belbari",
+   "name_ne": "बेलवारी",
+   "website": "http://www.belbarimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN054",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Pathari Shanischare",
+   "name_ne": "पथरी शनिश्चरे",
+   "website": "http://www.patharishanishcharemun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN055",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Ratuwamai",
+   "name_ne": "रतुवामाई",
+   "website": "http://www.ratuwamaimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN056",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Urlabari",
+   "name_ne": "उर्लावारी",
+   "website": "http://www.urlabarimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN057",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Rangeli",
+   "name_ne": "रंगेली",
+   "website": "http://www.rangelimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN058",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Sunawarshi",
+   "name_ne": "सुनवर्षि",
+   "website": "http://www.sunawarshimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN059",
+   "district_code": "D06",
+   "type": "MUNICIPALITY",
+   "name_en": "Letang",
+   "name_ne": "लेटाङ",
+   "website": "http://www.letangmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN060",
+   "district_code": "D06",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Biratnagar",
+   "name_ne": "विराटनगर",
+   "website": "http://www.biratnagarmun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN061",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jahada",
+   "name_ne": "जहदा",
+   "website": "http://www.jahadamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN062",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Budi Ganga",
+   "name_ne": "बुढीगंगा",
+   "website": "https://budhigangamunmorang.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN063",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Katahari",
+   "name_ne": "कटहरी",
+   "website": "http://www.kataharimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN064",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhanpalthan",
+   "name_ne": "धनपालथान",
+   "website": "http://www.dhanapalthanmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN065",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kanepokhari",
+   "name_ne": "कानेपोखरी",
+   "website": "http://www.kanepokharimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN066",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gramthan",
+   "name_ne": "ग्रामथान",
+   "website": "http://www.gramthanmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN067",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kerabari",
+   "name_ne": "केरावारी",
+   "website": "http://www.kerabarimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN068",
+   "district_code": "D06",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Miklajung",
+   "name_ne": "मिक्लाजुङ",
+   "website": "http://www.miklajungmunmorang.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN069",
+   "district_code": "D07",
+   "type": "MUNICIPALITY",
+   "name_en": "Siddhicharan",
+   "name_ne": "सिद्दिचरण",
+   "website": "http://www.siddhicharanmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN070",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khiji Demba",
+   "name_ne": "खिजिदेम्बा",
+   "website": "http://www.khijidembamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN071",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chisankhugadhi",
+   "name_ne": "चिशंखुगढी",
+   "website": "http://www.chishankhugadhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN072",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Molung",
+   "name_ne": "मोलुङ",
+   "website": "http://www.molungmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN073",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunkoshi",
+   "name_ne": "सुनकोशी",
+   "website": "http://www.sunkoshimunokhaldhunga.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN074",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Champadevi",
+   "name_ne": "चम्पादेवी",
+   "website": "http://www.champadevimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN075",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Manebhanjyang",
+   "name_ne": "मानेभञ्याङ",
+   "website": "http://www.manebhanjyangmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN076",
+   "district_code": "D07",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Likhu",
+   "name_ne": "लिखु",
+   "website": "https://likhumunokhaldhunga.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN077",
+   "district_code": "D08",
+   "type": "MUNICIPALITY",
+   "name_en": "Phidim",
+   "name_ne": "फिदिम",
+   "website": "http://www.phidimmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN078",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Miklajung",
+   "name_ne": "मिक्लाजुङ",
+   "website": "http://www.miklajungmunpanchthar.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN079",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phalgunanda",
+   "name_ne": "फाल्गुनन्द",
+   "website": "http://www.phalgunandamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN080",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Hilihang",
+   "name_ne": "हिलिहाङ",
+   "website": "http://www.hilihangmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN081",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phalelung",
+   "name_ne": "फालेलुङ",
+   "website": "http://www.phalelungmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN082",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Yangwarak",
+   "name_ne": "याङवरक",
+   "website": "http://www.yangwarakmunpanchthar.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN083",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kummayak",
+   "name_ne": "कुम्मायक",
+   "website": "http://www.kummayakmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN084",
+   "district_code": "D08",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tumbewa",
+   "name_ne": "तुम्बेवा",
+   "website": "http://www.tumwewamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN085",
+   "district_code": "D09",
+   "type": "MUNICIPALITY",
+   "name_en": "Khandbari",
+   "name_ne": "खाँदवारी",
+   "website": "http://www.khandbarimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN086",
+   "district_code": "D09",
+   "type": "MUNICIPALITY",
+   "name_en": "Chainpur",
+   "name_ne": "चैनपुर",
+   "website": "http://www.chainpurmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN087",
+   "district_code": "D09",
+   "type": "MUNICIPALITY",
+   "name_en": "Dharmadevi",
+   "name_ne": "धर्मदेवी",
+   "website": "http://www.dharmadevimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN088",
+   "district_code": "D09",
+   "type": "MUNICIPALITY",
+   "name_en": "Panchkhapan",
+   "name_ne": "पाँचखपन",
+   "website": "http://www.panchkhapanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN089",
+   "district_code": "D09",
+   "type": "MUNICIPALITY",
+   "name_en": "Madi",
+   "name_ne": "मादी",
+   "website": "http://www.madimunsankhuwasabha.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN090",
+   "district_code": "D09",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Makalu",
+   "name_ne": "मकालु",
+   "website": "http://www.makalumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN091",
+   "district_code": "D09",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Silichong",
+   "name_ne": "सिलीचोङ",
+   "website": "http://www.silichongmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN092",
+   "district_code": "D09",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sabhapokhari",
+   "name_ne": "सभापोखरी",
+   "website": "http://www.savapokharimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN093",
+   "district_code": "D09",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chichila",
+   "name_ne": "चिचिला",
+   "website": "http://www.chichilamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN094",
+   "district_code": "D09",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "BhotKhola",
+   "name_ne": "भोटखोला",
+   "website": "http://www.bhotkholamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN095",
+   "district_code": "D10",
+   "type": "MUNICIPALITY",
+   "name_en": "Solu Dudhkunda",
+   "name_ne": "सोलुदुधकुण्ड",
+   "website": "http://www.solududhkundamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN096",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mapya Dudhkoshi",
+   "name_ne": "माप्य दुधकोशी",
+   "website": "http://www.dudhkoshimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN097",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Necha Salyan",
+   "name_ne": "नेचासल्यान",
+   "website": "http://www.nechasalyanmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN098",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thulung Dudhkoshi",
+   "name_ne": "थुलुङ दुधकोशी",
+   "website": "http://www.thulungdudhkoshimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN099",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Maha Kulung",
+   "name_ne": "माहाकुलुङ",
+   "website": "http://www.mahakulungmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN100",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sotang",
+   "name_ne": "सोताङ",
+   "website": "http://www.sotangmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN101",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khumbu PasangLhamu",
+   "name_ne": "खुम्वु पासाङल्हमु",
+   "website": "http://www.khumbupasanglhamumun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN102",
+   "district_code": "D10",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Likhu Pike",
+   "name_ne": "लिखु पिके",
+   "website": "http://www.likhupikemun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN103",
+   "district_code": "D11",
+   "type": "MUNICIPALITY",
+   "name_en": "BarahaKshetra",
+   "name_ne": "बराहक्षेत्र",
+   "website": "http://www.barahamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN104",
+   "district_code": "D11",
+   "type": "MUNICIPALITY",
+   "name_en": "Inaruwa",
+   "name_ne": "ईनरुवा",
+   "website": "http://www.inaruwamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN105",
+   "district_code": "D11",
+   "type": "MUNICIPALITY",
+   "name_en": "Duhabi",
+   "name_ne": "दुहवी",
+   "website": "http://www.duhabimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN106",
+   "district_code": "D11",
+   "type": "MUNICIPALITY",
+   "name_en": "Ramdhuni",
+   "name_ne": "रामधुनी",
+   "website": "http://www.ramdhunimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN107",
+   "district_code": "D11",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Itahari",
+   "name_ne": "ईटहरी",
+   "website": "http://www.itaharimun.gov.np/",
+   "wards": 20
+  },
+  {
+   "code": "MUN108",
+   "district_code": "D11",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Dharan",
+   "name_ne": "धरान",
+   "website": "http://www.dharan.gov.np/",
+   "wards": 20
+  },
+  {
+   "code": "MUN109",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Koshi",
+   "name_ne": "कोशी",
+   "website": "http://www.koshimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN110",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Harinagar",
+   "name_ne": "हरिनगर",
+   "website": "http://www.harinagaramun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN111",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhokraha Narsingh",
+   "name_ne": "भोक्राहा नरसिंह",
+   "website": "http://www.bhokrahamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN112",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dewangunj",
+   "name_ne": "देवानगञ्ज",
+   "website": "http://www.dewanganjmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN113",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gadhi",
+   "name_ne": "गढी",
+   "website": "http://www.gadhimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN114",
+   "district_code": "D11",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barju",
+   "name_ne": "बर्जु",
+   "website": "http://www.barjumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN115",
+   "district_code": "D12",
+   "type": "MUNICIPALITY",
+   "name_en": "Phungling",
+   "name_ne": "फुङलिङ",
+   "website": "http://www.phunglingmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN116",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sirijangha",
+   "name_ne": "सिरीजङ्घा",
+   "website": "http://www.sirijanghamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN117",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aathrai Triveni",
+   "name_ne": "आठराई त्रिवेणी",
+   "website": "http://www.aathraitribenimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN118",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pathibhara Yangwarak",
+   "name_ne": "पाथीभरा याङवरक",
+   "website": "http://www.yangwarakmuntaplejung.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN119",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Meringden",
+   "name_ne": "मेरिङदेन",
+   "website": "http://www.meringdenmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN120",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sidingwa",
+   "name_ne": "सिदिङ्वा",
+   "website": "http://www.sidingbamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN121",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phaktanglung",
+   "name_ne": "फक्ताङलुङ",
+   "website": "http://www.phaktanglungmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN122",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Maiwa Khola",
+   "name_ne": "मैवाखोला",
+   "website": "http://www.maiwakholamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN123",
+   "district_code": "D12",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mikwa Khola",
+   "name_ne": "मिक्वाखोला",
+   "website": "http://www.mikwakholamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN124",
+   "district_code": "D13",
+   "type": "MUNICIPALITY",
+   "name_en": "Myanglung",
+   "name_ne": "म्याङलुङ",
+   "website": "http://www.myanglungmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN125",
+   "district_code": "D13",
+   "type": "MUNICIPALITY",
+   "name_en": "Laligurans",
+   "name_ne": "लालीगुराँस",
+   "website": "http://www.laliguransmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN126",
+   "district_code": "D13",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aathrai",
+   "name_ne": "आठराई",
+   "website": "http://www.aathraimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN127",
+   "district_code": "D13",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phedap",
+   "name_ne": "फेदाप",
+   "website": "http://www.phedapmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN128",
+   "district_code": "D13",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhathar",
+   "name_ne": "छथर",
+   "website": "http://www.chhatharmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN129",
+   "district_code": "D13",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Menchayayem",
+   "name_ne": "मेन्छयायेम",
+   "website": "http://www.menchhayayemmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN130",
+   "district_code": "D14",
+   "type": "MUNICIPALITY",
+   "name_en": "Triyuga",
+   "name_ne": "त्रियुगा",
+   "website": "http://www.triyugamun.gov.np/",
+   "wards": 16
+  },
+  {
+   "code": "MUN131",
+   "district_code": "D14",
+   "type": "MUNICIPALITY",
+   "name_en": "Katari",
+   "name_ne": "कटारी",
+   "website": "http://www.katarimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN132",
+   "district_code": "D14",
+   "type": "MUNICIPALITY",
+   "name_en": "Chaudandigadhi",
+   "name_ne": "चौदण्डीगढी",
+   "website": "http://www.chaudandigadhimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN133",
+   "district_code": "D14",
+   "type": "MUNICIPALITY",
+   "name_en": "Belaka",
+   "name_ne": "वेलका",
+   "website": "http://www.belakamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN134",
+   "district_code": "D14",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Udayapurgadhi",
+   "name_ne": "उदयपुरगढी",
+   "website": "http://www.udayapurgadhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN135",
+   "district_code": "D14",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rautamai",
+   "name_ne": "रौतामाई",
+   "website": "http://www.rautamaimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN136",
+   "district_code": "D14",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tapli",
+   "name_ne": "ताप्ली",
+   "website": "http://www.taplimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN137",
+   "district_code": "D14",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Limchungbung",
+   "name_ne": "लिम्चुङ्बुङ",
+   "website": "http://www.sunkoshimunudayapur.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN138",
+   "district_code": "D15",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Birgunj",
+   "name_ne": "बिरगंज",
+   "website": "http://www.birgunjmun.gov.np/",
+   "wards": 32
+  },
+  {
+   "code": "MUN139",
+   "district_code": "D15",
+   "type": "MUNICIPALITY",
+   "name_en": "Bahudarmai",
+   "name_ne": "बहुदरमाई",
+   "website": "http://www.bahudarmaimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN140",
+   "district_code": "D15",
+   "type": "MUNICIPALITY",
+   "name_en": "Parsagadhi",
+   "name_ne": "पर्सागढी",
+   "website": "http://www.parsagadhimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN141",
+   "district_code": "D15",
+   "type": "MUNICIPALITY",
+   "name_en": "Pokhariya",
+   "name_ne": "पोखरिया",
+   "website": "http://www.pokhariyamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN142",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bindabasini",
+   "name_ne": "बिन्दबासिनी",
+   "website": "http://www.bindabasinimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN143",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhobini",
+   "name_ne": "धोबीनी",
+   "website": "http://www.dhobinimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN144",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhipaharmai",
+   "name_ne": "छिपहरमाई",
+   "website": "http://www.chhipaharmaimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN145",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jagarnathpur",
+   "name_ne": "जगरनाथपुर",
+   "website": "http://www.jagarnathpurmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN146",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jirabhawani",
+   "name_ne": "जिरा भवानी",
+   "website": "http://www.jirabhawanimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN147",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kalikamai",
+   "name_ne": "कालिकामाई",
+   "website": "http://www.kalikamaimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN148",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pakaha Mainpur",
+   "name_ne": "पकाहा मैनपुर",
+   "website": "http://www.pakahamainpurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN149",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Paterwa Sugauli",
+   "name_ne": "पटेर्वा सुगौली",
+   "website": "http://www.paterwasugaulimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN150",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sakhuwa Prasauni",
+   "name_ne": "सखुवा प्रसौनी",
+   "website": "http://www.sakhuwaprasaunimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN151",
+   "district_code": "D15",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thori",
+   "name_ne": "ठोरी",
+   "website": "http://www.thorimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN152",
+   "district_code": "D16",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Kalaiya",
+   "name_ne": "कलैया",
+   "website": "http://www.kalaiyamun.gov.np/",
+   "wards": 27
+  },
+  {
+   "code": "MUN153",
+   "district_code": "D16",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Jitpur Simara",
+   "name_ne": "जीतपुर सिमरा",
+   "website": "http://www.jeetpursimaramun.gov.np/",
+   "wards": 24
+  },
+  {
+   "code": "MUN154",
+   "district_code": "D16",
+   "type": "MUNICIPALITY",
+   "name_en": "Kolhabi",
+   "name_ne": "कोल्हवी",
+   "website": "http://www.kolhabimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN155",
+   "district_code": "D16",
+   "type": "MUNICIPALITY",
+   "name_en": "Nijgadh",
+   "name_ne": "निजगढ",
+   "website": "http://www.nijgadhmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN156",
+   "district_code": "D16",
+   "type": "MUNICIPALITY",
+   "name_en": "Mahagadhimai",
+   "name_ne": "महागढीमाई",
+   "website": "http://www.mahagadimaimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN157",
+   "district_code": "D16",
+   "type": "MUNICIPALITY",
+   "name_en": "Simaraungadh",
+   "name_ne": "सिम्रौनगढ",
+   "website": "http://www.simraungadhmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN158",
+   "district_code": "D16",
+   "type": "MUNICIPALITY",
+   "name_en": "Pacharauta",
+   "name_ne": "पचरौता",
+   "website": "http://www.pachrautamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN159",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pheta",
+   "name_ne": "फेटा",
+   "website": "http://www.phetamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN160",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bishrampur",
+   "name_ne": "विश्रामपुर",
+   "website": "http://www.bishrampurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN161",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Prasauni",
+   "name_ne": "प्रसौनी",
+   "website": "http://www.prasaunimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN162",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Adarsh Kotwal",
+   "name_ne": "आदर्श कोटवाल",
+   "website": "http://www.aadarshakotwalmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN163",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Karaiyamai",
+   "name_ne": "करैयामाई",
+   "website": "http://www.karaiyamaimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN164",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Devtal",
+   "name_ne": "देवताल",
+   "website": "http://www.devtalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN165",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Parwanipur",
+   "name_ne": "परवानीपुर",
+   "website": "http://www.parwanipurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN166",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Baragadhi",
+   "name_ne": "बारागढी",
+   "website": "http://www.baragadhimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN167",
+   "district_code": "D16",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Suwarna",
+   "name_ne": "सुवर्ण",
+   "website": "http://www.suwarnamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN168",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Baudhimai",
+   "name_ne": "बौधीमाई",
+   "website": "http://www.baudhimaimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN169",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Brindaban",
+   "name_ne": "बृन्दावन",
+   "website": "http://www.brindawanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN170",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Chandrapur",
+   "name_ne": "चन्द्रपुर",
+   "website": "http://www.chandrapurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN171",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Dewahi Gonahi",
+   "name_ne": "देवाही गोनाही",
+   "website": "http://www.dewahigonahimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN172",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Gadhimai",
+   "name_ne": "गढीमाई",
+   "website": "http://www.gadhimaimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN173",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Guruda",
+   "name_ne": "गरुडा",
+   "website": "http://www.garudamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN174",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Gaur",
+   "name_ne": "गौर",
+   "website": "http://www.gaurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN175",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Gujara",
+   "name_ne": "गुजरा",
+   "website": "http://www.gujaramun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN176",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Ishanath",
+   "name_ne": "ईशनाथ",
+   "website": "http://www.ishnathmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN177",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Katahariya",
+   "name_ne": "कटहरिया",
+   "website": "http://www.katahariyamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN178",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Madhav Narayan",
+   "name_ne": "माधव नारायण",
+   "website": "http://www.madhavnarayanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN179",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Maulapur",
+   "name_ne": "मौलापुर",
+   "website": "http://www.maulapurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN180",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Paroha",
+   "name_ne": "परोहा",
+   "website": "http://www.parohamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN181",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Phatuwa Bijayapur",
+   "name_ne": "फतुवाबिजयपुर",
+   "website": "http://www.phatuwabijaypurmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN182",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Rajdevi",
+   "name_ne": "राजदेवी",
+   "website": "http://www.rajdevimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN183",
+   "district_code": "D17",
+   "type": "MUNICIPALITY",
+   "name_en": "Rajpur",
+   "name_ne": "राजपुर",
+   "website": "https://rajpurmunrautahat.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN184",
+   "district_code": "D17",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Durga Bhagwati",
+   "name_ne": "दुर्गा भगवती",
+   "website": "http://www.durgabhagawatimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN185",
+   "district_code": "D17",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Yamunamai",
+   "name_ne": "यमुनामाई",
+   "website": "http://www.yamunamaimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN186",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Bagmati",
+   "name_ne": "बागमती",
+   "website": "http://www.bagmatimunsarlahi.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN187",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Balara",
+   "name_ne": "बलरा",
+   "website": "http://www.balramun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN188",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Barahathwa",
+   "name_ne": "बरहथवा",
+   "website": "http://www.barhathwamun.gov.np/",
+   "wards": 18
+  },
+  {
+   "code": "MUN189",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Godaita",
+   "name_ne": "गोडैटा",
+   "website": "http://www.godaitamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN190",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Hariwan",
+   "name_ne": "हरिवन",
+   "website": "http://www.harionmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN191",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Haripur",
+   "name_ne": "हरिपुर",
+   "website": "http://www.haripurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN192",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Haripurwa",
+   "name_ne": "हरिपुर्वा",
+   "website": "http://www.haripurwamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN193",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Ishowrpur",
+   "name_ne": "ईश्वरपुर",
+   "website": "http://www.ishworpurmun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN194",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Kabilasi",
+   "name_ne": "कविलासी",
+   "website": "http://www.kawilasimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN195",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Lalbandi",
+   "name_ne": "लालबन्दी",
+   "website": "http://www.lalbandimun.gov.np/",
+   "wards": 17
+  },
+  {
+   "code": "MUN196",
+   "district_code": "D18",
+   "type": "MUNICIPALITY",
+   "name_en": "Malangawa",
+   "name_ne": "मलंगवा",
+   "website": "http://www.malangwamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN197",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Basbariya",
+   "name_ne": "बसबरीया",
+   "website": "http://www.basbariyamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN198",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bisnu",
+   "name_ne": "विष्णु",
+   "website": "http://www.bishnumun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN199",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Brahampuri",
+   "name_ne": "ब्रह्मपुरी",
+   "website": "http://www.brahmapurimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN200",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chakraghatta",
+   "name_ne": "चक्रघट्टा",
+   "website": "http://www.chakraghattamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN201",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chandranagar",
+   "name_ne": "चन्द्रनगर",
+   "website": "http://www.chandranagarmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN202",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhankaul",
+   "name_ne": "धनकौल",
+   "website": "http://www.dhankaulmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN203",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kaudena",
+   "name_ne": "कौडेना",
+   "website": "http://www.kaudenamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN204",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Parsa",
+   "name_ne": "पर्सा",
+   "website": "http://www.parsamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN205",
+   "district_code": "D18",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ramnagar",
+   "name_ne": "रामनगर",
+   "website": "http://www.ramnagarmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN206",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Lahan",
+   "name_ne": "लहान",
+   "website": "http://www.lahanmun.gov.np/",
+   "wards": 24
+  },
+  {
+   "code": "MUN207",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhangadhimai",
+   "name_ne": "धनगढीमाई",
+   "website": "http://www.dhangadhimaimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN208",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Siraha",
+   "name_ne": "सिरहा",
+   "website": "http://www.sirahamun.gov.np/",
+   "wards": 22
+  },
+  {
+   "code": "MUN209",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Golbazar",
+   "name_ne": "गोलबजार",
+   "website": "http://www.golbazarmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN210",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Mirchaiya",
+   "name_ne": "मिर्चैयाँ",
+   "website": "http://www.mirchaiyamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN211",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Kalyanpur",
+   "name_ne": "कल्याणपुर",
+   "website": "http://www.kalyanpurmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN212",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Karjanha",
+   "name_ne": "कर्जन्हा",
+   "website": "http://www.karjanhamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN213",
+   "district_code": "D19",
+   "type": "MUNICIPALITY",
+   "name_en": "Sukhipur",
+   "name_ne": "सुखीपुर",
+   "website": "http://www.sukhipurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN214",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhagwanpur",
+   "name_ne": "भगवानपुर",
+   "website": "http://www.bhagwanpurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN215",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aurahi",
+   "name_ne": "औरही",
+   "website": "http://www.aurahimunsiraha.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN216",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bishnupur",
+   "name_ne": "विष्णुपुर",
+   "website": "http://www.bishnupurmunsiraha.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN217",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bariyarpatti",
+   "name_ne": "बरियारपट्टी",
+   "website": "http://www.bariyapattimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN218",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lakshmipur Patari",
+   "name_ne": "लक्ष्मीपुर पतारी",
+   "website": "http://www.laxmipurpatarimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN219",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Naraha",
+   "name_ne": "नरहा",
+   "website": "http://www.narahamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN220",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "SakhuwanankarKatti",
+   "name_ne": "सखुवानान्कारकट्टी",
+   "website": "http://www.sakhuwanankarkattimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN221",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Arnama",
+   "name_ne": "अर्नमा",
+   "website": "http://www.anarmamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN222",
+   "district_code": "D19",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Navarajpur",
+   "name_ne": "नवराजपुर",
+   "website": "http://www.nawarajpurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN223",
+   "district_code": "D20",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Janakpurdham",
+   "name_ne": "जनकपुरधाम",
+   "website": "http://www.janakpurmun.gov.np/",
+   "wards": 25
+  },
+  {
+   "code": "MUN224",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Chhireshwarnath",
+   "name_ne": "क्षिरेश्वरनाथ",
+   "website": "http://www.kshireshwornathmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN225",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Ganeshman Charnath",
+   "name_ne": "गणेशमान चारनाथ",
+   "website": "http://www.ganeshmancharnathmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN226",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhanushadham",
+   "name_ne": "धनुषाधाम",
+   "website": "http://www.dhanushadhammun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN227",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Nagarain",
+   "name_ne": "नगराइन",
+   "website": "http://www.nagrainmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN228",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Bideha",
+   "name_ne": "विदेह",
+   "website": "http://www.bidehamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN229",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Mithila",
+   "name_ne": "मिथिला",
+   "website": "http://www.mithilamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN230",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Sahidnagar",
+   "name_ne": "शहीदनगर",
+   "website": "http://www.shahidnagarmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN231",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Sabaila",
+   "name_ne": "सबैला",
+   "website": "http://www.sabailamun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN232",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Kamala",
+   "name_ne": "कमला",
+   "website": "http://www.kamalamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN233",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "MithilaBihari",
+   "name_ne": "मिथिला बिहारी",
+   "website": "http://www.mithilabiharimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN234",
+   "district_code": "D20",
+   "type": "MUNICIPALITY",
+   "name_en": "Hansapur",
+   "name_ne": "हंसपुर",
+   "website": "http://www.hansapurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN235",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Janaknandani",
+   "name_ne": "जनकनन्दिनी",
+   "website": "http://www.janaknandinimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN236",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bateshwar",
+   "name_ne": "बटेश्वर",
+   "website": "http://www.bateshwormun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN237",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mukhiyapatti Musharniya",
+   "name_ne": "मुखियापट्टी मुसहरमिया",
+   "website": "http://www.mukhiyapattimusaharmiyamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN238",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lakshminya",
+   "name_ne": "लक्ष्मीनिया",
+   "website": "http://www.laxminiyamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN239",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aaurahi",
+   "name_ne": "औरही",
+   "website": "http://www.aurahimundhanusha.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN240",
+   "district_code": "D20",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhanauji",
+   "name_ne": "धनौजी",
+   "website": "http://www.dhanaujimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN241",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Bodebarsain",
+   "name_ne": "बोदेबरसाईन",
+   "website": "http://www.bodebarsainmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN242",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Dakneshwori",
+   "name_ne": "डाक्नेश्वरी",
+   "website": "http://www.dakneshworimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN243",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Hanumannagar Kankalini",
+   "name_ne": "हनुमाननगर कङ्‌कालिनी",
+   "website": "http://www.hanumannagarkankalinimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN244",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Kanchanrup",
+   "name_ne": "कञ्चनरुप",
+   "website": "http://www.kanchanrupmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN245",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Khadak",
+   "name_ne": "खडक",
+   "website": "http://www.khadakmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN246",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Shambhunath",
+   "name_ne": "शम्भुनाथ",
+   "website": "http://www.shambhunathmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN247",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Saptakoshi",
+   "name_ne": "सप्तकोशी",
+   "website": "http://www.saptakoshimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN248",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Surunga",
+   "name_ne": "सुरुङ्‍गा",
+   "website": "http://www.surungamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN249",
+   "district_code": "D21",
+   "type": "MUNICIPALITY",
+   "name_en": "Rajbiraj",
+   "name_ne": "राजविराज",
+   "website": "http://www.rajbirajmun.gov.np/",
+   "wards": 16
+  },
+  {
+   "code": "MUN250",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Agnisaira Krishnasavaran",
+   "name_ne": "अग्निसाइर कृष्णासरवन",
+   "website": "http://www.agnisairkrishnasawaranmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN251",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Balan-Bihul",
+   "name_ne": "बलान-बिहुल",
+   "website": "http://www.balanbihulmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN252",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rajgadh",
+   "name_ne": "राजगढ",
+   "website": "http://www.rajgadhmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN253",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bishnupur",
+   "name_ne": "बिष्णुपुर",
+   "website": "http://www.bishnupurmunsaptari.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN254",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhinnamasta",
+   "name_ne": "छिन्नमस्ता",
+   "website": "http://www.chhinnamastamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN255",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahadeva",
+   "name_ne": "महादेवा",
+   "website": "http://www.mahadevamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN256",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rupani",
+   "name_ne": "रुपनी",
+   "website": "http://www.rupanimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN257",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tilathi Koiladi",
+   "name_ne": "तिलाठी कोईलाडी",
+   "website": "http://www.tilathikoiladimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN258",
+   "district_code": "D21",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tirhut",
+   "name_ne": "तिरहुत",
+   "website": "http://www.tirahutmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN259",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Aaurahi",
+   "name_ne": "औरही",
+   "website": "http://www.aurahimunmahottari.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN260",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Balawa",
+   "name_ne": "बलवा",
+   "website": "http://www.balwamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN261",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Bardibas",
+   "name_ne": "बर्दिबास",
+   "website": "http://www.bardibasmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN262",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhangaha",
+   "name_ne": "भँगाहा",
+   "website": "http://www.bhagahamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN263",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Gaushala",
+   "name_ne": "गौशाला",
+   "website": "http://www.gaushalamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN264",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Jaleshor",
+   "name_ne": "जलेश्वर",
+   "website": "http://www.jaleshwormun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN265",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Loharpatti",
+   "name_ne": "लोहरपट्टी",
+   "website": "http://www.loharpattimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN266",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Manara Shiswa",
+   "name_ne": "मनरा शिसवा",
+   "website": "http://www.manrashiswamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN267",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Matihani",
+   "name_ne": "मटिहानी",
+   "website": "http://www.matihanimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN268",
+   "district_code": "D22",
+   "type": "MUNICIPALITY",
+   "name_en": "Ramgopalpur",
+   "name_ne": "रामगोपालपुर",
+   "website": "http://www.ramgopalpurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN269",
+   "district_code": "D22",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ekdara",
+   "name_ne": "एकडारा",
+   "website": "http://www.ekdaramun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN270",
+   "district_code": "D22",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahottari",
+   "name_ne": "महोत्तरी",
+   "website": "http://www.mahottarimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN271",
+   "district_code": "D22",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pipara",
+   "name_ne": "पिपरा",
+   "website": "http://www.pipramun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN272",
+   "district_code": "D22",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Samsi",
+   "name_ne": "साम्सी",
+   "website": "http://www.samsimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN273",
+   "district_code": "D22",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sonama",
+   "name_ne": "सोनमा",
+   "website": "http://www.sonmamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN274",
+   "district_code": "D23",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhaktapur",
+   "name_ne": "भक्तपुर",
+   "website": "http://www.bhaktapurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN275",
+   "district_code": "D23",
+   "type": "MUNICIPALITY",
+   "name_en": "Changunarayan",
+   "name_ne": "चाँगुनारायण",
+   "website": "http://www.changunarayanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN276",
+   "district_code": "D23",
+   "type": "MUNICIPALITY",
+   "name_en": "Suryabinayak",
+   "name_ne": "सूर्यविनायक",
+   "website": "http://www.suryabinayakmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN277",
+   "district_code": "D23",
+   "type": "MUNICIPALITY",
+   "name_en": "Madhyapur Thimi",
+   "name_ne": "मध्यपुर थिमी",
+   "website": "http://www.madhyapurthimimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN278",
+   "district_code": "D24",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Bharatpur",
+   "name_ne": "भरतपुर",
+   "website": "http://www.bharatpurmun.gov.np/",
+   "wards": 29
+  },
+  {
+   "code": "MUN279",
+   "district_code": "D24",
+   "type": "MUNICIPALITY",
+   "name_en": "Kalika",
+   "name_ne": "कालिका",
+   "website": "http://www.kalikamunchitwan.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN280",
+   "district_code": "D24",
+   "type": "MUNICIPALITY",
+   "name_en": "Khairhani",
+   "name_ne": "खैरहनी",
+   "website": "http://www.khairhanimun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN281",
+   "district_code": "D24",
+   "type": "MUNICIPALITY",
+   "name_en": "Madi",
+   "name_ne": "माडी",
+   "website": "http://www.madimunchitwan.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN282",
+   "district_code": "D24",
+   "type": "MUNICIPALITY",
+   "name_en": "Ratnagar",
+   "name_ne": "रत्ननगर",
+   "website": "http://www.ratnanagarmun.gov.np/",
+   "wards": 16
+  },
+  {
+   "code": "MUN283",
+   "district_code": "D24",
+   "type": "MUNICIPALITY",
+   "name_en": "Rapti",
+   "name_ne": "राप्ती",
+   "website": "http://www.raptimunchitwan.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN284",
+   "district_code": "D24",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ichchhakamana",
+   "name_ne": "इच्छाकामना",
+   "website": "http://www.ichchhakamanamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN285",
+   "district_code": "D25",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhunibeshi",
+   "name_ne": "धुनीबेंशी",
+   "website": "http://www.dhunibeshimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN286",
+   "district_code": "D25",
+   "type": "MUNICIPALITY",
+   "name_en": "Nilkantha",
+   "name_ne": "निलकण्ठ",
+   "website": "http://www.neelakanthamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN287",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khaniyabas",
+   "name_ne": "खनियाबास",
+   "website": "http://www.khaniyabasmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN288",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gajuri",
+   "name_ne": "गजुरी",
+   "website": "http://www.gajurimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN289",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Galchhi",
+   "name_ne": "गल्छी",
+   "website": "http://www.galchhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN290",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gangajamuna",
+   "name_ne": "गङ्गाजमुना",
+   "website": "http://www.gangajamunamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN291",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jwalamukhi",
+   "name_ne": "ज्वालामूखी",
+   "website": "http://www.jwalamukhimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN292",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thakre",
+   "name_ne": "थाक्रे",
+   "website": "http://www.thakremun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN293",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Netrawati Dabjong",
+   "name_ne": "नेत्रावती डबजोङ",
+   "website": "http://www.netrawatimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN294",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Benighat Rorang",
+   "name_ne": "बेनीघाट रोराङ्ग",
+   "website": "http://www.benighatrorangmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN295",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rubi Valley",
+   "name_ne": "रुवी भ्याली",
+   "website": "http://www.rubivalleymun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN296",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Siddhalek",
+   "name_ne": "सिद्धलेक",
+   "website": "http://www.siddhalekmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN297",
+   "district_code": "D25",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tripurasundari",
+   "name_ne": "त्रिपुरासुन्दरी",
+   "website": "http://www.tripurasundarimundhading.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN298",
+   "district_code": "D26",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhimeswor",
+   "name_ne": "भिमेश्वर",
+   "website": "http://www.bhimeshwormun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN299",
+   "district_code": "D26",
+   "type": "MUNICIPALITY",
+   "name_en": "Jiri",
+   "name_ne": "जिरी",
+   "website": "http://www.jirimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN300",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kalinchok",
+   "name_ne": "कालिन्चोक",
+   "website": "http://www.kalinchowkmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN301",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Melung",
+   "name_ne": "मेलुङ्ग",
+   "website": "http://www.melungmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN302",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bigu",
+   "name_ne": "विगु",
+   "website": "http://www.bigumun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN303",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gaurishankar",
+   "name_ne": "गौरीशङ्कर",
+   "website": "http://www.gaurishankarmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN304",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Baiteshowr",
+   "name_ne": "वैतेश्वर",
+   "website": "http://www.baiteshwormun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN305",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sailung",
+   "name_ne": "शैलुङ्ग",
+   "website": "http://www.shailungmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN306",
+   "district_code": "D26",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tamakoshi",
+   "name_ne": "तामाकोशी",
+   "website": "http://www.tamakoshimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN307",
+   "district_code": "D27",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Kathmandu",
+   "name_ne": "काठमाण्डौं",
+   "website": "http://www.kathmandu.gov.np/",
+   "wards": 32
+  },
+  {
+   "code": "MUN308",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Gokarneshwar",
+   "name_ne": "गोकर्णेश्वर",
+   "website": "http://www.gokarneshwormun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN309",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Kirtipur",
+   "name_ne": "कीर्तिपुर",
+   "website": "http://www.kirtipurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN310",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Kageshwari-Manohara",
+   "name_ne": "कागेश्वरी मनोहरा",
+   "website": "http://www.kageshworimanoharamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN311",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Chandragiri",
+   "name_ne": "चन्द्रागिरी",
+   "website": "http://www.chandragirimun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN312",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Tokha",
+   "name_ne": "टोखा",
+   "website": "http://www.tokhamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN313",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Tarakeshwar",
+   "name_ne": "तारकेश्वर",
+   "website": "http://www.tarakeshwormunkathmandu.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN314",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Dakshinkali",
+   "name_ne": "दक्षिणकाली",
+   "website": "http://www.dakshinkalimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN315",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Nagarjun",
+   "name_ne": "नागार्जुन",
+   "website": "http://www.nagarjunmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN316",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Budhalikantha",
+   "name_ne": "बुढानिलकण्ठ",
+   "website": "http://www.budhanilkanthamun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN317",
+   "district_code": "D27",
+   "type": "MUNICIPALITY",
+   "name_en": "Shankharapur",
+   "name_ne": "शङ्खरापुर",
+   "website": "http://www.shankharapurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN318",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhulikhel",
+   "name_ne": "धुलिखेल",
+   "website": "http://www.dhulikhelmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN319",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Namobuddha",
+   "name_ne": "नमोबुद्ध",
+   "website": "http://www.namobuddhamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN320",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Panauti",
+   "name_ne": "पनौती",
+   "website": "http://www.panautimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN321",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Panchkhal",
+   "name_ne": "पाँचखाल",
+   "website": "http://www.panchkhalmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN322",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Banepa",
+   "name_ne": "बनेपा",
+   "website": "http://www.banepamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN323",
+   "district_code": "D28",
+   "type": "MUNICIPALITY",
+   "name_en": "Mandandeupur",
+   "name_ne": "मण्डनदेउपुर",
+   "website": "http://www.mandandeupurmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN324",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khani Khola",
+   "name_ne": "खानीखोला",
+   "website": "http://www.khanikholamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN325",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chauri Deurali",
+   "name_ne": "चौंरीदेउराली",
+   "website": "http://www.chaurideuralimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN326",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Temal",
+   "name_ne": "तेमाल",
+   "website": "http://www.temalmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN327",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bethanchok",
+   "name_ne": "बेथानचोक",
+   "website": "http://www.bethanchowkmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN328",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhumlu",
+   "name_ne": "भुम्लु",
+   "website": "http://www.bhumlumun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN329",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahabharat",
+   "name_ne": "महाभारत",
+   "website": "http://www.mahabharatmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN330",
+   "district_code": "D28",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Roshi",
+   "name_ne": "रोशी",
+   "website": "http://www.roshimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN331",
+   "district_code": "D29",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Lalitpur",
+   "name_ne": "ललितपुर",
+   "website": "http://www.lalitpurmun.gov.np/",
+   "wards": 29
+  },
+  {
+   "code": "MUN332",
+   "district_code": "D29",
+   "type": "MUNICIPALITY",
+   "name_en": "Mahalaxmi",
+   "name_ne": "महालक्ष्मी",
+   "website": "http://www.mahalaxmimunlalitpur.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN333",
+   "district_code": "D29",
+   "type": "MUNICIPALITY",
+   "name_en": "Godawari",
+   "name_ne": "गोदावरी",
+   "website": "http://www.godawarimunlalitpur.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN334",
+   "district_code": "D29",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Konjyosom",
+   "name_ne": "कोन्ज्योसोम",
+   "website": "http://www.konjyosommun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN335",
+   "district_code": "D29",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bagmati",
+   "name_ne": "बागमती",
+   "website": "http://www.bagmatimunlalitpur.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN336",
+   "district_code": "D29",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahankal",
+   "name_ne": "महाङ्काल",
+   "website": "http://www.mahankalmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN337",
+   "district_code": "D30",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Hetauda",
+   "name_ne": "हेटौडा",
+   "website": "http://www.hetaudamun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN338",
+   "district_code": "D30",
+   "type": "MUNICIPALITY",
+   "name_en": "Thaha",
+   "name_ne": "थाहा",
+   "website": "http://www.thahamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN339",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhimphedi",
+   "name_ne": "भिमफेदी",
+   "website": "http://www.bhimphedimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN340",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Makawanpurgadhi",
+   "name_ne": "मकवानपुरगढी",
+   "website": "http://www.makawanpurgadhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN341",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Manahari",
+   "name_ne": "मनहरी",
+   "website": "http://www.manaharimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN342",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Raksirang",
+   "name_ne": "राक्सिराङ्ग",
+   "website": "http://www.raksirangmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN343",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bakaiya",
+   "name_ne": "बकैया",
+   "website": "http://www.bakaiyamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN344",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bagmati",
+   "name_ne": "बाग्मति",
+   "website": "http://www.bagmatimunmakawanpur.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN345",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kailash",
+   "name_ne": "कैलाश",
+   "website": "http://www.kailashmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN346",
+   "district_code": "D30",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Indrasarowar",
+   "name_ne": "इन्द्रसरोबर",
+   "website": "http://www.indrasarowarmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN347",
+   "district_code": "D31",
+   "type": "MUNICIPALITY",
+   "name_en": "Bidur",
+   "name_ne": "विदुर",
+   "website": "http://www.bidurmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN348",
+   "district_code": "D31",
+   "type": "MUNICIPALITY",
+   "name_en": "Belkotgadhi",
+   "name_ne": "बेलकोटगढी",
+   "website": "http://www.belkotgadhimun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN349",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kakani",
+   "name_ne": "ककनी",
+   "website": "http://www.kakanimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN350",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Panchakanya",
+   "name_ne": "पञ्चकन्या",
+   "website": "http://www.panchakanyamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN351",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Likhu",
+   "name_ne": "लिखु",
+   "website": "http://www.likhumunnuwakot.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN352",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dupcheshwar",
+   "name_ne": "दुप्चेश्वर",
+   "website": "http://www.dupcheshwormun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN353",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Shivapuri",
+   "name_ne": "शिवपुरी",
+   "website": "http://www.shivapurimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN354",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tadi",
+   "name_ne": "तादी",
+   "website": "http://www.tadimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN355",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Suryagadhi",
+   "name_ne": "सुर्यगढी",
+   "website": "http://www.suryagadhimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN356",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tarkeshwar",
+   "name_ne": "तारकेश्वर",
+   "website": "http://www.tarakeshwormunnuwakot.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN357",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kispang",
+   "name_ne": "किस्पाङ",
+   "website": "http://www.kispangmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN358",
+   "district_code": "D31",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Myagang",
+   "name_ne": "म्यगङ",
+   "website": "http://www.meghangmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN359",
+   "district_code": "D32",
+   "type": "MUNICIPALITY",
+   "name_en": "Manthali",
+   "name_ne": "मन्थली",
+   "website": "http://www.manthalimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN360",
+   "district_code": "D32",
+   "type": "MUNICIPALITY",
+   "name_en": "Ramechhap",
+   "name_ne": "रामेछाप",
+   "website": "http://www.ramechhapmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN361",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Umakunda",
+   "name_ne": "उमाकुण्ड",
+   "website": "http://www.umakundamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN362",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khandadevi",
+   "name_ne": "खाँडादेवी",
+   "website": "http://www.khandadevimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN363",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Doramba",
+   "name_ne": "दोरम्बा",
+   "website": "http://www.dorambamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN364",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gokulganga",
+   "name_ne": "गोकुलगङ्गा",
+   "website": "http://www.gokulgangamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN365",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "LikhuTamakoshi",
+   "name_ne": "लिखु तामाकोशी",
+   "website": "http://www.likhumunramechhap.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN366",
+   "district_code": "D32",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunapati",
+   "name_ne": "सुनापती",
+   "website": "http://www.sunapatimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN367",
+   "district_code": "D33",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kalika",
+   "name_ne": "कालिका",
+   "website": "http://www.kalikamunrasuwa.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN368",
+   "district_code": "D33",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gosaikunda",
+   "name_ne": "गोसाईकुण्ड",
+   "website": "http://www.gosaikundamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN369",
+   "district_code": "D33",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Naukunda",
+   "name_ne": "नौकुण्ड",
+   "website": "http://www.naukundamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN370",
+   "district_code": "D33",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Parbatikunda",
+   "name_ne": "आमाछोदिङमो",
+   "website": "http://www.parbatikundamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN371",
+   "district_code": "D33",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Uttargaya",
+   "name_ne": "उत्तरगया",
+   "website": "http://www.uttargayamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN372",
+   "district_code": "D34",
+   "type": "MUNICIPALITY",
+   "name_en": "Kamalamai",
+   "name_ne": "कमलामाई",
+   "website": "http://www.kamalamaimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN373",
+   "district_code": "D34",
+   "type": "MUNICIPALITY",
+   "name_en": "Dudhauli",
+   "name_ne": "दुधौली",
+   "website": "http://www.dudhaulimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN374",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunkoshi",
+   "name_ne": "सुनकोशी",
+   "website": "http://www.sunkoshimunsindhuli.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN375",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Hariharpurgadhi",
+   "name_ne": "हरिहरपुरगढी",
+   "website": "http://www.hariharpurgadhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN376",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tinpatan",
+   "name_ne": "तीनपाटन",
+   "website": "http://www.tinpatanmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN377",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Marin",
+   "name_ne": "मरिण",
+   "website": "http://www.marinmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN378",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Golanjor",
+   "name_ne": "गोलन्जर",
+   "website": "http://www.golanjormun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN379",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phikkal",
+   "name_ne": "फिक्कल",
+   "website": "http://www.phikkalmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN380",
+   "district_code": "D34",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ghyanglekh",
+   "name_ne": "घ्याङलेख",
+   "website": "http://www.ghyanglekhmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN381",
+   "district_code": "D35",
+   "type": "MUNICIPALITY",
+   "name_en": "Chautara Sangachowkgadi",
+   "name_ne": "चौतारा साँगाचोकगढी",
+   "website": "http://www.chautarasangachowkgadhimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN382",
+   "district_code": "D35",
+   "type": "MUNICIPALITY",
+   "name_en": "Bahrabise",
+   "name_ne": "बाह्रविसे",
+   "website": "http://www.bahrabisemun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN383",
+   "district_code": "D35",
+   "type": "MUNICIPALITY",
+   "name_en": "Melamchi",
+   "name_ne": "मेलम्ची",
+   "website": "http://www.melamchimun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN384",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Balephi",
+   "name_ne": "बलेफी",
+   "website": "http://www.balephimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN385",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunkoshi",
+   "name_ne": "सुनकोशी",
+   "website": "http://www.sunkoshimunsindhupalchowk.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN386",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Indrawati",
+   "name_ne": "ईन्द्रावती",
+   "website": "http://www.indrawatimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN387",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jugal",
+   "name_ne": "जुगल",
+   "website": "http://www.jugalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN388",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Panchpokhari",
+   "name_ne": "पाँचपोखरी थाङपाल",
+   "website": "http://www.panchpokharithangpalmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN389",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhotekoshi",
+   "name_ne": "भोटेकोशी",
+   "website": "http://www.bhotekoshimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN390",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lisankhu",
+   "name_ne": "लिसङ्खु पाखर",
+   "website": "http://www.lisankhupakharmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN391",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Helambu",
+   "name_ne": "हेलम्बु",
+   "website": "http://www.helambumun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN392",
+   "district_code": "D35",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tripurasundari",
+   "name_ne": "त्रिपुरासुन्दरी",
+   "website": "http://www.tripurasundarimunsindhupalchowk.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN393",
+   "district_code": "D36",
+   "type": "MUNICIPALITY",
+   "name_en": "Baglung",
+   "name_ne": "बागलुङ",
+   "website": "http://www.baglungmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN394",
+   "district_code": "D36",
+   "type": "MUNICIPALITY",
+   "name_en": "Dhorpatan",
+   "name_ne": "ढोरपाटन",
+   "website": "http://www.dhorpatanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN395",
+   "district_code": "D36",
+   "type": "MUNICIPALITY",
+   "name_en": "Galkot",
+   "name_ne": "गल्कोट",
+   "website": "http://www.galkotmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN396",
+   "district_code": "D36",
+   "type": "MUNICIPALITY",
+   "name_en": "Jaimuni",
+   "name_ne": "जैमूनी",
+   "website": "http://www.jaiminimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN397",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bareng",
+   "name_ne": "वरेङ",
+   "website": "http://www.barengmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN398",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khathekhola",
+   "name_ne": "काठेखोला",
+   "website": "http://www.kathekholamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN399",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Taman Khola",
+   "name_ne": "तमानखोला",
+   "website": "http://www.tamankholamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN400",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tara Khola",
+   "name_ne": "ताराखोला",
+   "website": "http://www.tarakholamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN401",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Nishi Khola",
+   "name_ne": "निसीखोला",
+   "website": "http://www.nisikholamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN402",
+   "district_code": "D36",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Badigad",
+   "name_ne": "वडिगाड",
+   "website": "http://www.badigadmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN403",
+   "district_code": "D37",
+   "type": "MUNICIPALITY",
+   "name_en": "Gorkha",
+   "name_ne": "गोरखा",
+   "website": "http://www.gorkhamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN404",
+   "district_code": "D37",
+   "type": "MUNICIPALITY",
+   "name_en": "Palungtar",
+   "name_ne": "पालुङटार",
+   "website": "http://www.palungtarmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN405",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sulikot",
+   "name_ne": "बारपाक सुलिकोट",
+   "website": "http://www.sulikotmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN406",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Siranchowk",
+   "name_ne": "सिरानचोक",
+   "website": "http://www.siranchowkmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN407",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ajirkot",
+   "name_ne": "अजिरकोट",
+   "website": "http://www.ajirkotmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN408",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chumnubri",
+   "name_ne": "चुमनुव्री",
+   "website": "http://www.chumanuwrimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN409",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dharche",
+   "name_ne": "धार्चे",
+   "website": "http://www.dharchemun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN410",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhimsen Thapa",
+   "name_ne": "भिमसेनथापा",
+   "website": "http://www.bhimsenmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN411",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sahid Lakhan",
+   "name_ne": "शहिद लखन",
+   "website": "http://www.shahidlakhanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN412",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aarughat",
+   "name_ne": "आरूघाट",
+   "website": "http://www.aarughatmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN413",
+   "district_code": "D37",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gandaki",
+   "name_ne": "गण्डकी",
+   "website": "http://www.gandakimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN414",
+   "district_code": "D38",
+   "type": "METROPOLITAN_CITY",
+   "name_en": "Pokhara",
+   "name_ne": "पोखरा",
+   "website": "http://www.pokharamun.gov.np/",
+   "wards": 33
+  },
+  {
+   "code": "MUN415",
+   "district_code": "D38",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Annapurna",
+   "name_ne": "अन्नपूर्ण",
+   "website": "http://www.annapurnamunkaski.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN416",
+   "district_code": "D38",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Machhapuchchhre",
+   "name_ne": "माछापुच्छ्रे",
+   "website": "http://www.machhapuchhremun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN417",
+   "district_code": "D38",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Madi",
+   "name_ne": "मादी",
+   "website": "http://www.madimunkaski.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN418",
+   "district_code": "D38",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rupa",
+   "name_ne": "रूपा",
+   "website": "http://www.rupamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN419",
+   "district_code": "D39",
+   "type": "MUNICIPALITY",
+   "name_en": "Besisahar",
+   "name_ne": "बेसीशहर",
+   "website": "http://www.besishaharmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN420",
+   "district_code": "D39",
+   "type": "MUNICIPALITY",
+   "name_en": "Madhya Nepal",
+   "name_ne": "मध्यनेपाल",
+   "website": "http://www.madhyanepalmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN421",
+   "district_code": "D39",
+   "type": "MUNICIPALITY",
+   "name_en": "Rainas",
+   "name_ne": "रारइनास",
+   "website": "http://www.rainasmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN422",
+   "district_code": "D39",
+   "type": "MUNICIPALITY",
+   "name_en": "Sundarbazar",
+   "name_ne": "सुन्दरबजार",
+   "website": "http://www.sundarbazarmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN423",
+   "district_code": "D39",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dordi",
+   "name_ne": "दोर्दी",
+   "website": "http://www.dordimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN424",
+   "district_code": "D39",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dudhpokhari",
+   "name_ne": "दूधपोखरी",
+   "website": "http://www.dudhpokharimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN425",
+   "district_code": "D39",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kwhlosothar",
+   "name_ne": "क्व्होलासोथार",
+   "website": "http://www.kwholasotharmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN426",
+   "district_code": "D39",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Marsyangdi",
+   "name_ne": "मर्स्याङदी",
+   "website": "http://www.marsyangdimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN427",
+   "district_code": "D40",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chame",
+   "name_ne": "चामे",
+   "website": "http://www.chamemun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN428",
+   "district_code": "D40",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Nason",
+   "name_ne": "नासोँ",
+   "website": "http://www.nasonmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN429",
+   "district_code": "D40",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "NarpaBhumi",
+   "name_ne": "नार्पा भूमि",
+   "website": "http://www.narpabhumimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN430",
+   "district_code": "D40",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Manang Ngisyang",
+   "name_ne": "मनाङ ङिस्याङ",
+   "website": "http://www.manangngisyangmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN431",
+   "district_code": "D41",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gharpajhong",
+   "name_ne": "घरपझोङ",
+   "website": "http://www.gharapjhongmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN432",
+   "district_code": "D41",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thasang",
+   "name_ne": "थासाङ",
+   "website": "http://www.thasangmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN433",
+   "district_code": "D41",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barhagaun Muktichhetra",
+   "name_ne": "वारागुङ मुक्तिक्षेत्र",
+   "website": "http://www.bahragaumuktichhetramun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN434",
+   "district_code": "D41",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lomanthang",
+   "name_ne": "लोमन्थाङ",
+   "website": "http://www.lomanthangmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN435",
+   "district_code": "D41",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lo-Ghekar Damodarkunda",
+   "name_ne": "लो-घेकर दामोदरकुण्ड",
+   "website": "http://www.dalomemun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN436",
+   "district_code": "D42",
+   "type": "MUNICIPALITY",
+   "name_en": "Beni",
+   "name_ne": "बेनी",
+   "website": "http://www.benimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN437",
+   "district_code": "D42",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Annapurna",
+   "name_ne": "अन्नपुर्ण",
+   "website": "http://www.annapurnamunmyagdi.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN438",
+   "district_code": "D42",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhaulagiri",
+   "name_ne": "धवलागिरी",
+   "website": "http://www.dhawalagirimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN439",
+   "district_code": "D42",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mangala",
+   "name_ne": "मंगला",
+   "website": "http://www.mangalamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN440",
+   "district_code": "D42",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Malika",
+   "name_ne": "मालिका",
+   "website": "http://www.malikamunmyagdi.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN441",
+   "district_code": "D42",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Raghuganga",
+   "name_ne": "रघुगंगा",
+   "website": "http://www.raghugangamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN442",
+   "district_code": "D43",
+   "type": "MUNICIPALITY",
+   "name_en": "Kawasoti",
+   "name_ne": "कावासोती",
+   "website": "http://www.kawasotimun.gov.np/",
+   "wards": 17
+  },
+  {
+   "code": "MUN443",
+   "district_code": "D43",
+   "type": "MUNICIPALITY",
+   "name_en": "Gaindakot",
+   "name_ne": "गैडाकोट",
+   "website": "http://www.gaindakotmun.gov.np/",
+   "wards": 18
+  },
+  {
+   "code": "MUN444",
+   "district_code": "D43",
+   "type": "MUNICIPALITY",
+   "name_en": "Devachuli",
+   "name_ne": "देवचुली",
+   "website": "http://www.devchulimun.gov.np/",
+   "wards": 17
+  },
+  {
+   "code": "MUN445",
+   "district_code": "D43",
+   "type": "MUNICIPALITY",
+   "name_en": "Madhya Bindu",
+   "name_ne": "मध्यविन्दु",
+   "website": "http://www.madhyabindumun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN446",
+   "district_code": "D43",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Baudikali",
+   "name_ne": "बौदीकाली",
+   "website": "http://www.bungdikalimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN447",
+   "district_code": "D43",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bulingtar",
+   "name_ne": "बुलिङटार",
+   "website": "http://www.bulingtarmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN448",
+   "district_code": "D43",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Binayi Tribeni",
+   "name_ne": "विनयी त्रिवेणी",
+   "website": "http://www.binayitribenimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN449",
+   "district_code": "D43",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Hupsekot",
+   "name_ne": "हुप्सेकोट",
+   "website": "http://www.hupsekotmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN450",
+   "district_code": "D44",
+   "type": "MUNICIPALITY",
+   "name_en": "Kushma",
+   "name_ne": "कुश्मा",
+   "website": "http://www.kushmamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN451",
+   "district_code": "D44",
+   "type": "MUNICIPALITY",
+   "name_en": "Phalewas",
+   "name_ne": "फलेवास",
+   "website": "http://www.phalewasmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN452",
+   "district_code": "D44",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jaljala",
+   "name_ne": "जलजला",
+   "website": "http://www.jaljalamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN453",
+   "district_code": "D44",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Paiyun",
+   "name_ne": "पैयूं",
+   "website": "http://www.paiyunmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN454",
+   "district_code": "D44",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahashila",
+   "name_ne": "महाशिला",
+   "website": "http://www.mahashilamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN455",
+   "district_code": "D44",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Modi",
+   "name_ne": "मोदी",
+   "website": "http://www.modimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN456",
+   "district_code": "D44",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bihadi",
+   "name_ne": "विहादी",
+   "website": "http://www.bihadimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN457",
+   "district_code": "D45",
+   "type": "MUNICIPALITY",
+   "name_en": "Galyang",
+   "name_ne": "गल्याङ",
+   "website": "http://www.galyangmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN458",
+   "district_code": "D45",
+   "type": "MUNICIPALITY",
+   "name_en": "Chapakot",
+   "name_ne": "चापाकोट",
+   "website": "http://www.chapakotmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN459",
+   "district_code": "D45",
+   "type": "MUNICIPALITY",
+   "name_en": "Putalibazar",
+   "name_ne": "पुतलीबजार",
+   "website": "http://www.putalibazarmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN460",
+   "district_code": "D45",
+   "type": "MUNICIPALITY",
+   "name_en": "Bheerkot",
+   "name_ne": "भीरकोट",
+   "website": "http://www.bheerkotmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN461",
+   "district_code": "D45",
+   "type": "MUNICIPALITY",
+   "name_en": "Waling",
+   "name_ne": "वालिङ",
+   "website": "http://www.walingmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN462",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Arjun Chaupari",
+   "name_ne": "अर्जुनचौपारी",
+   "website": "http://www.arjunchauparimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN463",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aandhikhola",
+   "name_ne": "आँधिखोला",
+   "website": "http://www.aandhikholamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN464",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kaligandaki",
+   "name_ne": "कालीगण्डकी",
+   "website": "http://www.kaligandakimunsyangja.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN465",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Phedikhola",
+   "name_ne": "फेदीखोला",
+   "website": "http://www.phedikholamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN466",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Harinas",
+   "name_ne": "हरिनास",
+   "website": "http://www.harinasmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN467",
+   "district_code": "D45",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Biruwa",
+   "name_ne": "बिरुवा",
+   "website": "http://www.biruwamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN468",
+   "district_code": "D46",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhanu",
+   "name_ne": "भानु",
+   "website": "http://www.bhanumun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN469",
+   "district_code": "D46",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhimad",
+   "name_ne": "भिमाद",
+   "website": "http://www.bhimadmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN470",
+   "district_code": "D46",
+   "type": "MUNICIPALITY",
+   "name_en": "Byas",
+   "name_ne": "व्यास",
+   "website": "http://www.vyasmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN471",
+   "district_code": "D46",
+   "type": "MUNICIPALITY",
+   "name_en": "Suklagandaki",
+   "name_ne": "शुक्लागण्डकी",
+   "website": "http://www.shuklagandakimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN472",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "AnbuKhaireni",
+   "name_ne": "आँबुखैरेनी",
+   "website": "http://www.aanbookhairenimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN473",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Devghat",
+   "name_ne": "देवघाट",
+   "website": "http://www.devghatmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN474",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bandipur",
+   "name_ne": "वन्दिपुर",
+   "website": "http://www.bandipurmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN475",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rishing",
+   "name_ne": "ऋषिङ्ग",
+   "website": "http://www.rishingmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN476",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ghiring",
+   "name_ne": "घिरिङ",
+   "website": "http://www.ghiringmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN477",
+   "district_code": "D46",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Myagde",
+   "name_ne": "म्याग्दे",
+   "website": "http://www.myagdemun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN478",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Kapilvastu",
+   "name_ne": "कपिलवस्तु",
+   "website": "http://www.kapilvastumun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN479",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Banganga",
+   "name_ne": "बाणगंगा",
+   "website": "http://www.bangangamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN480",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Buddhabhumi",
+   "name_ne": "बुद्धभुमी",
+   "website": "http://www.buddhabhumimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN481",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Shivaraj",
+   "name_ne": "शिवराज",
+   "website": "http://www.shivrajmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN482",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Krishnanagar",
+   "name_ne": "कृष्णनगर",
+   "website": "http://www.krishnanagarmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN483",
+   "district_code": "D47",
+   "type": "MUNICIPALITY",
+   "name_en": "Maharajgunj",
+   "name_ne": "महाराजगंज",
+   "website": "http://www.maharajgunjmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN484",
+   "district_code": "D47",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mayadevi",
+   "name_ne": "मायादेवी",
+   "website": "http://www.mayadevimunkapilvastu.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN485",
+   "district_code": "D47",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Yashodhara",
+   "name_ne": "यसोधरा",
+   "website": "http://www.yasodharamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN486",
+   "district_code": "D47",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Suddhodan",
+   "name_ne": "सुद्धोधन",
+   "website": "http://www.shuddhodhanmunkapilvastu.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN487",
+   "district_code": "D47",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bijaynagar",
+   "name_ne": "विजयनगर",
+   "website": "http://www.bijaynagarmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN488",
+   "district_code": "D48",
+   "type": "MUNICIPALITY",
+   "name_en": "Bardaghat",
+   "name_ne": "बर्दघाट",
+   "website": "http://www.bardghatmun.gov.np/",
+   "wards": 16
+  },
+  {
+   "code": "MUN489",
+   "district_code": "D48",
+   "type": "MUNICIPALITY",
+   "name_en": "Ramgram",
+   "name_ne": "रामग्राम",
+   "website": "http://www.ramgrammun.gov.np/",
+   "wards": 18
+  },
+  {
+   "code": "MUN490",
+   "district_code": "D48",
+   "type": "MUNICIPALITY",
+   "name_en": "Sunwal",
+   "name_ne": "सुनवल",
+   "website": "http://www.sunwalmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN491",
+   "district_code": "D48",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Susta",
+   "name_ne": "सुस्ता",
+   "website": "http://www.sustamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN492",
+   "district_code": "D48",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Palhi Nandan",
+   "name_ne": "पाल्हीनन्दन",
+   "website": "http://www.palhinandanmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN493",
+   "district_code": "D48",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pratappur",
+   "name_ne": "प्रतापपुर",
+   "website": "http://www.pratappurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN494",
+   "district_code": "D48",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sarawal",
+   "name_ne": "सरावल",
+   "website": "http://www.sarawalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN495",
+   "district_code": "D49",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Butwal",
+   "name_ne": "बुटवल",
+   "website": "http://www.butwalmun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN496",
+   "district_code": "D49",
+   "type": "MUNICIPALITY",
+   "name_en": "Devdaha",
+   "name_ne": "देवदह",
+   "website": "http://www.devdahamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN497",
+   "district_code": "D49",
+   "type": "MUNICIPALITY",
+   "name_en": "Lumbini Sanskritik",
+   "name_ne": "लुम्बिनी सांस्कृतिक",
+   "website": "http://www.lumbinisanskritikmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN498",
+   "district_code": "D49",
+   "type": "MUNICIPALITY",
+   "name_en": "Sainamaina",
+   "name_ne": "सैनामैना",
+   "website": "http://www.sainamainamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN499",
+   "district_code": "D49",
+   "type": "MUNICIPALITY",
+   "name_en": "Siddharthanagar",
+   "name_ne": "सिद्धार्थनगर",
+   "website": "http://www.siddharthanagarmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN500",
+   "district_code": "D49",
+   "type": "MUNICIPALITY",
+   "name_en": "Tilottama",
+   "name_ne": "तिलोत्तमा",
+   "website": "http://www.tilottamamun.gov.np/",
+   "wards": 17
+  },
+  {
+   "code": "MUN501",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gaidahawa",
+   "name_ne": "गैडहवा",
+   "website": "http://www.gaidahawamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN502",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kanchan",
+   "name_ne": "कन्चन",
+   "website": "http://www.kanchanmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN503",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kotahimai",
+   "name_ne": "कोटहीमाई",
+   "website": "http://www.kotahimaimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN504",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Marchawari",
+   "name_ne": "मर्चवारी",
+   "website": "http://www.marchawarimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN505",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mayadevi",
+   "name_ne": "मायादेवी",
+   "website": "http://www.mayadevimunrupandehi.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN506",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Omsatiya",
+   "name_ne": "ओमसतिया",
+   "website": "http://www.omsatiyamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN507",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rohini",
+   "name_ne": "रोहिणी",
+   "website": "http://www.rohinimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN508",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sammarimai",
+   "name_ne": "सम्मरीमाई",
+   "website": "http://www.sammarimaimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN509",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Siyari",
+   "name_ne": "सियारी",
+   "website": "http://www.siyarimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN510",
+   "district_code": "D49",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Suddodhan",
+   "name_ne": "शुद्धोधन",
+   "website": "http://www.shuddhodhanmunrupandehi.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN511",
+   "district_code": "D50",
+   "type": "MUNICIPALITY",
+   "name_en": "Sandhikharka",
+   "name_ne": "सन्धिखर्क",
+   "website": "http://www.sandhikharkamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN512",
+   "district_code": "D50",
+   "type": "MUNICIPALITY",
+   "name_en": "Sitganga",
+   "name_ne": "शितगंगा",
+   "website": "http://www.shitagangamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN513",
+   "district_code": "D50",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhumikasthan",
+   "name_ne": "भूमिकास्थान",
+   "website": "http://www.bhumikasthanmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN514",
+   "district_code": "D50",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhatradev",
+   "name_ne": "छत्रदेव",
+   "website": "http://www.chhatradevmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN515",
+   "district_code": "D50",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Panini",
+   "name_ne": "पाणिनी",
+   "website": "http://www.paninimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN516",
+   "district_code": "D50",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Malarani",
+   "name_ne": "मालारानी",
+   "website": "http://www.malaranimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN517",
+   "district_code": "D51",
+   "type": "MUNICIPALITY",
+   "name_en": "Resunga",
+   "name_ne": "रेसुङ्गा",
+   "website": "http://www.resungamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN518",
+   "district_code": "D51",
+   "type": "MUNICIPALITY",
+   "name_en": "Musikot",
+   "name_ne": "मुसिकोट",
+   "website": "http://www.musikotmungulmi.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN519",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rurukshetra",
+   "name_ne": "रुरुक्षेत्र",
+   "website": "http://www.rurumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN520",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhatrakot",
+   "name_ne": "छत्रकोट",
+   "website": "http://www.chhatrakotmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN521",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gulmidarbar",
+   "name_ne": "गुल्मी दरबार",
+   "website": "http://www.gulmidarbarmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN522",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chandrakot",
+   "name_ne": "चन्द्रकोट",
+   "website": "http://www.chandrakotmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN523",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Satyawati",
+   "name_ne": "सत्यवती",
+   "website": "http://www.satyawatimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN524",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhurkot",
+   "name_ne": "धुर्कोट",
+   "website": "http://www.dhurkotmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN525",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kaligandaki",
+   "name_ne": "कालीगण्डकी",
+   "website": "http://www.kaligandakimungulmi.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN526",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Isma",
+   "name_ne": "ईस्मा",
+   "website": "http://www.ishmamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN527",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Malika",
+   "name_ne": "मालिका",
+   "website": "http://www.malikamungulmi.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN528",
+   "district_code": "D51",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Madane",
+   "name_ne": "मदाने",
+   "website": "http://www.madanemun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN529",
+   "district_code": "D52",
+   "type": "MUNICIPALITY",
+   "name_en": "Tansen",
+   "name_ne": "तानसेन",
+   "website": "http://www.tansenmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN530",
+   "district_code": "D52",
+   "type": "MUNICIPALITY",
+   "name_en": "Rampur",
+   "name_ne": "रामपुर",
+   "website": "http://www.rampurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN531",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rainadevi Chhahara",
+   "name_ne": "रैनादेवी छहरा",
+   "website": "http://www.rainadevichhaharamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN532",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ripdikot",
+   "name_ne": "रिब्दिकोट",
+   "website": "http://www.ribdikotmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN533",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bagnaskali",
+   "name_ne": "बगनासकाली",
+   "website": "http://www.baganaskalimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN534",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rambha",
+   "name_ne": "रम्भा",
+   "website": "http://www.rambhamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN535",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Purbakhola",
+   "name_ne": "पूर्वखोला",
+   "website": "http://www.purbakholamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN536",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Nisdi",
+   "name_ne": "निस्दी",
+   "website": "http://www.nisdimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN537",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mathagadhi",
+   "name_ne": "माथागढी",
+   "website": "http://www.mathagadhimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN538",
+   "district_code": "D52",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tinahu",
+   "name_ne": "तिनाउ",
+   "website": "http://www.tinaumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN539",
+   "district_code": "D53",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Ghorahi",
+   "name_ne": "घोराही",
+   "website": "http://www.ghorahimun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN540",
+   "district_code": "D53",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Tulsipur",
+   "name_ne": "तुल्सीपुर",
+   "website": "http://www.tulsipurmun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN541",
+   "district_code": "D53",
+   "type": "MUNICIPALITY",
+   "name_en": "Lamahi",
+   "name_ne": "लमही",
+   "website": "http://www.lamahimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN542",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gadhawa",
+   "name_ne": "गढवा",
+   "website": "http://www.gadhawamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN543",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rajpur",
+   "name_ne": "राजपुर",
+   "website": "http://www.rajpurmundang.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN544",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Shantinagar",
+   "name_ne": "शान्तिनगर",
+   "website": "http://www.shantinagarmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN545",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rapti",
+   "name_ne": "राप्ती",
+   "website": "http://www.raptimundang.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN546",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Banglachuli",
+   "name_ne": "बंगलाचुली",
+   "website": "http://www.bangalachulimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN547",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dangisharan",
+   "name_ne": "दंगीशरण",
+   "website": "http://www.dangisharanmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN548",
+   "district_code": "D53",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Babai",
+   "name_ne": "बबई",
+   "website": "http://www.babaimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN549",
+   "district_code": "D54",
+   "type": "MUNICIPALITY",
+   "name_en": "Sworgadwari",
+   "name_ne": "स्वर्गद्वारी",
+   "website": "http://www.swargadwarimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN550",
+   "district_code": "D54",
+   "type": "MUNICIPALITY",
+   "name_en": "Pyuthan",
+   "name_ne": "प्यूठान",
+   "website": "http://www.pyuthanmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN551",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mandavi",
+   "name_ne": "माण्डवी",
+   "website": "http://www.mandavimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN552",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sarumarani",
+   "name_ne": "सरुमारानी",
+   "website": "http://www.sarumaranimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN553",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ayirawati",
+   "name_ne": "ऐरावती",
+   "website": "http://www.airawatimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN554",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mallarani",
+   "name_ne": "मल्लरानी",
+   "website": "http://www.mallaranimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN555",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jhimruk",
+   "name_ne": "झिमरुक",
+   "website": "http://www.jhimrukmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN556",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Naubahini",
+   "name_ne": "नौवहिनी",
+   "website": "http://www.naubahinimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN557",
+   "district_code": "D54",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gaumukhi",
+   "name_ne": "गौमुखी",
+   "website": "http://www.gaumukhimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN558",
+   "district_code": "D55",
+   "type": "MUNICIPALITY",
+   "name_en": "Rolpa",
+   "name_ne": "रोल्पा",
+   "website": "http://www.rolpamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN559",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Runtigadi",
+   "name_ne": "रुन्टीगढी",
+   "website": "http://www.runtigadhimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN560",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Triveni",
+   "name_ne": "त्रिवेणी",
+   "website": "http://www.trivenimunrolpa.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN561",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunil Smiriti",
+   "name_ne": "सुनिल स्मृति",
+   "website": "http://www.sunilsmritimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN562",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lungri",
+   "name_ne": "लुङग्री",
+   "website": "http://www.lungrimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN563",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sunchhahari",
+   "name_ne": "सुनछहरी",
+   "website": "http://www.sunchhaharimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN564",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thawang",
+   "name_ne": "थवाङ",
+   "website": "http://www.thabangmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN565",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Madi",
+   "name_ne": "माडी",
+   "website": "http://www.madimunrolpa.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN566",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "GangaDev",
+   "name_ne": "गंगादेव",
+   "website": "http://www.sukidahamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN567",
+   "district_code": "D55",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pariwartan",
+   "name_ne": "परिवर्तन",
+   "website": "http://www.duikholimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN568",
+   "district_code": "D56",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Putha Uttarganga",
+   "name_ne": "पुथा उत्तरगंगा",
+   "website": "http://www.puthauttargangamun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN569",
+   "district_code": "D56",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhume",
+   "name_ne": "भूमे",
+   "website": "http://www.bhumemun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN570",
+   "district_code": "D56",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sisne",
+   "name_ne": "सिस्ने",
+   "website": "http://www.sisnemun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN571",
+   "district_code": "D57",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Nepalgunj",
+   "name_ne": "नेपालगंज",
+   "website": "http://www.nepalgunjmun.gov.np/",
+   "wards": 23
+  },
+  {
+   "code": "MUN572",
+   "district_code": "D57",
+   "type": "MUNICIPALITY",
+   "name_en": "Kohalpur",
+   "name_ne": "कोहलपुर",
+   "website": "http://www.kohalpurmun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN573",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Rapti-Sonari",
+   "name_ne": "राप्ती सोनारी",
+   "website": "http://www.raptisonarimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN574",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Narainapur",
+   "name_ne": "नरैनापुर",
+   "website": "http://www.narainapurmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN575",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Duduwa",
+   "name_ne": "डुडुवा",
+   "website": "http://www.duduwamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN576",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Janaki",
+   "name_ne": "जानकी",
+   "website": "http://www.janakimunbanke.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN577",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khajura",
+   "name_ne": "खजुरा",
+   "website": "http://www.khajuramun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN578",
+   "district_code": "D57",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Baijanath",
+   "name_ne": "बैजनाथ",
+   "website": "http://www.baijanathmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN579",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Gulariya",
+   "name_ne": "गुलरिया",
+   "website": "http://www.gulariyamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN580",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Rajapur",
+   "name_ne": "राजापुर",
+   "website": "http://www.rajapurmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN581",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Madhuwan",
+   "name_ne": "मधुवन",
+   "website": "http://www.madhuwanmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN582",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Thakurbaba",
+   "name_ne": "ठाकुरबाबा",
+   "website": "http://www.thakurbabamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN583",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Basgadhi",
+   "name_ne": "बाँसगढी",
+   "website": "http://www.bansgadhimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN584",
+   "district_code": "D58",
+   "type": "MUNICIPALITY",
+   "name_en": "Barbardiya",
+   "name_ne": "बारबर्दिया",
+   "website": "http://www.barbardiyamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN585",
+   "district_code": "D58",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Badhaiyatal",
+   "name_ne": "बढैयाताल",
+   "website": "http://www.badhaiyatalmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN586",
+   "district_code": "D58",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Geruwa",
+   "name_ne": "गेरुवा",
+   "website": "http://www.geruwamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN587",
+   "district_code": "D59",
+   "type": "MUNICIPALITY",
+   "name_en": "Aathabiskot",
+   "name_ne": "आठबिसकोट",
+   "website": "http://www.aathbiskotmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN588",
+   "district_code": "D59",
+   "type": "MUNICIPALITY",
+   "name_en": "Musikot",
+   "name_ne": "मुसिकोट",
+   "website": "http://www.musikotmunrukum.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN589",
+   "district_code": "D59",
+   "type": "MUNICIPALITY",
+   "name_en": "Chaurjahari",
+   "name_ne": "चौरजहारी",
+   "website": "http://www.chaurjaharimun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN590",
+   "district_code": "D59",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "SaniBheri",
+   "name_ne": "सानी भेरी",
+   "website": "http://www.sanibherimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN591",
+   "district_code": "D59",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Triveni",
+   "name_ne": "त्रिवेणी",
+   "website": "http://www.trivenimunrukum.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN592",
+   "district_code": "D59",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Banphikot",
+   "name_ne": "बाँफिकोट",
+   "website": "http://www.banphikotmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN593",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kumakh",
+   "name_ne": "कुमाख",
+   "website": "http://www.kumakhmalikamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN594",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kalimati",
+   "name_ne": "कालिमाटी",
+   "website": "http://www.kalimatimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN595",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhatreshwari",
+   "name_ne": "छत्रेश्वरी",
+   "website": "http://www.chhatreshworimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN596",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Darma",
+   "name_ne": "दार्मा",
+   "website": "http://www.darmamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN597",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kapurkot",
+   "name_ne": "कपुरकोट",
+   "website": "http://www.kapurkotmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN598",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Triveni",
+   "name_ne": "त्रिवेणी",
+   "website": "http://www.trivenimunsalyan.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN599",
+   "district_code": "D60",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Siddha Kumakh",
+   "name_ne": "सिद्ध कुमाख",
+   "website": "http://www.siddhakumakhmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN600",
+   "district_code": "D60",
+   "type": "MUNICIPALITY",
+   "name_en": "Bagchaur",
+   "name_ne": "बागचौर",
+   "website": "http://www.bagchaurmun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN601",
+   "district_code": "D60",
+   "type": "MUNICIPALITY",
+   "name_en": "Shaarda",
+   "name_ne": "शारदा",
+   "website": "http://www.shaaradamun.gov.np/",
+   "wards": 15
+  },
+  {
+   "code": "MUN602",
+   "district_code": "D60",
+   "type": "MUNICIPALITY",
+   "name_en": "Bangad Kupinde",
+   "name_ne": "बनगाड कुपिण्डे",
+   "website": "http://www.bangadkupindemun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN603",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mudkechula",
+   "name_ne": "मुड्केचुला",
+   "website": "http://www.mudkechulamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN604",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kaike",
+   "name_ne": "काईके",
+   "website": "http://www.kaikemun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN605",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "She Phoksundo",
+   "name_ne": "शे फोक्सुन्डो",
+   "website": "http://www.shephoksundomun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN606",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jagadulla",
+   "name_ne": "जगदुल्ला",
+   "website": "http://www.jagdullamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN607",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dolpo Buddha",
+   "name_ne": "डोल्पो बुद्ध",
+   "website": "http://www.dolpobuddhamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN608",
+   "district_code": "D61",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chharka Tongsong",
+   "name_ne": "छार्का ताङसोङ",
+   "website": "http://www.chharkatangsongmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN609",
+   "district_code": "D61",
+   "type": "MUNICIPALITY",
+   "name_en": "Thuli Bheri",
+   "name_ne": "ठूली भेरी",
+   "website": "http://www.thulibherimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN610",
+   "district_code": "D61",
+   "type": "MUNICIPALITY",
+   "name_en": "Tripurasundari",
+   "name_ne": "त्रिपुरासुन्दरी",
+   "website": "http://www.tripurasundarimundolpa.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN611",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Simkot",
+   "name_ne": "सिमकोट",
+   "website": "http://www.simkotmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN612",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sarkegad",
+   "name_ne": "सर्केगाड",
+   "website": "http://www.sarkegadmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN613",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Adanchuli",
+   "name_ne": "अदानचुली",
+   "website": "http://www.adanchulimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN614",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kharpunath",
+   "name_ne": "खार्पुनाथ",
+   "website": "http://www.kharpunathmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN615",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tanjakot",
+   "name_ne": "ताँजाकोट",
+   "website": "http://www.tajakotmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN616",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chankheli",
+   "name_ne": "चंखेली",
+   "website": "http://www.chankhelimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN617",
+   "district_code": "D62",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Namkha",
+   "name_ne": "नाम्खा",
+   "website": "http://www.namkhamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN618",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tatopani",
+   "name_ne": "तातोपानी",
+   "website": "http://www.tatopanimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN619",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Patarasi",
+   "name_ne": "पातारासी",
+   "website": "http://www.patarasimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN620",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Tila",
+   "name_ne": "तिला",
+   "website": "http://www.tilamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN621",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kanaka Sundari",
+   "name_ne": "कनकासुन्दरी",
+   "website": "http://www.kankasundarimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN622",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sinja",
+   "name_ne": "सिंजा",
+   "website": "http://www.sinjamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN623",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Hima",
+   "name_ne": "हिमा",
+   "website": "http://www.himamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN624",
+   "district_code": "D63",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Guthichaur",
+   "name_ne": "गुठिचौर",
+   "website": "http://www.guthichaurmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN625",
+   "district_code": "D63",
+   "type": "MUNICIPALITY",
+   "name_en": "Chandannath",
+   "name_ne": "चन्दननाथ",
+   "website": "http://www.chandannathmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN626",
+   "district_code": "D64",
+   "type": "MUNICIPALITY",
+   "name_en": "Khandachakra",
+   "name_ne": "खाँडाचक्र",
+   "website": "http://www.khandachakramun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN627",
+   "district_code": "D64",
+   "type": "MUNICIPALITY",
+   "name_en": "Raskot",
+   "name_ne": "रास्कोट",
+   "website": "http://www.raskotmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN628",
+   "district_code": "D64",
+   "type": "MUNICIPALITY",
+   "name_en": "Tilagufa",
+   "name_ne": "तिलागुफा",
+   "website": "http://www.tilagufamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN629",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Narharinath",
+   "name_ne": "नरहरिनाथ",
+   "website": "http://www.narharinathmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN630",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Palata",
+   "name_ne": "पलाता",
+   "website": "http://www.palatamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN631",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Shubha Kalika",
+   "name_ne": "शुभ कालीका",
+   "website": "http://www.kalikamunkalikot.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN632",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sanni Triveni",
+   "name_ne": "सान्नी त्रिवेणी",
+   "website": "http://www.sannitrivenimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN633",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pachaljharana",
+   "name_ne": "पचालझरना",
+   "website": "http://www.pachaljharanamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN634",
+   "district_code": "D64",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahawai",
+   "name_ne": "महावै",
+   "website": "http://www.mahawaimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN635",
+   "district_code": "D65",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khatyad",
+   "name_ne": "खत्याड",
+   "website": "http://www.khatyadmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN636",
+   "district_code": "D65",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Soru",
+   "name_ne": "सोरु",
+   "website": "http://www.sorumun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN637",
+   "district_code": "D65",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mugum Karmarong",
+   "name_ne": "मुगुम कार्मारोंग",
+   "website": "http://www.mugumkarmarongmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN638",
+   "district_code": "D65",
+   "type": "MUNICIPALITY",
+   "name_en": "Chhayanath Rara",
+   "name_ne": "छायाँनाथ रारा",
+   "website": "http://www.chhayanathraramun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN639",
+   "district_code": "D66",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Simta",
+   "name_ne": "सिम्ता",
+   "website": "http://www.simtamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN640",
+   "district_code": "D66",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barahatal",
+   "name_ne": "बराहताल",
+   "website": "http://www.barahatalmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN641",
+   "district_code": "D66",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chaukune",
+   "name_ne": "चौकुने",
+   "website": "http://www.chaukunemun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN642",
+   "district_code": "D66",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chingad",
+   "name_ne": "चिङ्गाड",
+   "website": "http://www.chingadmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN643",
+   "district_code": "D66",
+   "type": "MUNICIPALITY",
+   "name_en": "Gurbhakot",
+   "name_ne": "गुर्भाकोट",
+   "website": "http://www.gurbhakotmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN644",
+   "district_code": "D66",
+   "type": "MUNICIPALITY",
+   "name_en": "Birendranagar",
+   "name_ne": "बीरेन्द्रनगर",
+   "website": "http://www.birendranagarmun.gov.np/",
+   "wards": 16
+  },
+  {
+   "code": "MUN645",
+   "district_code": "D66",
+   "type": "MUNICIPALITY",
+   "name_en": "Bheriganga",
+   "name_ne": "भेरीगंगा",
+   "website": "http://www.bherigangamun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN646",
+   "district_code": "D66",
+   "type": "MUNICIPALITY",
+   "name_en": "Panchapuri",
+   "name_ne": "पञ्चपुरी",
+   "website": "http://www.panchapurimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN647",
+   "district_code": "D66",
+   "type": "MUNICIPALITY",
+   "name_en": "Lekbeshi",
+   "name_ne": "लेकवेशी",
+   "website": "http://www.lekbeshimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN648",
+   "district_code": "D67",
+   "type": "MUNICIPALITY",
+   "name_en": "Dullu",
+   "name_ne": "दुल्लु",
+   "website": "http://www.dullumun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN649",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gurans",
+   "name_ne": "गुराँस",
+   "website": "http://www.guransmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN650",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhairabi",
+   "name_ne": "भैरवी",
+   "website": "http://www.bhairabimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN651",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Naumule",
+   "name_ne": "नौमुले",
+   "website": "http://www.naumulemun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN652",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mahabu",
+   "name_ne": "महावु",
+   "website": "http://www.mahabumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN653",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thantikandh",
+   "name_ne": "ठाँटीकाँध",
+   "website": "http://www.thantikandhmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN654",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhagawatimai",
+   "name_ne": "भगवतीमाई",
+   "website": "http://www.bhagawatimaimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN655",
+   "district_code": "D67",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dungeshwar",
+   "name_ne": "डुंगेश्वर",
+   "website": "http://www.dungeshwormun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN656",
+   "district_code": "D67",
+   "type": "MUNICIPALITY",
+   "name_en": "Aathabis",
+   "name_ne": "आठबीस",
+   "website": "http://www.aathabismun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN657",
+   "district_code": "D67",
+   "type": "MUNICIPALITY",
+   "name_en": "Narayan",
+   "name_ne": "नारायण",
+   "website": "http://www.narayanmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN658",
+   "district_code": "D67",
+   "type": "MUNICIPALITY",
+   "name_en": "Chamunda Bindrasaini",
+   "name_ne": "चामुण्डा विन्द्रासैनी",
+   "website": "http://www.chamundabindrasainimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN659",
+   "district_code": "D68",
+   "type": "MUNICIPALITY",
+   "name_en": "Chhedagad",
+   "name_ne": "छेडागाड",
+   "website": "http://www.chhedagadmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN660",
+   "district_code": "D68",
+   "type": "MUNICIPALITY",
+   "name_en": "Bheri",
+   "name_ne": "भेरी",
+   "website": "http://www.bherimun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN661",
+   "district_code": "D68",
+   "type": "MUNICIPALITY",
+   "name_en": "Nalgad",
+   "name_ne": "नलगाड",
+   "website": "http://www.tribeninalgaadmun.gov.np/",
+   "wards": 13
+  },
+  {
+   "code": "MUN662",
+   "district_code": "D68",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Junichande",
+   "name_ne": "जुनीचाँदे",
+   "website": "http://www.junichaandemun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN663",
+   "district_code": "D68",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kuse",
+   "name_ne": "कुसे",
+   "website": "http://www.kushemun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN664",
+   "district_code": "D68",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Barekot",
+   "name_ne": "बारेकोट",
+   "website": "http://www.barekotmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN665",
+   "district_code": "D68",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Shivalaya",
+   "name_ne": "शिवालय",
+   "website": "http://www.shibalayamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN666",
+   "district_code": "D69",
+   "type": "MUNICIPALITY",
+   "name_en": "Mahakali",
+   "name_ne": "महाकाली",
+   "website": "http://www.mahakalimundarchula.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN667",
+   "district_code": "D69",
+   "type": "MUNICIPALITY",
+   "name_en": "Shailyashikhar",
+   "name_ne": "शैल्यशिखर",
+   "website": "http://www.shailyashikharmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN668",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Naugad",
+   "name_ne": "नौगाड",
+   "website": "http://www.naugadmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN669",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Malikarjun",
+   "name_ne": "मालिकार्जुन",
+   "website": "http://www.malikarjunmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN670",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Marma",
+   "name_ne": "मार्मा",
+   "website": "http://www.marmamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN671",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Lekam",
+   "name_ne": "लेकम",
+   "website": "http://www.lekammun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN672",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Duhun",
+   "name_ne": "दुहुँ",
+   "website": "http://www.duhunmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN673",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Vyans",
+   "name_ne": "ब्याँस",
+   "website": "http://www.vyansmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN674",
+   "district_code": "D69",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Apihimal",
+   "name_ne": "अपिहिमाल",
+   "website": "http://www.apihimalmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN675",
+   "district_code": "D70",
+   "type": "MUNICIPALITY",
+   "name_en": "Jayaprithvi",
+   "name_ne": "जयपृथ्वी",
+   "website": "http://www.jayaprithvimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN676",
+   "district_code": "D70",
+   "type": "MUNICIPALITY",
+   "name_en": "Bungal",
+   "name_ne": "बुंगल",
+   "website": "http://www.bungalmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN677",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kedarsyu",
+   "name_ne": "केदारस्युँ",
+   "website": "http://www.kedarasyumun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN678",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Thalara",
+   "name_ne": "थलारा",
+   "website": "http://www.thalaramun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN679",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bitthadchir",
+   "name_ne": "वित्थडचिर",
+   "website": "http://www.bitthadchirmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN680",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chhabis Pathibhera",
+   "name_ne": "छबिसपाथिभेरा",
+   "website": "http://www.chhabispathiveramun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN681",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khaptadchhanna",
+   "name_ne": "खप्तडछान्ना",
+   "website": "http://www.khaptadchhannamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN682",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Masta",
+   "name_ne": "मष्टा",
+   "website": "http://www.mastamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN683",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Durgathali",
+   "name_ne": "दुर्गाथली",
+   "website": "http://www.durgathalimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN684",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Talkot",
+   "name_ne": "तलकोट",
+   "website": "http://www.talkotmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN685",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Surma",
+   "name_ne": "सूर्मा",
+   "website": "http://www.surmamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN686",
+   "district_code": "D70",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Saipal",
+   "name_ne": "साइपाल",
+   "website": "http://www.kandamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN687",
+   "district_code": "D71",
+   "type": "MUNICIPALITY",
+   "name_en": "Badimalika",
+   "name_ne": "बडीमालिका",
+   "website": "http://www.badimalikamun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN688",
+   "district_code": "D71",
+   "type": "MUNICIPALITY",
+   "name_en": "Triveni",
+   "name_ne": "त्रिवेणी",
+   "website": "http://www.trivenimunbajura.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN689",
+   "district_code": "D71",
+   "type": "MUNICIPALITY",
+   "name_en": "Budhiganga",
+   "name_ne": "बुढीगंगा",
+   "website": "http://www.budhigangamunbajura.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN690",
+   "district_code": "D71",
+   "type": "MUNICIPALITY",
+   "name_en": "Budhinanda",
+   "name_ne": "बुढीनन्दा",
+   "website": "http://www.budhinandamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN691",
+   "district_code": "D71",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Khaptad Chhededaha",
+   "name_ne": "खप्तड छेडेदह",
+   "website": "http://www.chhededahamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN692",
+   "district_code": "D71",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Swami Kartik Khapar",
+   "name_ne": "स्वामीकार्तिक खापर",
+   "website": "http://www.swamikartikmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN693",
+   "district_code": "D71",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jagannath",
+   "name_ne": "जगन्‍नाथ",
+   "website": "http://www.jagganathmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN694",
+   "district_code": "D71",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Himali",
+   "name_ne": "हिमाली",
+   "website": "http://www.himalimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN695",
+   "district_code": "D71",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Gaumul",
+   "name_ne": "गौमुल",
+   "website": "http://www.gaumulmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN696",
+   "district_code": "D72",
+   "type": "MUNICIPALITY",
+   "name_en": "Dashrathchanda",
+   "name_ne": "दशरथचन्द",
+   "website": "http://www.dasharathchandmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN697",
+   "district_code": "D72",
+   "type": "MUNICIPALITY",
+   "name_en": "Patan",
+   "name_ne": "पाटन",
+   "website": "http://www.patanmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN698",
+   "district_code": "D72",
+   "type": "MUNICIPALITY",
+   "name_en": "Melauli",
+   "name_ne": "मेलौली",
+   "website": "http://www.melaulimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN699",
+   "district_code": "D72",
+   "type": "MUNICIPALITY",
+   "name_en": "Purchaudi",
+   "name_ne": "पुर्चौडी",
+   "website": "http://www.purchaudimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN700",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dogdakedar",
+   "name_ne": "दोगडाकेदार",
+   "website": "http://www.dogdakedarmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN701",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dilashaini",
+   "name_ne": "डीलासैनी",
+   "website": "http://www.dilasainimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN702",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sigas",
+   "name_ne": "सिगास",
+   "website": "http://www.sigasmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN703",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Pancheshwar",
+   "name_ne": "पञ्चेश्वर",
+   "website": "http://www.pancheshwormun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN704",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Surnaya",
+   "name_ne": "सुर्नया",
+   "website": "http://www.sunaryamun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN705",
+   "district_code": "D72",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Shivanath",
+   "name_ne": "शिवनाथ",
+   "website": "http://www.shivanathmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN706",
+   "district_code": "D73",
+   "type": "MUNICIPALITY",
+   "name_en": "Dipayal Silgadhi",
+   "name_ne": "दिपायल सिलगढी",
+   "website": "http://www.dipayalsilgadhimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN707",
+   "district_code": "D73",
+   "type": "MUNICIPALITY",
+   "name_en": "Shikhar",
+   "name_ne": "शिखर",
+   "website": "http://www.shikharmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN708",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aadarsha",
+   "name_ne": "आदर्श",
+   "website": "http://www.aadarshamun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN709",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Purbichauki",
+   "name_ne": "पूर्वीचौकी",
+   "website": "http://www.purbichaukimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN710",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "K.I.Singh",
+   "name_ne": "के.आई.सिं.",
+   "website": "http://www.kisinghmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN711",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Jorayal",
+   "name_ne": "जोरायल",
+   "website": "http://www.jorayalmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN712",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Sayal",
+   "name_ne": "सायल",
+   "website": "http://www.sayalmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN713",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bogatan-Phudsil",
+   "name_ne": "बोगटान फुड्सिल",
+   "website": "http://www.bogatanmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN714",
+   "district_code": "D73",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Badikedar",
+   "name_ne": "बडीकेदार",
+   "website": "http://www.badikedarmun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN715",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ramaroshan",
+   "name_ne": "रामारोशन",
+   "website": "http://www.ramaroshanmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN716",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chaurpati",
+   "name_ne": "चौरपाटी",
+   "website": "http://www.chaurpatimun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN717",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Turmakhand",
+   "name_ne": "तुर्माखाँद",
+   "website": "http://www.turmakhadmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN718",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mellekh",
+   "name_ne": "मेल्लेख",
+   "website": "http://www.mellekhmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN719",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Dhakari",
+   "name_ne": "ढकारी",
+   "website": "http://www.dhakarimun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN720",
+   "district_code": "D74",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bannigadi Jayagad",
+   "name_ne": "बान्निगढी जयगढ",
+   "website": "http://www.bannigadhijaygadhmun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN721",
+   "district_code": "D74",
+   "type": "MUNICIPALITY",
+   "name_en": "Mangalsen",
+   "name_ne": "मंगलसेन",
+   "website": "http://www.mangalsenmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN722",
+   "district_code": "D74",
+   "type": "MUNICIPALITY",
+   "name_en": "Kamalbazar",
+   "name_ne": "कमलबजार",
+   "website": "http://www.kamalbazarmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN723",
+   "district_code": "D74",
+   "type": "MUNICIPALITY",
+   "name_en": "Sanfebagar",
+   "name_ne": "साँफेबगर",
+   "website": "http://www.sanfebagarmun.gov.np/",
+   "wards": 14
+  },
+  {
+   "code": "MUN724",
+   "district_code": "D74",
+   "type": "MUNICIPALITY",
+   "name_en": "Panchadewal Binayak",
+   "name_ne": "पन्चदेवल विनायक",
+   "website": "http://www.panchadewalbinayakmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN725",
+   "district_code": "D75",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Navadurga",
+   "name_ne": "नवदुर्गा",
+   "website": "http://www.navadurgamun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN726",
+   "district_code": "D75",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Aalitaal",
+   "name_ne": "आलिताल",
+   "website": "http://www.aalitalmun.gov.np/",
+   "wards": 8
+  },
+  {
+   "code": "MUN727",
+   "district_code": "D75",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ganyapadhura",
+   "name_ne": "गन्यापधुरा",
+   "website": "http://www.ganyapadhuramun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN728",
+   "district_code": "D75",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bhageshwar",
+   "name_ne": "भागेश्वर",
+   "website": "http://www.bhageshwormun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN729",
+   "district_code": "D75",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Ajaymeru",
+   "name_ne": "अजयमेरु",
+   "website": "http://www.ajayamerumun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN730",
+   "district_code": "D75",
+   "type": "MUNICIPALITY",
+   "name_en": "Amargadhi",
+   "name_ne": "अमरगढी",
+   "website": "http://www.amargadhimun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN731",
+   "district_code": "D75",
+   "type": "MUNICIPALITY",
+   "name_en": "Parshuram",
+   "name_ne": "परशुराम",
+   "website": "http://www.parshurammun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN732",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhimdatta",
+   "name_ne": "भीमदत्त",
+   "website": "http://www.bheemdattamun.gov.np/",
+   "wards": 19
+  },
+  {
+   "code": "MUN733",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Punarbas",
+   "name_ne": "पुर्नवास",
+   "website": "http://www.punarbasmun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN734",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Bedkot",
+   "name_ne": "वेदकोट",
+   "website": "http://www.bedkotmun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN735",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Mahakali",
+   "name_ne": "माहाकाली",
+   "website": "https://mahakalimunkanchanpur.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN736",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Shuklaphanta",
+   "name_ne": "शुक्लाफाँटा",
+   "website": "http://www.shuklaphantamun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN737",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Belauri",
+   "name_ne": "बेलौरी",
+   "website": "http://www.belaurimun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN738",
+   "district_code": "D76",
+   "type": "MUNICIPALITY",
+   "name_en": "Krishnapur",
+   "name_ne": "कृष्णपुर",
+   "website": "http://www.krishnapurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN739",
+   "district_code": "D76",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Laljhadi",
+   "name_ne": "लालझाडी",
+   "website": "http://www.laljhadimun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN740",
+   "district_code": "D76",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Beldandi",
+   "name_ne": "बेलडाडी",
+   "website": "http://www.beldandimun.gov.np/",
+   "wards": 5
+  },
+  {
+   "code": "MUN741",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Janaki",
+   "name_ne": "जानकी",
+   "website": "http://www.janakimunkailali.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN742",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Kailari",
+   "name_ne": "कैलारी",
+   "website": "http://www.kailarimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN743",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Joshipur",
+   "name_ne": "जोशीपुर",
+   "website": "http://www.joshipurmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN744",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Bardagoriya",
+   "name_ne": "बर्दगोरिया",
+   "website": "http://www.bardgoriyamun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN745",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Mohanyal",
+   "name_ne": "मोहन्याल",
+   "website": "http://www.mohanyalmun.gov.np/",
+   "wards": 7
+  },
+  {
+   "code": "MUN746",
+   "district_code": "D77",
+   "type": "RURAL_MUNICIPALITY",
+   "name_en": "Chure",
+   "name_ne": "चुरे",
+   "website": "http://www.churemun.gov.np/",
+   "wards": 6
+  },
+  {
+   "code": "MUN747",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Tikapur",
+   "name_ne": "टिकापुर",
+   "website": "http://www.tikapurmun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN748",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Ghodaghodi",
+   "name_ne": "घोडाघोडी",
+   "website": "http://www.ghodaghodimun.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN749",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Lamkichuha",
+   "name_ne": "लम्कीचुहा",
+   "website": "http://www.lamkichuhamun.gov.np/",
+   "wards": 10
+  },
+  {
+   "code": "MUN750",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Bhajni",
+   "name_ne": "भजनी",
+   "website": "http://www.bhajanimun.gov.np/",
+   "wards": 9
+  },
+  {
+   "code": "MUN751",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Godawari",
+   "name_ne": "गोदावरी",
+   "website": "http://www.godawarimunkailali.gov.np/",
+   "wards": 12
+  },
+  {
+   "code": "MUN752",
+   "district_code": "D77",
+   "type": "MUNICIPALITY",
+   "name_en": "Gauriganga",
+   "name_ne": "गौरीगंगा",
+   "website": "http://www.gaurigangamun.gov.np/",
+   "wards": 11
+  },
+  {
+   "code": "MUN753",
+   "district_code": "D77",
+   "type": "SUB_METROPOLITAN_CITY",
+   "name_en": "Dhangadhi",
+   "name_ne": "धनगढी",
+   "website": "http://www.dhangadhimun.gov.np/",
+   "wards": 19
+  }
+ ]
+}

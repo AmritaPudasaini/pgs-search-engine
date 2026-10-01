@@ -17,12 +17,33 @@ config.set_main_option("sqlalchemy.url", get_database_url())
 target_metadata = Base.metadata
 
 
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    """Keep autogenerate to the tables this project actually owns.
+
+    The postgis/postgis image installs ~37 PostGIS and TIGER geocoder tables
+    (spatial_ref_sys, topology, tract, zip_lookup, ...) into the same database.
+    Alembic sees them in the database but not in our metadata, so without this
+    filter `alembic revision --autogenerate` emits DROP TABLE for every one of
+    them -- which would tear out PostGIS the first time anyone adds a column.
+    """
+    if type_ == "table" and reflected and name not in target_metadata.tables:
+        return False
+    # One HNSW index per embedding model, created by migrations and
+    # SilverRepository.register_embedding_model rather than declared on the model.
+    if type_ == "index" and reflected and (name or "").startswith("ix_page_embeddings_hnsw_"):
+        return False
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -35,7 +56,12 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_object=include_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
