@@ -1,7 +1,7 @@
-"""One-off: embed every documents row that has no embedding yet.
+"""One-off: embed every crawled_documents row that has no embedding yet.
 
 Usage: python backfill_embeddings.py [batch_size]
-Assumes documents(document_id, title, content). Adjust the SELECT if yours differ.
+Uses crawled_documents(id, title, text).
 """
 import sys
 from typing import cast
@@ -20,11 +20,11 @@ def main(batch_size: int = 200) -> None:
         with get_connection() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT document_id, COALESCE(title,'') || E'\n' || COALESCE(content,'')
-                FROM documents
+                SELECT id, COALESCE(title, '') || E'\n' || COALESCE(text, '')
+                FROM crawled_documents
                 WHERE embedding IS NULL
-                  AND length(trim(COALESCE(title,'') || COALESCE(content,''))) > 0
-                ORDER BY document_id
+                  AND length(trim(COALESCE(title, '') || COALESCE(text, ''))) > 0
+                ORDER BY id
                 LIMIT %s
                 """,
                 (batch_size,),

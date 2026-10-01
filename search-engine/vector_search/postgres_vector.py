@@ -10,7 +10,7 @@ from .embeddings import generate_embedding, to_pgvector
 VectorSearchResult = dict[str, int | float | str]
 _execute_values = cast(
     Callable[..., object],
-    getattr(import_module("psycopg2.extras"), "execute_values"),
+    import_module("psycopg2.extras").execute_values,
 )
 
 
@@ -21,8 +21,8 @@ def vector_search_postgres(query: str, top_k: int = 10) -> list[VectorSearchResu
     vec = to_pgvector(generate_embedding(query))
 
     sql = """
-        SELECT document_id, 1 - (embedding <=> q.v) AS vector_score
-        FROM documents, (SELECT %s::vector AS v) AS q
+        SELECT id, 1 - (embedding <=> q.v) AS vector_score
+        FROM crawled_documents, (SELECT %s::vector AS v) AS q
         WHERE embedding IS NOT NULL
         ORDER BY embedding <=> q.v
         LIMIT %s;
@@ -46,10 +46,10 @@ def vector_search_postgres(query: str, top_k: int = 10) -> list[VectorSearchResu
 
 
 def update_embedding_postgres(document_id: int, embedding: list[float]) -> bool:
-    """Store an embedding on an existing documents row. Returns True if a row matched."""
+    """Store an embedding on an existing crawled_documents row. Returns True if matched."""
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "UPDATE documents SET embedding = %s::vector WHERE document_id = %s",
+            "UPDATE crawled_documents SET embedding = %s::vector WHERE id = %s",
             (to_pgvector(embedding), document_id),
         )
         return cur.rowcount > 0
@@ -64,9 +64,9 @@ def bulk_update_embeddings(pairs: Sequence[tuple[int, Sequence[float]]]) -> None
         _execute_values(
             cur,
             """
-            UPDATE documents AS d SET embedding = v.emb::vector
+            UPDATE crawled_documents AS d SET embedding = v.emb::vector
             FROM (VALUES %s) AS v(id, emb)
-            WHERE d.document_id = v.id
+            WHERE d.id = v.id
             """,
             values,
         )

@@ -31,7 +31,7 @@ class _OpenSearchClient(Protocol):
 @lru_cache(maxsize=1)
 def get_client() -> _OpenSearchClient:
     opensearch = import_module("opensearchpy")
-    client_type = getattr(opensearch, "OpenSearch")
+    client_type = opensearch.OpenSearch
     return cast(
         _OpenSearchClient,
         client_type(hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}]),

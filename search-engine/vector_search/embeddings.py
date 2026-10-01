@@ -24,7 +24,7 @@ class _SentenceEncoder(Protocol):
 @lru_cache(maxsize=1)
 def _get_model() -> _SentenceEncoder:
     sentence_transformers = import_module("sentence_transformers")
-    sentence_transformer = getattr(sentence_transformers, "SentenceTransformer")
+    sentence_transformer = sentence_transformers.SentenceTransformer
     return cast(_SentenceEncoder, sentence_transformer(EMBEDDING_MODEL))
 
 

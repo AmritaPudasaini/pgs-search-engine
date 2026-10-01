@@ -4,8 +4,13 @@ from contextlib import contextmanager
 from psycopg2.pool import ThreadedConnectionPool
 
 from .config import (
-    POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_POOL_MAX,
-    POSTGRES_POOL_MIN, POSTGRES_PORT, POSTGRES_USER,
+    POSTGRES_DB,
+    POSTGRES_HOST,
+    POSTGRES_PASSWORD,
+    POSTGRES_POOL_MAX,
+    POSTGRES_POOL_MIN,
+    POSTGRES_PORT,
+    POSTGRES_USER,
 )
 
 _pool: ThreadedConnectionPool | None = None
