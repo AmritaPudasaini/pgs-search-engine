@@ -70,6 +70,8 @@ class SearchRepository:
         - the `SearchDocument` fields (`document_id`, `title`, `searchable_text`,
           `source_url`, `domain`, `language`, `content_type`, `published_at`,
           `keywords`, and `geo` = the primary location with gazetteer names);
+        - `geo_location`: the same location block again, for the geo filter and
+          region counts (`search-engine/geo`), which read that name;
         - `geo_tags`: every location, so OpenSearch can filter on any of them;
         - `file_info`: extension, MIME type and size for PDFs and other files, else None.
         """
@@ -130,6 +132,9 @@ class SearchRepository:
             "published_at": row.published_at,
             "keywords": list(row.keywords or []),
             "geo": primary,
+            # The same block under the name the geo filter / region counts read
+            # (search-engine/geo, Hishila); `geo` is SearchDocument's (Shreya's).
+            "geo_location": dict(primary),
             "geo_tags": geo_tags,
             "file_info": file_info,
         }

@@ -25,8 +25,8 @@ class SearchDocumentOut(SchemaBase):
     """One document for the search index.
 
     A superset of the search team's `pgs_search.models.document.SearchDocument`:
-    its fields, plus `category`, `geo_tags` and `file_info` for filtering and the
-    API's result card. `geo` is the primary location.
+    its fields, plus `category`, `geo_location`, `geo_tags` and `file_info` for
+    filtering and the API's result card. `geo` is the primary location.
     """
 
     document_id: str
@@ -41,6 +41,9 @@ class SearchDocumentOut(SchemaBase):
     published_at: datetime | None = None
     keywords: list[str] = Field(default_factory=list)
     geo: GeoLocationOut
+    geo_location: GeoLocationOut = Field(
+        description="Same as `geo`, under the name search-engine/geo filters on"
+    )
     geo_tags: list[GeoLocationOut] = Field(default_factory=list)
     file_info: FileInfo | None = None
 

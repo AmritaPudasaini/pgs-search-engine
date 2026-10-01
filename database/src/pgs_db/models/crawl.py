@@ -9,6 +9,8 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -159,3 +161,32 @@ class StoredFile(IdMixin, TimestampMixin, Base):
     processing_error: Mapped[str | None] = mapped_column(Text)
 
     crawled_document: Mapped[CrawledDocument | None] = relationship(back_populates="stored_files")
+
+
+class BronzeIngestState(IdMixin, TimestampMixin, Base):
+    """How far `pgs_db.ingest` has loaded one crawl run from the scraper's S3 bucket.
+
+    The scraper writes `<run>/_run.json` and `<run>/<sha256(url)>.json` objects to S3
+    instead of Postgres; the loader copies them into Bronze. `last_modified` is the
+    newest object already loaded, so a re-run only reads what is new. A run is
+    `finished` once its manifest is terminal and every object up to then is loaded;
+    finished runs are never listed again.
+    """
+
+    __tablename__ = "bronze_ingest_state"
+    __table_args__ = (
+        CheckConstraint(
+            "objects_loaded >= 0 AND objects_failed >= 0", name="counts_non_negative"
+        ),
+    )
+
+    crawl_run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("crawl_runs.id", ondelete="CASCADE"), unique=True
+    )
+    # bucket/prefix the run was read from, e.g. "s3://pgs-crawl/staging/".
+    source: Mapped[str] = mapped_column(String(512))
+    last_modified: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    objects_loaded: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    objects_failed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    finished: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

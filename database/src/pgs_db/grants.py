@@ -6,7 +6,7 @@
 | `pgs_etl` | Spark / ETL workers | Bronze processing state, Silver, reference contact fields |
 | `pgs_search` | search service / indexer | `pages` indexing state |
 | `pgs_api` | FastAPI gateway | admin tables, domains, quick links, quarantine, search log, labels |
-| `pgs_jobs` | `python -m pgs_db.jobs` | Gold summaries and scores, log retention |
+| `pgs_jobs` | `python -m pgs_db.jobs` | S3 -> Bronze ingest, Gold summaries and scores, log retention |
 | `pgs_readonly` | analysts, dashboards | nothing |
 
 Every service may append to `error_logs`. Only `pgs_api` can read `admin_users`
@@ -34,6 +34,7 @@ ROLES = {
 }
 
 _BRONZE = ("crawl_runs", "crawled_documents", "stored_files")
+_INGEST = ("bronze_ingest_state",)
 _REFERENCE = ("provinces", "districts", "local_bodies", "domains", "region_links")
 _SILVER = (
     "pages",
@@ -56,7 +57,15 @@ SECRET_TABLES = ("admin_users",)
 
 # Everything a service may read: all tables and views except the secret ones.
 READABLE = (
-    _BRONZE + _REFERENCE + _REGISTRIES + _SILVER + _GOLD_SUMMARIES + _SEARCH_LOG + _VIEWS + _OPS
+    _BRONZE
+    + _INGEST
+    + _REFERENCE
+    + _REGISTRIES
+    + _SILVER
+    + _GOLD_SUMMARIES
+    + _SEARCH_LOG
+    + _VIEWS
+    + _OPS
 )
 ALL_OBJECTS = READABLE + SECRET_TABLES
 
@@ -93,13 +102,17 @@ PRIVILEGES: dict[str, dict[str, str]] = {
     "pgs_jobs": {
         **dict.fromkeys(_GOLD_SUMMARIES, "INSERT, UPDATE, DELETE"),
         "pages": "UPDATE",  # release stale indexing claims
-        "crawled_documents": "UPDATE",  # release stale ETL claims
+        # The S3 loader (pgs_db.ingest) writes Bronze on the scraper's behalf; UPDATE
+        # also releases stale ETL claims.
+        "crawl_runs": "INSERT, UPDATE",
+        "crawled_documents": "INSERT, UPDATE",
         "stored_files": "UPDATE",
+        "bronze_ingest_state": "INSERT, UPDATE, DELETE",
+        "domains": "INSERT, UPDATE",  # ingest registers hosts; link_domains_to_local_bodies
+        "local_bodies": "UPDATE",  # fill_local_body_contacts
         "search_queries": "DELETE",  # retention
         "search_clicks": "DELETE",
         "error_logs": "INSERT, DELETE",
-        "domains": "UPDATE",  # link_domains_to_local_bodies
-        "local_bodies": "UPDATE",  # fill_local_body_contacts
     },
     "pgs_readonly": {},
 }

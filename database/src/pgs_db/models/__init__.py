@@ -1,6 +1,6 @@
 """Import every model here so Alembic autogenerate sees all tables."""
 
-from .crawl import CrawledDocument, CrawlRun, StoredFile
+from .crawl import BronzeIngestState, CrawledDocument, CrawlRun, StoredFile
 from .domain import Domain
 from .geography import District, LocalBody, Province, RegionLink
 from .gold import (
@@ -29,6 +29,7 @@ from .silver import (
 
 __all__ = [
     # bronze
+    "BronzeIngestState",
     "CrawlRun",
     "CrawledDocument",
     "StoredFile",

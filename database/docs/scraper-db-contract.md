@@ -1,5 +1,9 @@
 # Bronze write contract (for the Go scraper and Spark)
 
+> **The scraper is moving to S3-only storage** (`oxfordoli/api-s3-rework`). Nothing below is
+> needed then: the `ingest` job (`pgs_db.ingest`) loads its bucket layout into these tables. This
+> contract remains for any writer that talks to Postgres directly.
+
 How a non-Python service writes the Bronze tables. The Python reference implementation is
 `pgs_db.repositories.BronzeRepository`; every statement below is what it emits, and
 `tests/test_bronze_repository.py` proves each one against a real PostgreSQL.

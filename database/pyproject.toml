@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.1"]
 auth = ["argon2-cffi>=23.1"]  # pgs_db.security, scripts/create_admin.py
+s3 = ["boto3>=1.34"]  # pgs_db.ingest: the scraper's S3 bucket -> Bronze
 dev = ["pytest>=8.0", "argon2-cffi>=23.1"]
 
 [tool.setuptools.packages.find]

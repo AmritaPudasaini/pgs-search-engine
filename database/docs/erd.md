@@ -453,3 +453,11 @@ writers that bypass the ORM.
 - **`crawl_runs`** gains `seed_count`, `max_depth`, `max_pages`, `domain_capped_count` and
   `error`; a trigger upper-cases `status`, so lower-case writers are accepted.
 - **`page_media.context_text`**: an image's surrounding text.
+
+## S3 loader (migration `a7b8c9d0e1f2`)
+
+The scraper now writes S3 instead of Postgres; `pgs_db.ingest` (the `ingest` job) copies its
+runs and documents into Bronze. **`bronze_ingest_state`** (`crawl_run_id` UK → `crawl_runs`,
+`source`, `last_modified`, `objects_loaded`, `objects_failed`, `finished`, `finished_at`)
+remembers how far each run is loaded, so a pass only reads new objects and finished runs are
+skipped. Runs keep the scraper's own id (`UnixNano`) as `crawl_runs.id`.

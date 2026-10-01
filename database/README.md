@@ -4,8 +4,9 @@ We design and manage the PostgreSQL database that the scraper, ETL, search engin
 
 **Status: complete.** Every layer is built and migrated: Bronze, Silver, Gold, the reference
 gazetteer with map boundaries, and the ops tables. Each service has its own database role, a
-scheduled jobs runner keeps Gold fresh, and CI checks every migration from an empty database.
-What remains is for the other teams to connect to it — see [§8](#8-connecting-the-other-teams).
+scheduled jobs runner loads the scraper's S3 output into Bronze and keeps Gold fresh, and CI
+checks every migration from an empty database. What remains is for the other teams to connect
+to it — see [§8](#8-connecting-the-other-teams).
 
 ---
 
@@ -51,7 +52,8 @@ to refresh. The Gold *tables* are rebuilt by the jobs in [§6](#6-scheduled-jobs
 
 | Service | Role | Repository | Reads | Writes |
 |---|---|---|---|---|
-| Scraper (Go) | `pgs_scraper` | `BronzeRepository` / [`scraper-db-contract.md`](docs/scraper-db-contract.md) | gazetteer, domains | Bronze, `domains` |
+| Scraper (Go) | none (writes S3) | its S3 bucket, loaded by the `ingest` job (`pgs_db.ingest`) | — | — |
+| Scraper, if it writes Postgres directly | `pgs_scraper` | `BronzeRepository` / [`scraper-db-contract.md`](docs/scraper-db-contract.md) | gazetteer, domains | Bronze, `domains` |
 | ETL (Spark) | `pgs_etl` | `SilverRepository`, `pgs_db.etl` / [`bronze-silver-contract.md`](docs/bronze-silver-contract.md) | Bronze, gazetteer (`ReferenceRepository.gazetteer`, `locate`) | Silver |
 | Search / indexer | `pgs_search` | `SearchRepository` | `search_documents`, `page_embeddings` | `pages` indexing state |
 | API | `pgs_api` | `OpsRepository`, `StatsRepository`, `QuarantineRepository`, `ReferenceRepository`, `SearchLogRepository` | everything | admin tables, domains, quick links, search log, labels |
@@ -132,11 +134,16 @@ which predates the 2017 restructuring (75 districts; only 544 of 766 names match
 
 ## 6. Scheduled jobs
 
+Local and dev crawls (`--storage=ndjson`, the scraper's default) load with
+`pgs_db.ingest.ingest_ndjson(Session, "documents.ndjson")`; production reads S3 through the
+`ingest` job below.
+
 `python -m pgs_db.jobs <job>` as the `pgs_jobs` role. Each job runs in its own transaction under
 an advisory lock (an overlapping run skips), prints one JSON line, and exits non-zero on failure.
 
 | Job | Does | Schedule |
 |---|---|---|
+| `ingest` | load new runs and documents from the scraper's S3 bucket into Bronze | every 5 min |
 | `stats` | rebuild `domain_stats`, `geo_content_stats` | every 15 min |
 | `scores` | rebuild `page_scores` (PageRank, freshness, quality) and domain authority | hourly |
 | `reference` | link domains to local bodies, fill missing municipality contacts | daily |
@@ -163,7 +170,7 @@ export DATABASE_URL=postgresql+psycopg://pgs:pgs@localhost:5432/pgs
 python -m alembic upgrade head        # all tables, views, triggers and roles
 python scripts/seed_geography.py      # 7 provinces, 77 districts, 753 local bodies
 python scripts/seed_boundaries.py     # their shapes
-python -m pytest                      # 315 tests should pass
+python -m pytest                      # 328 tests should pass
 ```
 
 The tests need a live, seeded database: they read `DATABASE_URL`, and each test runs in a
@@ -181,9 +188,14 @@ database on every change under `database/`, plus a full downgrade and re-upgrade
    `pgs_readonly`). Each service connects as its own role.
 4. **Create the first admin**: `pip install -e ".[postgres,auth]"`, then
    `python scripts/create_admin.py <username> --email <address>` (asks for the password; Argon2id).
-5. **Schedule the jobs** in [§6](#6-scheduled-jobs), and point the API's readiness probe at
+5. **Point the loader at the scraper's bucket** (read-only credentials are enough) in the jobs'
+   environment, with `pip install -e ".[postgres,s3]"`:
+   `PGS_S3_BUCKET`, `PGS_S3_PREFIX` (the scraper's key prefix, if any), `PGS_S3_ENDPOINT_URL`
+   (MinIO; omit for AWS), and the usual `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+   `AWS_REGION`. Until `PGS_S3_BUCKET` is set, the `ingest` job reports "not configured".
+6. **Schedule the jobs** in [§6](#6-scheduled-jobs), and point the API's readiness probe at
    `pgs_db.health.check`.
-6. **Back up** with the platform's point-in-time recovery (WAL archiving), or at least a nightly
+7. **Back up** with the platform's point-in-time recovery (WAL archiving), or at least a nightly
    `pg_dump -Fc`. Bronze is re-crawlable and Gold is rebuildable, so the tables that cannot be
    recreated are `admin_users`, `domains`, `region_links`, `relevance_judgments`, the search log
    and `quarantined_files` — make sure restores are tested for those.
@@ -221,3 +233,59 @@ review it). A migration that adds a table must also: add the `updated_at` trigge
 | Go scraper (`--storage=postgres`) | `postgres://pgs_scraper:<password>@<host>:5432/pgs` |
 | Other containers in the same compose | host `postgres` instead of `localhost` |
 
+## 8. Connecting the other teams
+
+The database no longer waits on anyone, and it already accepts what each branch sends
+today (checked against the branches on 2026-09-30, `tests/test_team_fit.py`). What is left
+is on each team's side:
+
+- **Scraper** (`oxfordoli/api-s3-rework`, `moni/s3-storage-data-integrity`): it is moving to
+  S3-only storage, and that already works with us: the `ingest` job reads its bucket layout
+  (`<run>/_run.json`, `<run>/<sha256(url)>.json`) into Bronze, run manifests included. All it has
+  to give us is the bucket name, prefix and read-only credentials. Optional, for features that
+  need it: put PDFs/images and contacts back in `Document` (PDF search, municipality contacts),
+  and read `domains.status` so the admin's PAUSE / RESUME reach the crawler.
+- **ETL** (`etl/workflow_saurav`): replace the JSONL / SQLite sink with one call per record,
+  `pgs_db.etl.save_transformed(Session, record, geo_confidence=...)`, as `pgs_etl`. When the
+  record came off Kafka (`--storage=kafka`, where nothing else writes Bronze), also pass the
+  message: `bronze_document=message` saves it to Bronze in the same transaction. Its
+  `transform.py` output is accepted unchanged: top-level title, hex simhash, place-name geo
+  (resolved through the gazetteer) and the 768-d LaBSE embedding. Its rule-based
+  `resolve_geo` can later give way to `ReferenceRepository.gazetteer` (names) and `locate`
+  (coordinates). Its intake scanner records hits with `SilverRepository.quarantine`, passing
+  its reasons as `threat_signature` and its name as `scanner_engine`.
+- **Search** (`pg_vector`, `bm25-opensearch-vectorsearch`, `rabin/grpc-search-service`):
+  **embed queries with LaBSE** (`sentence-transformers/LaBSE`, 768-d) — documents are LaBSE
+  now, and a MiniLM query vector cannot be compared with them. Replace
+  `SELECT ... FROM documents` with `SearchRepository.vector_search`, which takes the proto's
+  `SearchRequest` values as sent (`municipality_id`, `""`, ward `0`, `"all"`, `"auto"`). Index
+  OpenSearch from `claim_for_indexing` (their `SearchDocument` shape) and finish each page with
+  `SilverRepository.mark_processed`. Every exported document carries its location under both
+  `geo` (Shreya's `SearchDocument`) and `geo_location` (Hishila's filter and region counts), so
+  both work on one index as they are.
+- **Image indexing** (`feat/image-ingestion`): send images as `media` items on their page
+  (`alt_text`, `extracted_text` = OCR, `surrounding_context`), or as stored files; both land.
+- **Reranker** (`rashik/lightGBM`, `niseta/lightgbm-reranker`): train on
+  `SearchLogRepository.training_examples()` instead of the hand-made CSV; it supplies labels and
+  the query-independent features (`freshness`, `source_authority`, `content_length`, ...).
+- **API** (`baidehi/api-core-structure`): the table in [§3](#3-how-data-is-organised) maps each
+  endpoint; downloads go through `SearchRepository.file_location` (never serves a quarantined
+  file). The service filter values are upper case (`SCRAPER`, not `Scraper`).
+- **UI** (`ui-new`, `ui-new-map`): replace `ui/public/data/nepal-*.geojson` with the output of
+  `python scripts/export_boundaries.py ../ui/public/data`: current boundaries (77 districts)
+  under the property names the map already reads, plus our codes; show the attribution. Later,
+  log in through the API (email works) and colour the map from `geo_content`. Its `src/lib` folder
+  is missing from the branch: the root `.gitignore`'s Python `lib/` rule hides it.
+- **DevOps** (`devops*`): no compose file includes the database yet. Add `database/`'s image,
+  run `alembic upgrade head` and both seed scripts on deploy, and give each service its role's
+  password (§7).
+
+## 9. Rules everyone should follow
+
+1. **Don't create or change tables yourself.** Ask the Database group; all changes go through migrations.
+2. **Never store file contents in PostgreSQL.** Store the MinIO path instead.
+3. **All times in UTC.**
+4. **Use the fixed status values** in `src/pgs_db/enums.py`.
+5. **Connect as your service's role**, never as the schema owner.
+6. **Python services** use the package (`pip install -e ./database`, `import pgs_db`); **non-Python
+   services** write the same tables with the statements our contracts publish.

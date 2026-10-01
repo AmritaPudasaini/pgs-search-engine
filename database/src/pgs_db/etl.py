@@ -33,6 +33,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import DEFAULT_EMBEDDING_MODEL, CrawledDocument, Page, StoredFile
+from .ingest import upsert_run
+from .repositories.bronze import BronzeRepository
 from .repositories.reference import ReferenceRepository
 from .repositories.silver import SilverRepository
 
@@ -246,6 +248,7 @@ def save_transformed(
     document: Mapping[str, Any],
     *,
     geo_confidence: float,
+    bronze_document: Mapping[str, Any] | None = None,
     dedup: bool = True,
     domain_geo: bool = True,
 ) -> TransformedSave:
@@ -255,19 +258,34 @@ def save_transformed(
     `storage_path`, or a crawled page's `minio_path`), else by `source_url` (the
     newest crawl of it). That row is marked PROCESSED. Raises LookupError when the
     scraper never wrote the row: Silver never holds a page without its Bronze source.
+
+    `bronze_document`: the scraper's `Document` as it arrived on Kafka
+    (`--storage=kafka`, where nothing else writes Bronze). It is saved to Bronze
+    first, in the same transaction, and becomes the page's source.
     """
     payload = payload_from_transform(document, geo_confidence=geo_confidence)
     object_key = document.get("object_key") or None
     source_url = document.get("source_url") or None
     with session_factory() as s, s.begin():
         repo = SilverRepository(s)
-        stored = (
-            s.scalars(select(StoredFile).where(StoredFile.storage_path == object_key)).first()
-            if object_key
-            else None
-        )
+        stored = None
         crawled = None
-        if stored is None:
+        if bronze_document is not None:
+            run_id = bronze_document.get("crawl_run_id") or None
+            if run_id is not None:
+                upsert_run(s, int(run_id), None)  # FK target; ingest fills it in later
+            saved_doc = BronzeRepository(s).save_document(
+                bronze_document,
+                crawl_run_id=run_id,
+                minio_path=object_key,
+                register_unknown_domains=True,
+            )
+            crawled = s.get(CrawledDocument, saved_doc.id)
+        elif object_key:
+            stored = s.scalars(
+                select(StoredFile).where(StoredFile.storage_path == object_key)
+            ).first()
+        if stored is None and crawled is None:
             conditions = []
             if object_key:
                 conditions.append(CrawledDocument.minio_path == object_key)

@@ -7,6 +7,7 @@ JSON line per job; exits non-zero if any job failed.
 
 | Job | What it does | Suggested schedule |
 |---|---|---|
+| `ingest` | load the scraper's new S3 objects into Bronze (`pgs_db.ingest`) | every 5 min |
 | `stats` | rebuild `domain_stats` and `geo_content_stats` | every 15 min |
 | `scores` | rebuild `page_scores` and domain authority | hourly |
 | `reference` | link domains to local bodies, fill missing municipality contacts | daily |
@@ -25,7 +26,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
+
+from .ingest import S3Source, ingest
 
 from .repositories import (
     OpsRepository,
@@ -39,6 +42,21 @@ from .repositories import (
 from .session import make_session_factory
 
 JobFn = Callable[[Session, argparse.Namespace], dict[str, Any]]
+
+
+def _ingest(session: Session, _: argparse.Namespace) -> dict[str, Any]:
+    source = S3Source.from_env()
+    if source is None:
+        return {"skipped": "PGS_S3_BUCKET not set"}
+    # The loader commits per chunk, on its own sessions bound to this job's engine.
+    report = ingest(sessionmaker(bind=session.get_bind(), expire_on_commit=False), source)
+    return {
+        "source": source.name,
+        "runs_seen": report.runs_seen,
+        "runs_finished": report.runs_finished,
+        "documents_loaded": report.documents_loaded,
+        "documents_failed": report.documents_failed,
+    }
 
 
 def _stats(session: Session, _: argparse.Namespace) -> dict[str, Any]:
@@ -82,6 +100,7 @@ def _purge(session: Session, args: argparse.Namespace) -> dict[str, Any]:
 
 
 JOBS: dict[str, JobFn] = {
+    "ingest": _ingest,
     "stats": _stats,
     "scores": _scores,
     "reference": _reference,

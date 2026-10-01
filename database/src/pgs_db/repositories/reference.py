@@ -42,6 +42,14 @@ from ..models import (
 
 BOUNDARY_ATTRIBUTION = "Boundaries © Open Knowledge Nepal, CC BY 4.0"
 
+# LocalBodyType -> the Nepali level word the UI's old municipality layer used.
+_LEGACY_LEVEL = {
+    "METROPOLITAN_CITY": "Mahanagarpalika",
+    "SUB_METROPOLITAN_CITY": "Upamahanagarpalika",
+    "MUNICIPALITY": "Nagarpalika",
+    "RURAL_MUNICIPALITY": "Gaunpalika",
+}
+
 
 def site_host(url_or_host: str | None) -> str | None:
     """`http://www.pokharamun.gov.np/` or `WWW.Pokharamun.gov.np` -> `pokharamun.gov.np`."""
@@ -310,6 +318,7 @@ class ReferenceRepository:
         *,
         within: str | None = None,
         tolerance: float | None = None,
+        legacy_properties: bool = False,
     ) -> dict[str, Any]:
         """A GeoJSON FeatureCollection of one level's shapes, for the UI's map.
 
@@ -319,6 +328,11 @@ class ReferenceRepository:
         coordinates at 5 decimals, which keeps the whole country small enough to ship.
         Each feature's properties carry the code and names. Shapes are Open Knowledge
         Nepal's (CC BY 4.0): the map must credit them.
+
+        `legacy_properties` also adds the property names the UI's old static GeoJSON
+        used (`ADM1_PCODE` / `ADM1_EN`, `DISTRICT`, `NAME` / `DISTRICT` / `LEVEL` /
+        `N_ID`), so these files replace `ui/public/data/nepal-*.geojson` with no UI
+        code change (`scripts/export_boundaries.py`).
         """
         model: type[Province] | type[District] | type[LocalBody]
         if level == "province":
@@ -340,6 +354,11 @@ class ReferenceRepository:
             if parent is None:
                 raise ValueError("provinces have no parent to filter by")
             stmt = stmt.where(parent == within)
+        district_names: dict[str, str] = {}
+        if legacy_properties and level == "local_body":
+            district_names = dict(
+                self.session.execute(select(District.code, District.name_en)).all()
+            )
         features = []
         for region, geometry in self.session.execute(stmt).all():
             properties: dict[str, Any] = {
@@ -349,8 +368,20 @@ class ReferenceRepository:
             }
             if isinstance(region, LocalBody):
                 properties |= {"type": region.type.value, "district_code": region.district_code}
+                if legacy_properties:
+                    properties |= {
+                        "NAME": region.name_en,
+                        "DISTRICT": district_names.get(region.district_code),
+                        "LEVEL": _LEGACY_LEVEL[region.type.value],
+                        "N_ID": region.code,
+                    }
             elif isinstance(region, District):
                 properties["province_code"] = region.province_code
+                if legacy_properties:
+                    properties["DISTRICT"] = region.name_en.upper()
+            elif legacy_properties:  # a province: P4 -> NP04, "4"
+                number = region.code.removeprefix("P")
+                properties |= {"ADM1_PCODE": f"NP{int(number):02d}", "ADM1_EN": number}
             features.append(
                 {"type": "Feature", "properties": properties, "geometry": json.loads(geometry)}
             )
