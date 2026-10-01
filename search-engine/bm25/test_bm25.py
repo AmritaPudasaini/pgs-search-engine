@@ -1,7 +1,5 @@
-from opensearchpy import OpenSearch
-
 from bm25_search import BM25Searcher
-
+from opensearchpy import OpenSearch
 
 INDEX_NAME = "nepal_test_documents"
 

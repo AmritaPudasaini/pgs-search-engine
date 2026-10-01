@@ -1,7 +1,5 @@
-from opensearchpy import OpenSearch
-
 from opensearch_vector_search import OpenSearchVectorSearcher
-
+from opensearchpy import OpenSearch
 
 INDEX_NAME = "pgs-vector-test"
 
