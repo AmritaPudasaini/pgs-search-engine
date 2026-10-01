@@ -1,7 +1,5 @@
-from opensearchpy import OpenSearch
-
 from geo_filter_search import GeoFilteredSearch
-
+from opensearchpy import OpenSearch
 
 INDEX_NAME = "nepal_test_documents_geo"
 

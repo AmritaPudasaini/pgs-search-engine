@@ -7,14 +7,11 @@ name = "pgs-search"
 version = "0.1.0"
 description = "Search Engine Core for PGS"
 requires-python = ">=3.11"
-shreya/bilingual-query-normalization
-search-engine
 dependencies = [
     "opensearch-py>=3.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
-shreya/bilingual-query-normalization
     "nltk>=3.7",
     "sentence-transformers>=3.0",
     "scikit-learn>=1.0",
@@ -25,7 +22,6 @@ shreya/bilingual-query-normalization
     "grpcio>=1.84.0",
     "grpcio-tools>=1.84.0",
     "protobuf>=7.35.1",
-search-engine
 ]
 
 [project.optional-dependencies]
@@ -37,7 +33,6 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-shreya/bilingual-query-normalization
 
 [tool.setuptools.package-data]
 pgs_search = ["query/data/*.json"]
@@ -51,4 +46,3 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-search-engine

@@ -3,6 +3,7 @@ import math
 import re
 from collections import defaultdict
 from pathlib import Path
+
 from sklearn.base import BaseEstimator, TransformerMixin
 
 LEMMA_DICT_PATH = Path(__file__).resolve().parent / "nepali_lemma_dict.json"
@@ -18,15 +19,15 @@ def load_lemma_dict(path: Path = LEMMA_DICT_PATH) -> dict:
     return flat
 
 # 1. Stop Words Definition
-NEPALI_STOP_WORDS = set([
+NEPALI_STOP_WORDS = {
     "म", "मेरो", "मलाई", "हामी", "हाम्रो", "हामीलाई", "तँ", "तँलाई", "तेरो", "तिमी", "तिम्रो", "तिमीलाई", "तपाईं", "तपाईंको", "तपाईंलाई", "उ", "उसको", "उसलाई", "उसले", "उनी", "उनको", "उनलाई", "उनले", "उनीहरु", "उनीहरुको", "उनीहरुलाई", "यिनीहरु", "तिनीहरु", "आफू", "आफ्नो",
     "र", "पनि", "तर", "कि", "वा", "अथवा", "तथा", "भने", "यदि", "यद्यपि", "तथापि", "किनभने", "किनकि", "बरु", "त्यसैले", "तसर्थ", "अतः",
     "को", "का", "की", "लाई", "ले", "बाट", "द्वारा", "मा", "माथि", "तल", "भित्र", "बाहिर", "सँग", "सित", "बिना", "बाहेक", "लागि", "निम्ति", "तर्फ", "तिर", "भन्दा",
     "छ", "छन्", "छु", "छौं", "छस्", "छौ", "हो", "हुन्", "हुँ", "हौं", "होस्", "हौ", "थियो", "थिए", "थिइन्", "थिएँ", "थियौं", "हुनेछ", "भयो", "भए", "भएन", "गर्छ", "गर्छन्", "गर्छु", "गर्छौं",
-    "के", "को", "कुन", "किन", "कसरी", "कस्तो", "कहाँ", "कहिले", "कति", "कसको", "कसलाई", "कसले",
+    "के", "कुन", "किन", "कसरी", "कस्तो", "कहाँ", "कहिले", "कति", "कसको", "कसलाई", "कसले",
     "अझै", "अधिक", "अन्य", "अन्यत्र", "अन्यथा", "अब", "अरु", "अर्को", "अर्थात्", "अलग", "आज", "हिजो", "भोलि", "अघि", "पछि", "सधैं", "कहिल्यै", "अक्सर", "धेरै", "थोरै", "कम", "सबै", "केही", "कोही", "जहाँ", "त्यहाँ", "यहाँ", "यसो", "त्यसो", "यस्तो", "त्यस्तो", "जस्तो", "उस्तो",
     "यस", "त्यस", "यी", "ती", "जुन", "कुरा", "एकदम", "ज्यादै", "अति", "अनि", "लौ", "पो", "नि", "त", "नै", "मात्र", "भरि", "सम्म", "एउटा", "दुइटा", "आदि", "इत्यादि"
-])
+}
 
 
 class NepaliLexicalAnalyzer(BaseEstimator, TransformerMixin):
@@ -81,8 +82,7 @@ class NepaliHeuristicDatasetGenerator(BaseEstimator, TransformerMixin):
         for ending in self.verb_endings:
             if word.endswith(ending) and original_length > len(ending) + 1:
                 base = word[:-len(ending)]
-                if base.endswith("्"):
-                    base = base[:-1]
+                base = base.removesuffix("्")
                 return base + "नु"
 
         return word
@@ -221,7 +221,7 @@ class NepaliHMMLemmatizer(BaseEstimator, TransformerMixin):
             return {self.lemma_dict[word]}
         root = word
         if word.endswith("हरु"): root = word[:-3]
-        elif word.endswith("ले") or word.endswith("को"): root = word[:-2]
+        elif word.endswith(("ले", "को")): root = word[:-2]
         return {root}
 
 
