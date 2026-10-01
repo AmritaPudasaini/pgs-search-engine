@@ -1,0 +1,10 @@
+# Airflow generated logs
+logs/*
+!logs/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
