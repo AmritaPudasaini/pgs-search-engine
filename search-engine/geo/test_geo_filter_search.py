@@ -1,14 +1,9 @@
-from opensearchpy import OpenSearch
-
 from geo_filter_search import GeoFilteredSearch
-
+from opensearchpy import OpenSearch
 
 INDEX_NAME = "nepal_test_documents_geo"
 
-# NOTE: "scraped_at" is a placeholder date field name -- confirm the
-# real field name with the ETL team once their indexed document schema
-# includes a timestamp. See the NOTE in geo_filter_search.py.
-DATE_FIELD = "scraped_at"
+DATE_FIELD = "published_at"
 
 
 # Connect to local OpenSearch
@@ -19,52 +14,51 @@ client = OpenSearch(
 )
 
 
-# Sample documents across different regions and dates, matching the
-# ETL team's documented geo_location shape (ETL/README.md, section 5.2)
+# Sample documents across different regions and dates, matching np_web_pages.
 documents = [
     {
         "title": "Pokhara Metropolitan City Notice",
         "description": "Official notice regarding municipal administration.",
-        "text": "Road maintenance work scheduled in Pokhara this month.",
-        "geo_location": {
+        "searchable_text": "Road maintenance work scheduled in Pokhara this month.",
+        "geo": {
             "province_code": "P4",
             "district_code": "D39",
             "municipality_id": "MUN75340",
         },
-        "scraped_at": "2026-09-20T10:00:00Z",
+        "published_at": "2026-09-20T10:00:00Z",
     },
     {
         "title": "Pokhara Tourism Update",
         "description": "New tourism initiatives announced for Pokhara.",
-        "text": "Pokhara tourism board launches new trekking routes.",
-        "geo_location": {
+        "searchable_text": "Pokhara tourism board launches new trekking routes.",
+        "geo": {
             "province_code": "P4",
             "district_code": "D39",
             "municipality_id": "MUN75340",
         },
-        "scraped_at": "2026-09-23T08:00:00Z",
+        "published_at": "2026-09-23T08:00:00Z",
     },
     {
         "title": "Kathmandu Metropolitan Notice",
         "description": "Traffic advisory for Kathmandu valley.",
-        "text": "Kathmandu traffic police announce new routes for the festival season.",
-        "geo_location": {
+        "searchable_text": "Kathmandu traffic police announce new routes for the festival season.",
+        "geo": {
             "province_code": "P3",
             "district_code": "D27",
             "municipality_id": "MUN27001",
         },
-        "scraped_at": "2026-09-22T09:00:00Z",
+        "published_at": "2026-09-22T09:00:00Z",
     },
     {
         "title": "Kaski District Agriculture Report",
         "description": "Agricultural output report for Kaski district.",
-        "text": "Farmers in Kaski district report increased maize yields this season.",
-        "geo_location": {
+        "searchable_text": "Farmers in Kaski district report increased maize yields this season.",
+        "geo": {
             "province_code": "P4",
             "district_code": "D39",
             "municipality_id": "MUN75341",
         },
-        "scraped_at": "2026-09-18T12:00:00Z",
+        "published_at": "2026-09-18T12:00:00Z",
     },
 ]
 
@@ -75,9 +69,9 @@ def create_index():
             "properties": {
                 "title": {"type": "text"},
                 "description": {"type": "text"},
-                "text": {"type": "text"},
-                "scraped_at": {"type": "date"},
-                "geo_location": {
+                "searchable_text": {"type": "text"},
+                "published_at": {"type": "date"},
+                "geo": {
                     "properties": {
                         "province_code": {"type": "keyword"},
                         "district_code": {"type": "keyword"},
@@ -112,8 +106,8 @@ def print_results(label: str, results: list[dict]) -> None:
     for rank, result in enumerate(results, start=1):
         source = result["source"]
         print(f"{rank}. {source['title']}")
-        print(f"   Scraped at: {source['scraped_at']}")
-        print(f"   Geo: {source['geo_location']}")
+        print(f"   Published at: {source['published_at']}")
+        print(f"   Geo: {source['geo']}")
         print(f"   Score: {result['score']}")
         print()
 

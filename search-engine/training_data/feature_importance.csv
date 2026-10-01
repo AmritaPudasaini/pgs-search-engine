@@ -1,0 +1,10 @@
+feature,importance
+bm25_score,0
+vector_score,0
+title_match,0
+geo_match,0
+freshness,0
+source_authority,0
+language_match,0
+query_term_ratio,0
+content_length,0
