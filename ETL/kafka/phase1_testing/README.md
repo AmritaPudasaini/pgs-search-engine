@@ -6,10 +6,17 @@ using dummy `Document` JSON shaped exactly like the scraper's
 
 ## Prerequisites
 
-From `ETL/kafka/`:
+Kafka runs in the repository-root stack (`docker compose up -d` from the
+repo root); its host listener stays `localhost:9092`, so these scripts work
+unchanged. Then, from `ETL/kafka/`:
 
-    docker compose up -d          # starts the local Kafka broker
     pip install -r requirements.txt
+
+The stack also runs this consumer as the `etl-consumer` service, in the
+default group `search-engine-etl-v1`, so it picks up what these scripts
+publish: watch it with `docker compose logs -f etl-consumer`. To run the
+host-side consumer below instead, stop it first
+(`docker compose stop etl-consumer`) or pass a different `--group`.
 
 ## How to run each test
 

@@ -1,0 +1,40 @@
+# Version pins for pgs-db's dependency closure (all extras except `dev`), used by
+# every container image that installs the package:
+#
+#   pip install -c database/constraints.txt "./database[postgres]"
+#
+# pyproject.toml keeps the open ranges (>=) for local installs; this file only pins
+# what the images resolve to, so the migrations, API, ETL and search engine all run
+# the same SQLAlchemy / psycopg / pydantic. Versions that the repo-root
+# requirements.txt freeze already pins (SQLAlchemy, pydantic, ...) are kept equal to
+# it. A constraints file never installs anything by itself.
+#
+# Regenerate after changing pyproject.toml dependencies, e.g. with uv:
+#   uv pip compile - -c <(grep -v '^-e ' requirements.txt) --python-version 3.11 \
+#     --no-header --no-annotate <<< "./database[postgres,auth,s3]"
+alembic==1.20.0
+annotated-types==0.8.0
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+boto3==1.43.106
+botocore==1.43.106
+cffi==2.1.1
+geoalchemy2==0.20.0
+greenlet==3.5.6
+jmespath==1.1.0
+mako==1.4.3
+markupsafe==3.0.3
+packaging==26.3
+pgvector==0.5.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+pycparser==3.0
+pydantic==2.13.5
+pydantic-core==2.46.5
+python-dateutil==2.9.0.post0
+s3transfer==0.19.2
+six==1.17.0
+sqlalchemy==2.0.52
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+urllib3==2.8.0

@@ -1,0 +1,18 @@
+# Build context: scraper/ -- the Go module (go.mod, go.sum, cmd/, internal/, proto/).
+.git
+.env
+*.log
+/search-engine
+*.exe
+data/output
+
+# Not part of the Go build
+python
+**/__pycache__
+**/*.py[cod]
+.venv
+*.md
+Makefile
+Dockerfile
+.dockerignore
+.gitignore

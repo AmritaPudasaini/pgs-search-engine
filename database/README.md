@@ -158,18 +158,24 @@ an advisory lock (an overlapping run skips), prints one JSON line, and exits non
 
 Needs **Docker Desktop** (running) and **Python 3.11+**.
 
+PostgreSQL runs in the repository-root `docker-compose.yml` (image: `./Dockerfile`, PostgreSQL 16 +
+PostGIS + pgvector). Starting the stack also migrates and seeds the database: the one-shot
+`db-migrate` service (`./migrate.Dockerfile`) runs `alembic upgrade head`, then `db-seed` runs both
+seed scripts and `db-role-passwords` sets the service roles' passwords from `.env`; the services
+start only after those succeed.
+
 ```bash
+cp .env.example .env                  # in the repository root (Windows: copy)
+docker compose up -d --build postgres db-seed db-role-passwords   # or the whole stack
 cd database
-cp .env.example .env                  # Windows: copy .env.example .env
-docker compose up -d --build          # PostgreSQL 16 + PostGIS + pgvector (./Dockerfile)
 pip install -e ".[postgres,dev]"
 
 export DATABASE_URL=postgresql+psycopg://pgs:pgs@localhost:5432/pgs
 # Windows PowerShell: $env:DATABASE_URL="postgresql+psycopg://pgs:pgs@localhost:5432/pgs"
 
-python -m alembic upgrade head        # all tables, views, triggers and roles
-python scripts/seed_geography.py      # 7 provinces, 77 districts, 753 local bodies
-python scripts/seed_boundaries.py     # their shapes
+python -m alembic upgrade head        # all tables, views, triggers and roles (done by db-migrate)
+python scripts/seed_geography.py      # 7 provinces, 77 districts, 753 local bodies (db-seed)
+python scripts/seed_boundaries.py     # their shapes (db-seed)
 python -m pytest                      # 328 tests should pass
 ```
 
@@ -215,14 +221,14 @@ review it). A migration that adds a table must also: add the `updated_at` trigge
 
 - **`alembic` / `pytest` not recognized:** use `python -m alembic` and `python -m pytest`.
 - **`password authentication failed for user "pgs"`:** another PostgreSQL owns port 5432. Set
-  `POSTGRES_PORT=5433` in `.env`, `docker compose down && docker compose up -d`, and use 5433 in
+  `POSTGRES_PORT=5433` in the root `.env`, `docker compose up -d postgres`, and use 5433 in
   `DATABASE_URL`.
 - **`extension "vector" is not available`:** the container is on the old PostGIS-only image. Run
-  `docker compose up -d --build`.
+  `docker compose up -d --build postgres` (repository root).
 - **`column ... does not exist` although `alembic current` says head:** your database was built
   from an earlier draft of a migration. Recreate it (this deletes its data):
-  `docker exec pgs-postgres psql -U pgs -d postgres -c "DROP DATABASE pgs WITH (FORCE)" -c "CREATE DATABASE pgs"`,
-  then migrate and seed again.
+  `docker compose exec postgres psql -U pgs -d postgres -c "DROP DATABASE pgs WITH (FORCE)" -c "CREATE DATABASE pgs"`,
+  then migrate and seed again (`docker compose up db-seed db-role-passwords`).
 - **Boundary tests skipped:** run `python scripts/seed_boundaries.py`.
 
 **Connection URLs**
@@ -231,7 +237,7 @@ review it). A migration that adds a table must also: add the `updated_at` trigge
 |---|---|
 | Python (SQLAlchemy, Alembic) | `postgresql+psycopg://<role>:<password>@<host>:5432/pgs` |
 | Go scraper (`--storage=postgres`) | `postgres://pgs_scraper:<password>@<host>:5432/pgs` |
-| Other containers in the same compose | host `postgres` instead of `localhost` |
+| Other containers in the root compose | host `postgres` instead of `localhost` |
 
 ## 8. Connecting the other teams
 
@@ -276,9 +282,9 @@ is on each team's side:
   under the property names the map already reads, plus our codes; show the attribution. Later,
   log in through the API (email works) and colour the map from `geo_content`. Its `src/lib` folder
   is missing from the branch: the root `.gitignore`'s Python `lib/` rule hides it.
-- **DevOps** (`devops*`): no compose file includes the database yet. Add `database/`'s image,
-  run `alembic upgrade head` and both seed scripts on deploy, and give each service its role's
-  password (§7).
+- **DevOps**: done in the repository-root `docker-compose.yml`: `database/`'s image, `alembic
+  upgrade head` (`db-migrate`), both seed scripts (`db-seed`) and a password per service role
+  (`db-role-passwords`) on every start; each service connects as its own role.
 
 ## 9. Rules everyone should follow
 

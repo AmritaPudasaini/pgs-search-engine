@@ -27,26 +27,28 @@ stand-in, not the final wiring.**
 
 ## Local setup
 
-You need Kafka and Airflow running; both share one Docker network so
-Airflow can reach Kafka by container name.
+Kafka, Airflow and the Kafka consumer are part of the stack in the
+repository-root `docker-compose.yml`; every service shares its network, so
+Airflow reaches Kafka as `kafka:29092`. From the repository root:
 
 ```bash
-# 1. One-time: create the shared network
-docker network create pgs-etl-dag
-
-# 2. Start Kafka
-cd ETL/kafka
-docker compose up -d
-
-# 3. Start Airflow (builds a custom image with PySpark + kafka-python
-#    baked in, and mounts ETL/spark/ so DAGs can import transform.py)
-cd ../airflow
-docker compose build
-docker compose up -d
+cp .env.example .env     # once; set AIRFLOW_UID to `id -u`
+docker compose up -d --build
 ```
 
-Airflow UI: http://localhost:8080 (login: `airflow` / `airflow`).
-Give the webserver ~30-40s after `up -d` to pass its healthcheck.
+All ETL services run one image, `ETL/Dockerfile` (Airflow 2.10 + JDK +
+PySpark 3.5.3 + kafka-python). `ETL/airflow/{dags,logs,plugins,config,data}`
+and `ETL/spark/` are bind-mounted into the Airflow containers, so DAG and
+`transform.py` edits apply without a rebuild. The shared `pgs-db` package
+needs SQLAlchemy 2, which Airflow 2.10 cannot load, so it is installed in a
+separate interpreter, `/opt/etl-venv/bin/python` (the Kafka consumer runs
+with it; an Airflow task can use it via
+`@task.external_python(python="/opt/etl-venv/bin/python")`). ETL containers
+get `DATABASE_URL` for the `pgs_etl` role.
+
+Airflow UI: http://localhost:8080 (login from `.env`, default `airflow` /
+`airflow`). Give the webserver ~30-60s after `up -d` to pass its healthcheck
+(`docker compose ps`).
 
 ## What's here so far (Phase 1 — proving the tools work together)
 
@@ -107,16 +109,14 @@ stand-in, and real PySpark execution, and back out through
 
 `spark/transform.py` holds `analyze_text()` — the one place Spark
 transformation logic lives. Both `spark/test_spark.py` (standalone,
-run via the `spark/Dockerfile` image) and the Airflow chain DAG
+run via the `etl-spark-test` service) and the Airflow chain DAG
 (`run_spark_transform`, run via Airflow's embedded PySpark) import and
 call this same function, so there's one implementation, not two
 copies that could drift apart.
 
 ```bash
-# Run the standalone Spark test directly (no Airflow needed):
-cd ETL/spark
-docker build -t pgs-spark-test .
-docker run --rm pgs-spark-test
+# Run the standalone Spark test (no Airflow needed), from the repo root:
+docker compose run --rm etl-spark-test
 ```
 
 ## Known gaps (intentional, for later phases)

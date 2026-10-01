@@ -1,0 +1,580 @@
+# PGS Search Engine -- the whole stack, from the repository root.
+#
+#   cp .env.example .env        # once; then adjust (AIRFLOW_UID, passwords, ports)
+#   docker compose up -d --build
+#
+# Startup order (enforced with health checks and depends_on conditions, no sleeps):
+#
+#   postgres ─► db-migrate ─┬─► db-seed ─────────┐
+#                           └─► db-role-passwords ┴─► api, etl-consumer, airflow-worker,
+#   kafka ─► kafka-init ──────────────────────────────► etl-consumer, airflow-worker, scraper
+#   opensearch ─► (search-index-init) ─► api, search-engine
+#   airflow-db + redis ─► airflow-init ─► airflow-webserver / -scheduler / -worker
+#
+# Optional services are grouped in profiles, enabled with --profile or COMPOSE_PROFILES:
+#   ui       Next.js UI          (its build needs ui/src/lib + deps missing from the repo)
+#   scraper  Go crawler + Temporal dev server (cmd/worker does not compile yet)
+#   search   gRPC search engine + index init (needs ~3 GB RAM, ~2.5 GB model download)
+#   tools    OpenSearch Dashboards, standalone Spark check
+#
+# Containers reach each other by service name (postgres:5432, kafka:29092,
+# opensearch:9200, ...). Ports published to the host are bound to 127.0.0.1 only.
+
+name: pgs-search-engine
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+# ---------------------------------------------------------------------------------
+# ETL image (ETL/Dockerfile): Airflow, PySpark and the Kafka consumer
+# ---------------------------------------------------------------------------------
+x-etl-build: &etl-build
+  build:
+    context: .
+    dockerfile: ETL/Dockerfile
+  image: pgs-search-engine/etl:local
+
+x-airflow-common: &airflow-common
+  <<: *etl-build
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}@airflow-db/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:${AIRFLOW_DB_PASSWORD}@airflow-db/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:?set AIRFLOW_SECRET_KEY in .env}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # Local-development sizing (Airflow defaults: 4 webserver workers, 16 task slots).
+    AIRFLOW__WEBSERVER__WORKERS: ${AIRFLOW_WEBSERVER_WORKERS:-2}
+    AIRFLOW__CELERY__WORKER_CONCURRENCY: ${AIRFLOW_WORKER_CONCURRENCY:-4}
+    # For DAG tasks. pgs_db needs the separate interpreter /opt/etl-venv/bin/python
+    # (see ETL/Dockerfile); phase1_chain_dag.py itself uses kafka:29092 directly.
+    DATABASE_URL: postgresql+psycopg://pgs_etl:${PGS_ETL_DB_PASSWORD:?set PGS_ETL_DB_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-pgs}
+    DB_APPLICATION_NAME: pgs-airflow
+    KAFKA_BROKERS: kafka:29092
+    OPENSEARCH_HOST: opensearch
+    OPENSEARCH_PORT: "9200"
+  # Live-editable DAGs/code and the local DFS stand-in, as in the former
+  # ETL/airflow/docker-compose.yaml (paths now relative to the repository root).
+  volumes:
+    - ./ETL/airflow/dags:/opt/airflow/dags
+    - ./ETL/airflow/logs:/opt/airflow/logs
+    - ./ETL/airflow/plugins:/opt/airflow/plugins
+    - ./ETL/airflow/config:/opt/airflow/config
+    - ./ETL/airflow/data:/opt/airflow/data
+    - ./ETL/spark:/opt/airflow/spark_lib:ro
+  # Set AIRFLOW_UID to your WSL/Linux user id (`id -u`) so files written to the bind
+  # mounts above (logs) belong to you.
+  user: "${AIRFLOW_UID:-50000}:0"
+
+x-airflow-depends: &airflow-depends
+  airflow-db:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  airflow-init:
+    condition: service_completed_successfully
+
+services:
+  # =================================================================================
+  # PostgreSQL 16 + PostGIS + pgvector (database/Dockerfile)
+  # =================================================================================
+  postgres:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: pgs-search-engine/postgres:local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pgs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pgs}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Published for host-side tooling (database tests, psql, GUI clients).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    shm_size: 256m
+    healthcheck:
+      # Over TCP: during first-time init the entrypoint's temporary server only
+      # listens on the Unix socket, so this does not report ready too early.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------------
+  # One-shot database tasks (exit 0 when done; re-run, idempotently, on every `up`)
+  # ---------------------------------------------------------------------------------
+  db-migrate:
+    <<: *hardening
+    build:
+      context: ./database
+      dockerfile: migrate.Dockerfile
+    image: pgs-search-engine/db-migrate:local
+    # Default command: python -m alembic upgrade head (schema, extensions, roles).
+    # Runs as the schema owner; services never do.
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pgs}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-db-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  db-seed:
+    <<: *hardening
+    build:
+      context: ./database
+      dockerfile: migrate.Dockerfile
+    image: pgs-search-engine/db-migrate:local
+    # Reference data the services need (7 provinces, 77 districts, 753 local bodies)
+    # and their map boundaries. Both scripts upsert, so re-running is safe.
+    command: ["sh", "-c", "python scripts/seed_geography.py && python scripts/seed_boundaries.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pgs}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-db-seed
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  db-role-passwords:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: pgs-search-engine/postgres:local
+    # Gives the service roles the migrations created a login password
+    # (docker/postgres/set-role-passwords.sql).
+    entrypoint: ["psql"]
+    command:
+      - --host=postgres
+      - --username=${POSTGRES_USER:-pgs}
+      - --dbname=${POSTGRES_DB:-pgs}
+      - --no-psqlrc
+      - --quiet
+      - --file=/sql/set-role-passwords.sql
+    user: postgres
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGS_API_DB_PASSWORD: ${PGS_API_DB_PASSWORD:?set PGS_API_DB_PASSWORD in .env}
+      PGS_ETL_DB_PASSWORD: ${PGS_ETL_DB_PASSWORD}
+      PGS_SEARCH_DB_PASSWORD: ${PGS_SEARCH_DB_PASSWORD:?set PGS_SEARCH_DB_PASSWORD in .env}
+      PGS_SCRAPER_DB_PASSWORD: ${PGS_SCRAPER_DB_PASSWORD:?set PGS_SCRAPER_DB_PASSWORD in .env}
+    volumes:
+      - ./docker/postgres/set-role-passwords.sql:/sql/set-role-passwords.sql:ro
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # =================================================================================
+  # OpenSearch (security plugin disabled for local development, as the search-engine
+  # team configured it; reachable only from the Docker network and 127.0.0.1)
+  # =================================================================================
+  opensearch:
+    image: opensearchproject/opensearch:3.8.0
+    environment:
+      cluster.name: pgs-search
+      node.name: opensearch
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: ${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "127.0.0.1:${OPENSEARCH_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  opensearch-dashboards:
+    profiles: ["tools"]
+    image: opensearchproject/opensearch-dashboards:3.8.0
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports:
+      - "127.0.0.1:${OPENSEARCH_DASHBOARDS_PORT:-5601}:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # =================================================================================
+  # Kafka 3.8 in KRaft mode (one combined broker/controller, no ZooKeeper)
+  #   PLAINTEXT_INTERNAL kafka:29092    containers
+  #   PLAINTEXT          localhost:9092 host tools (ETL/kafka/phase1_testing scripts)
+  # =================================================================================
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092},PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Single broker: every internal topic has one replica.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Persist the log in the volume below (the image default is under /tmp), formatted
+      # with a fixed cluster id (the image's default value, pinned so the stored log
+      # stays valid across image upgrades).
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx512m}
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    ports:
+      - "127.0.0.1:${KAFKA_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx128m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 20s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:3.8.0
+    # The topics the code uses: scraper -> ETL consumer (crawled-documents) and the
+    # DFS "file ready" signal the Airflow chain DAG polls (scraped_files_topic).
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for topic in crawled-documents scraped_files_topic; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
+            --create --if-not-exists --topic "$$topic" \
+            --partitions 1 --replication-factor 1
+        done
+    environment:
+      KAFKA_HEAP_OPTS: -Xmx128m
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+
+  # =================================================================================
+  # API gateway (api/Dockerfile)
+  # =================================================================================
+  api:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: pgs-search-engine/api:local
+    environment:
+      DATABASE_URL: postgresql+psycopg://pgs_api:${PGS_API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-api
+      SEARCH_GRPC_HOST: search-engine
+      SEARCH_GRPC_PORT: "50051"
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      db-role-passwords:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+      # Only with the `search` profile; the gRPC channel connects lazily.
+      search-engine:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+
+  # =================================================================================
+  # UI (ui/Dockerfile) -- profile `ui`
+  # =================================================================================
+  ui:
+    <<: *hardening
+    profiles: ["ui"]
+    build:
+      context: ./ui
+      args:
+        # Build-time: inlined into the browser bundle; a host URL, not a service name.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    image: pgs-search-engine/ui:local
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  # =================================================================================
+  # ETL: Kafka consumer, Airflow (CeleryExecutor), standalone Spark check
+  # =================================================================================
+  etl-consumer:
+    <<: [*etl-build, *hardening]
+    # kafka/consumer.py with the pgs-db interpreter, so the PostgreSQL write path
+    # (pgs_db.etl) can be used from it. dumb-init (from the Airflow image) is PID 1 and
+    # forwards SIGTERM, which the consumer handles before committing offsets.
+    entrypoint: ["/usr/bin/dumb-init", "--"]
+    command: ["/opt/etl-venv/bin/python", "consumer.py", "consume"]
+    working_dir: /opt/etl/kafka
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: crawled-documents
+      KAFKA_GROUP: search-engine-etl-v1
+      ETL_DATABASE: /data/etl.sqlite3
+      DATABASE_URL: postgresql+psycopg://pgs_etl:${PGS_ETL_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-etl-consumer
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+    volumes:
+      - etl-data:/data
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      db-seed:
+        condition: service_completed_successfully
+      db-role-passwords:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  etl-spark-test:
+    <<: [*etl-build, *hardening]
+    profiles: ["tools"]
+    # Formerly `docker build ETL/spark && docker run`: runs test_spark.py once.
+    entrypoint: ["/usr/bin/dumb-init", "--"]
+    command: ["python", "test_spark.py"]
+    working_dir: /opt/airflow/spark_lib
+    restart: "no"
+
+  airflow-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow users create \
+          --username "$${AIRFLOW_ADMIN_USERNAME}" \
+          --password "$${AIRFLOW_ADMIN_PASSWORD}" \
+          --firstname Air \
+          --lastname Flow \
+          --role Admin \
+          --email admin@example.com || true
+    environment:
+      <<: *airflow-env
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-airflow}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?set AIRFLOW_ADMIN_PASSWORD in .env}
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on: *airflow-depends
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on: *airflow-depends
+    restart: unless-stopped
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    environment:
+      <<: *airflow-env
+      # Lets the Celery worker shut down warmly (finish running tasks) on SIGTERM.
+      DUMB_INIT_SETSID: "0"
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d \"celery@$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      <<: *airflow-depends
+      # phase1_chain_dag.py polls Kafka; future tasks write PostgreSQL as pgs_etl.
+      kafka-init:
+        condition: service_completed_successfully
+      db-role-passwords:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # =================================================================================
+  # Search engine core (search-engine/Dockerfile) -- profile `search`
+  # =================================================================================
+  search-index-init:
+    <<: *hardening
+    profiles: ["search"]
+    build:
+      context: .
+      dockerfile: search-engine/Dockerfile
+    image: pgs-search-engine/search-engine:local
+    # Creates the OpenSearch index with its mapping; a no-op when it already exists.
+    command: ["python", "scripts/create_index.py"]
+    environment:
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-np_web_pages}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: "no"
+
+  search-engine:
+    <<: *hardening
+    profiles: ["search"]
+    build:
+      context: .
+      dockerfile: search-engine/Dockerfile
+    image: pgs-search-engine/search-engine:local
+    environment:
+      SEARCH_GRPC_HOST: 0.0.0.0
+      SEARCH_GRPC_PORT: "50051"
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-np_web_pages}
+      # vector_search/config.py (psycopg2) and pgs_db (DATABASE_URL), both as pgs_search
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-pgs}
+      POSTGRES_USER: pgs_search
+      POSTGRES_PASSWORD: ${PGS_SEARCH_DB_PASSWORD}
+      DATABASE_URL: postgresql+psycopg://pgs_search:${PGS_SEARCH_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-search
+    volumes:
+      # Hugging Face model cache, so the models download once, not on every start.
+      - search-models:/home/app/.cache/huggingface
+    # Published for search-engine/scripts/test_grpc_client.py (localhost:50051).
+    ports:
+      - "127.0.0.1:${SEARCH_GRPC_PORT:-50051}:50051"
+    depends_on:
+      search-index-init:
+        condition: service_completed_successfully
+      db-role-passwords:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # =================================================================================
+  # Scraper (scraper/Dockerfile) + Temporal dev server -- profile `scraper`
+  # =================================================================================
+  temporal:
+    profiles: ["scraper"]
+    image: temporalio/temporal:1.9.1
+    # Development server: in-memory state, Web UI on :8233.
+    command: ["server", "start-dev", "--ip", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  scraper:
+    <<: *hardening
+    profiles: ["scraper"]
+    build:
+      context: ./scraper
+    image: pgs-search-engine/scraper:local
+    # The worker's flags, as environment variables of the same name.
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      # ndjson (default) | postgres | kafka. With ndjson/postgres, KAFKA_BROKERS also
+      # fans every document out to Kafka for the ETL consumer.
+      STORAGE: ${SCRAPER_STORAGE:-ndjson}
+      OUTPUT: /app/data/output/documents.ndjson
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: crawled-documents
+      # Go (pgx) URL form, as the pgs_scraper role; used when STORAGE=postgres.
+      DATABASE_URL: postgres://pgs_scraper:${PGS_SCRAPER_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}?sslmode=disable
+      METRICS_ADDRESS: ":9090"
+    volumes:
+      - scraper-output:/app/data/output
+    depends_on:
+      temporal:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      db-role-passwords:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  opensearch-data:
+  kafka-data:
+  airflow-db-data:
+  etl-data:
+  search-models:
+  scraper-output:

@@ -27,6 +27,46 @@ A real-time, geographically aware, cross-lingual (Nepali + English) search engin
 
 ## Getting started
 
+### Run everything with Docker
+
+The whole stack is defined in one file, [`docker-compose.yml`](docker-compose.yml), at the repo
+root. You need Docker Desktop. On Windows, run these commands inside WSL, with *Settings →
+Resources → WSL Integration* enabled for your distro.
+
+```bash
+cp .env.example .env          # once; set AIRFLOW_UID to `id -u`, change passwords as needed
+docker compose up -d --build
+docker compose ps             # wait until services are "healthy"
+```
+
+On every start, the stack migrates the database with Alembic (`db-migrate`), seeds the
+reference data (`db-seed`) and sets each service role's password (`db-role-passwords`). It also
+creates the Kafka topics (`kafka-init`). Only then do the services that depend on those start.
+
+| Service | URL on the host | Notes |
+| --- | --- | --- |
+| API | http://localhost:8000 | `api/Dockerfile` |
+| Airflow | http://localhost:8080 | ETL orchestration (`ETL/Dockerfile`); login from `.env` |
+| PostgreSQL 16 + PostGIS + pgvector | `localhost:5432` | `database/Dockerfile`; schema owned by `pgs-db` migrations |
+| OpenSearch 3.8 | http://localhost:9200 | security plugin disabled (local only) |
+| Kafka 3.8 (KRaft) | `localhost:9092` | containers use `kafka:29092` |
+
+Optional parts are behind Compose profiles. Enable them with `--profile <name>`, or set
+`COMPOSE_PROFILES` in `.env`:
+
+| Profile | Adds | Status |
+| --- | --- | --- |
+| `search` | gRPC search engine (`search-engine/Dockerfile`, :50051) + index setup | needs ~3 GB RAM; downloads ~2.5 GB of models on first start |
+| `ui` | Next.js UI on http://localhost:3000 (`ui/Dockerfile`) | build fails until `ui/src/lib` and the UI's npm dependencies are in the repo |
+| `scraper` | Go crawler (`scraper/Dockerfile`) + Temporal dev server (http://localhost:8233) | build fails until `cmd/worker`'s missing packages are in the repo |
+| `tools` | OpenSearch Dashboards (http://localhost:5601), `etl-spark-test` | |
+
+All published ports bind to `127.0.0.1`. Containers reach each other by service name
+(`postgres`, `kafka`, `opensearch`, `search-engine`). `docker compose down` stops the stack;
+`docker compose down -v` also deletes its data volumes.
+
+### Run services individually
+
 Each service has its own setup docs in its directory. Quick summary:
 
 - **UI**: `cd ui && npm install && npm run dev`

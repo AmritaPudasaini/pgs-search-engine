@@ -1,0 +1,26 @@
+# Build context: database/ -- shared by Dockerfile (PostgreSQL image, copies nothing)
+# and migrate.Dockerfile (needs pyproject.toml, README.md, constraints.txt, src/,
+# alembic.ini, migrations/, scripts/ and data/).
+
+# Local environments, caches and build output
+.venv
+venv
+.env
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+build
+dist
+.pytest_cache
+.ruff_cache
+*.log
+
+# Not needed by any image
+tests
+docs
+*.png
+Dockerfile
+*.Dockerfile
+.dockerignore
+.gitignore
+.env.example
