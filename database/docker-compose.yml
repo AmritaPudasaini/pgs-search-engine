@@ -1,8 +1,9 @@
-# Local PostgreSQL + PostGIS for development.
-# Start:  docker compose up -d      Stop: docker compose down
+# Local PostgreSQL + PostGIS + pgvector for development (image: ./Dockerfile).
+# Start:  docker compose up -d --build      Stop: docker compose down
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    build: .
+    image: pgs-postgres:16-postgis-pgvector
     container_name: pgs-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pgs}
