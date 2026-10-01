@@ -1,29 +1,30 @@
-from postgres_vector import (
-    vector_search_postgres
-)
+from collections.abc import Sequence
+from typing import Literal
 
-from opensearch_vector import (
-    vector_search_opensearch
-)
+from .opensearch_vector import vector_search_opensearch
+from .postgres_vector import vector_search_postgres
+
+Backend = Literal["postgresql", "opensearch"]
+VectorSearchResult = dict[str, int | float | str]
+SearchResponse = dict[str, str | list[VectorSearchResult]]
 
 
 def vector_search(
     query: str,
-    top_k: int = 10
-):
+    top_k: int = 10,
+    backends: Sequence[Backend] = ("postgresql", "opensearch"),
+) -> SearchResponse:
+    out: SearchResponse = {"query": query}
+    if "postgresql" in backends:
+        out["postgresql"] = vector_search_postgres(query, top_k)
+    if "opensearch" in backends:
+        out["opensearch"] = vector_search_opensearch(query, top_k)
+    return out
 
-    pg_results = vector_search_postgres(
-        query,
-        top_k
-    )
 
-    os_results = vector_search_opensearch(
-        query,
-        top_k
-    )
+if __name__ == "__main__":
+    import json
+    import sys
 
-    return {
-        "query": query,
-        "postgresql": pg_results,
-        "opensearch": os_results
-    }
+    q = " ".join(sys.argv[1:]) or "hello world"
+    print(json.dumps(vector_search(q, 5, backends=("postgresql",)), indent=2))

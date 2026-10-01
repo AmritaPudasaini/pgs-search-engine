@@ -1,74 +1,44 @@
-from opensearchpy import OpenSearch
+"""Index a single new/changed document into Postgres (pgvector) and OpenSearch."""
+from collections.abc import Mapping
 
-from config import (
-    OPENSEARCH_HOST,
-    OPENSEARCH_PORT,
-    OPENSEARCH_INDEX
-)
-
-from embeddings import generate_embedding
+from .config import OPENSEARCH_INDEX
+from .embeddings import generate_embedding
+from .opensearch_vector import ensure_index, get_client
+from .postgres_vector import update_embedding_postgres
 
 
-def get_client():
+def index_new_document(document: Mapping[str, object]) -> dict[str, int | bool | str]:
+    """`document` must already exist in the Postgres `documents` table
+    (the ETL inserts the row; this step adds its embedding)."""
+    document_id = document.get("document_id")
+    if not isinstance(document_id, int):
+        raise ValueError("document_id must be an integer")
 
-    return OpenSearch(
-        hosts=[
-            {
-                "host": OPENSEARCH_HOST,
-                "port": OPENSEARCH_PORT
-            }
-        ]
-    )
-
-
-def index_new_document(
-    document: dict
-):
-
-    document_id = document[
-        "document_id"
-    ]
-
-    title = document.get(
-        "title",
-        ""
-    )
-
-    content = document.get(
-        "content",
-        ""
-    )
-
-    text = (
-        f"{title}\n{content}"
-    ).strip()
-
+    title = document.get("title")
+    content = document.get("content", document.get("text"))
+    title = title if isinstance(title, str) else ""
+    content = content if isinstance(content, str) else ""
+    text = f"{title}\n{content}".strip()
     if not text:
+        raise ValueError("Document has no text.")
 
-        raise ValueError(
-            "Document has no text."
-        )
+    embedding = generate_embedding(text)
 
-    embedding = generate_embedding(
-        text
-    )
+    pg_updated = update_embedding_postgres(document_id, embedding)
 
-    client = get_client()
-
-    document_to_index = {
-        **document,
-        "embedding": embedding
-    }
-
-    response = client.index(
+    ensure_index()
+    os_resp = get_client().index(
         index=OPENSEARCH_INDEX,
         id=document_id,
-        body=document_to_index,
-        refresh=True
+        body={**document, "embedding": embedding},
+        refresh=True,
     )
+    index_name = os_resp.get("_index")
+    if not isinstance(index_name, str):
+        raise RuntimeError("OpenSearch returned no index name")
 
     return {
         "document_id": document_id,
-        "indexed": True,
-        "index": response["_index"]
+        "postgres_updated": pg_updated,
+        "opensearch_index": index_name,
     }
