@@ -1,3 +1,5 @@
+from typing import Any
+
 from opensearchpy import OpenSearch
 
 from pgs_search.config import settings
@@ -14,6 +16,7 @@ def search_bm25(
     client: OpenSearch,
     query: str,
     limit: int = 10,
+    filters: list[dict[str, Any]] | None = None,
 ) -> list[dict]:
     normalized = normalize_query(query)
     if not normalized:
@@ -21,23 +24,25 @@ def search_bm25(
 
     variants = expand_query_terms(normalized)
 
+    bool_query: dict[str, Any] = {
+        "should": [
+            {
+                "multi_match": {
+                    "query": variant,
+                    "fields": _SEARCH_FIELDS,
+                    "type": "best_fields",
+                    "fuzziness": "AUTO",
+                }
+            }
+            for variant in variants
+        ]
+    }
+    if filters:
+        bool_query["filter"] = filters
+
     body = {
         "size": limit * max(1, len(variants)),
-        "query": {
-            "bool": {
-                "should": [
-                    {
-                        "multi_match": {
-                            "query": variant,
-                            "fields": _SEARCH_FIELDS,
-                            "type": "best_fields",
-                            "fuzziness": "AUTO",
-                        }
-                    }
-                    for variant in variants
-                ]
-            }
-        },
+        "query": {"bool": bool_query},
     }
 
     response = client.search(

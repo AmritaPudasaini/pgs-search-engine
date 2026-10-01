@@ -2,13 +2,13 @@ from typing import Any
 
 from opensearchpy import OpenSearch
 
-DEFAULT_DATE_FIELD = "scraped_at"
+DEFAULT_DATE_FIELD = "published_at"
 
 GEO_FIELD_MAP = {
-    "province_code": "geo_location.province_code",
-    "district_code": "geo_location.district_code",
-    "municipality_id": "geo_location.municipality_id",
-    "ward_number": "geo_location.ward_number",
+    "province_code": "geo.province_code",
+    "district_code": "geo.district_code",
+    "municipality_id": "geo.municipality_id",
+    "ward_number": "geo.ward_number",
 }
 
 
@@ -62,7 +62,7 @@ class GeoFilteredSearch:
             bool_query["must"] = {
                 "multi_match": {
                     "query": query,
-                    "fields": ["title^3", "text", "description"],
+                    "fields": ["title^3", "description^2", "searchable_text"],
                     "type": "best_fields",
                 }
             }

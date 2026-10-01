@@ -28,6 +28,11 @@ def _get_model() -> _SentenceEncoder:
     return cast(_SentenceEncoder, sentence_transformer(EMBEDDING_MODEL))
 
 
+def get_model() -> _SentenceEncoder:
+    """Load and cache the configured sentence-transformer model."""
+    return _get_model()
+
+
 def _check_dim(vec: list[float]) -> list[float]:
     if len(vec) != EMBEDDING_DIM:
         raise ValueError(

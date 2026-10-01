@@ -1,6 +1,8 @@
 """Central configuration. Every value can be overridden with an environment variable."""
 import os
 
+from pgs_search.config import settings
+
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_DB = os.getenv("POSTGRES_DB", "postgres")
@@ -9,9 +11,9 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
 POSTGRES_POOL_MIN = int(os.getenv("POSTGRES_POOL_MIN", "1"))
 POSTGRES_POOL_MAX = int(os.getenv("POSTGRES_POOL_MAX", "10"))
 
-OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "localhost")
-OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", "9200"))
-OPENSEARCH_INDEX = os.getenv("OPENSEARCH_INDEX", "documents")
+OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", settings.opensearch_host)
+OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", str(settings.opensearch_port)))
+OPENSEARCH_INDEX = os.getenv("OPENSEARCH_INDEX", settings.opensearch_index)
 
 # The dimension MUST match the model (all-MiniLM-L6-v2 -> 384, bge-base -> 768).
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
