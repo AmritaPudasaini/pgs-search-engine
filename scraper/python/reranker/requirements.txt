@@ -1,0 +1,2 @@
+lightgbm>=4.3
+numpy>=1.26

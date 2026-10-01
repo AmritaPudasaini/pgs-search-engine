@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package search.engine.v1;
+
+option go_package = "github.com/tekraj/pgs-search-engine/scraper/proto;enginev1";
+
+// SearchService is the internal gRPC contract consumed by the FastAPI API
+// Gateway. Mirrors api/README.md section 5. Person 6 owns finalizing these
+// messages and implementing the server in internal/grpcserver.
+service SearchService {
+  rpc ExecuteSearch(SearchRequest) returns (SearchResponse);
+  rpc GetGeoHierarchy(GeoHierarchyRequest) returns (GeoHierarchyResponse);
+}
+
+message SearchRequest {
+  string query = 1;
+  string province_code = 2;
+  string district_code = 3;
+  string municipality_id = 4;
+  int32 ward_number = 5;
+  string content_type = 6;
+  string language = 7;
+  int32 page = 8;
+  int32 limit = 9;
+}
+
+message SearchResponse {
+  int32 status_code = 1;
+  int32 total_hits = 2;
+  int64 execution_time_ms = 3;
+  RegionalCard regional_card = 4;
+  repeated SearchResultItem results = 5;
+}
+
+message RegionalCard {
+  string region_name_en = 1;
+  string region_name_ne = 2;
+  string official_website = 3;
+  string phone = 4;
+  string email = 5;
+  string address = 6;
+}
+
+message SearchResultItem {
+  string id = 1;
+  string result_type = 2;
+  string title = 3;
+  string url = 4;
+  string domain = 5;
+  string snippet = 6;
+  string download_url = 7;
+  int64 file_size_bytes = 8;
+  double relevance_score = 9;
+}
+
+message GeoHierarchyRequest {}
+
+message GeoHierarchyResponse {
+  repeated ProvinceNode provinces = 1;
+}
+
+message ProvinceNode {
+  string province_code = 1;
+  string name_en = 2;
+  string name_ne = 3;
+  repeated DistrictNode districts = 4;
+}
+
+message DistrictNode {
+  string district_code = 1;
+  string name_en = 2;
+  string name_ne = 3;
+  repeated MunicipalityNode municipalities = 4;
+}
+
+message MunicipalityNode {
+  string municipality_id = 1;
+  string name_en = 2;
+  string name_ne = 3;
+  string municipality_type = 4;
+}
