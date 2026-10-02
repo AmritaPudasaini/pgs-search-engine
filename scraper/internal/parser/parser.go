@@ -24,10 +24,18 @@ type Parsed struct {
 	// MetaDescription is <meta name="description"> content, falling back to
 	// og:description if the page only declares that.
 	MetaDescription string
+	MetaKeywords    []string
+	OpenGraph       map[string]string
+	ContactInfo     model.ContactInfo
+	SocialLinks     []string
 	Text            string
 	// Headings is the page's h1-h6 outline, in document order.
-	Headings []model.Heading
-	Links    []string // absolute, canonicalized, deduped
+	Headings      []model.Heading
+	Links         []string // absolute, canonicalized, deduped
+	InternalLinks []string
+	ExternalLinks []string
+	ImageLinks    []string
+	VideoLinks    []string
 	// AnchorTexts is parallel to Links (same index, same length): the
 	// visible text of the first <a> tag seen for each URL, collapsed to a
 	// single line. Empty string for links with no text (image-only
@@ -77,6 +85,32 @@ type Parsed struct {
 	// Country is the page's best-guess origin country (ISO 3166-1 alpha-2),
 	// or "" if no signal resolved one. See DetectCountry.
 	Country string
+}
+
+// ApplyTo copies extracted fields into the storage-neutral document model.
+func (p *Parsed) ApplyTo(doc *model.Document) {
+	if p == nil || doc == nil {
+		return
+	}
+	doc.Title = p.Title
+	doc.MetaDescription = p.MetaDescription
+	doc.MetaKeywords = p.MetaKeywords
+	doc.OpenGraph = p.OpenGraph
+	doc.ContactInfo = p.ContactInfo
+	doc.SocialLinks = p.SocialLinks
+	doc.Text = p.Text
+	doc.Headings = p.Headings
+	doc.Links = p.Links
+	doc.InternalLinks = p.InternalLinks
+	doc.ExternalLinks = p.ExternalLinks
+	doc.ImageLinks = p.ImageLinks
+	doc.VideoLinks = p.VideoLinks
+	doc.AnchorTexts = p.AnchorTexts
+	doc.JSONLD = p.JSONLD
+	doc.Geo = p.Geo
+	doc.CanonicalURL = p.CanonicalURL
+	doc.SimHash = p.SimHash
+	doc.Country = p.Country
 }
 
 // skipTextTags never contribute to the visible-text field, and their
@@ -132,6 +166,17 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ParseForDomain(body, baseURL, contentType, base.Hostname())
+}
+
+// ParseForDomain parses a page and classifies crawlable links against the
+// workflow's target domain. Subdomains remain internal; unrelated hosts stay
+// in metadata but must not enter the crawl frontier.
+func ParseForDomain(body []byte, baseURL string, contentType string, targetDomain string) (*Parsed, error) {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
 
 	utf8Body, err := charset.NewReader(bytes.NewReader(body), contentType)
 	if err != nil {
@@ -146,8 +191,10 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 		return nil, err
 	}
 
-	p := &Parsed{}
+	p := &Parsed{OpenGraph: make(map[string]string)}
 	seenLinks := make(map[string]bool)
+	seenImages := make(map[string]bool)
+	seenVideos := make(map[string]bool)
 	inTitle := false
 
 	// Geo candidates gathered from <meta> tags, resolved by priority (after
@@ -188,6 +235,14 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 						}
 					}
 				}
+			case "img":
+				if src := attrValue(n, "src"); src != "" {
+					appendResolved(&p.ImageLinks, seenImages, base, src)
+				}
+			case "video", "source":
+				if src := attrValue(n, "src"); src != "" {
+					appendResolved(&p.VideoLinks, seenVideos, base, src)
+				}
 			case "script":
 				if isJSONLD(n) {
 					if raw := strings.TrimSpace(nodeText(n)); raw != "" && json.Valid([]byte(raw)) {
@@ -196,6 +251,9 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 				}
 			case "meta":
 				name, property, content := metaAttrs(n)
+				if strings.HasPrefix(property, "og:") && content != "" {
+					p.OpenGraph[property] = collapseWhitespace(content)
+				}
 				switch {
 				case name == "robots":
 					noindex, nofollow := ParseRobotsDirectives(content)
@@ -209,6 +267,8 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 					geoRegion = content
 				case name == "description" && p.MetaDescription == "":
 					p.MetaDescription = collapseWhitespace(content)
+				case name == "keywords":
+					p.MetaKeywords = splitKeywords(content)
 				case property == "og:description" && ogDescription == "":
 					ogDescription = collapseWhitespace(content)
 				case property == "og:locale":
@@ -240,6 +300,8 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 		}
 	}
 	walk(doc)
+	p.InternalLinks, p.ExternalLinks = ClassifyLinks(p.Links, targetDomain)
+	p.ContactInfo, p.SocialLinks = extractContactData(doc, p.Links)
 
 	text, _ := extractMainText(doc)
 	p.Text = collapseWhitespace(text)
@@ -266,6 +328,55 @@ func Parse(body []byte, baseURL string, contentType string) (*Parsed, error) {
 	}
 
 	return p, nil
+}
+
+// ClassifyLinks separates URLs allowed into one domain workflow from links
+// retained only as external metadata.
+func ClassifyLinks(links []string, targetDomain string) (internal, external []string) {
+	targetDomain = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(targetDomain), "."))
+	for _, link := range links {
+		u, err := url.Parse(link)
+		if err != nil || u.Hostname() == "" {
+			continue
+		}
+		host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+		if host == targetDomain || strings.HasSuffix(host, "."+targetDomain) {
+			internal = append(internal, link)
+		} else {
+			external = append(external, link)
+		}
+	}
+	return internal, external
+}
+
+func appendResolved(out *[]string, seen map[string]bool, base *url.URL, raw string) {
+	if resolved, ok := normalize.Resolve(base, raw); ok && !seen[resolved] {
+		seen[resolved] = true
+		*out = append(*out, resolved)
+	}
+}
+
+func attrValue(n *html.Node, key string) string {
+	for _, attr := range n.Attr {
+		if strings.EqualFold(attr.Key, key) {
+			return strings.TrimSpace(attr.Val)
+		}
+	}
+	return ""
+}
+
+func splitKeywords(content string) []string {
+	var keywords []string
+	seen := make(map[string]bool)
+	for _, keyword := range strings.Split(content, ",") {
+		keyword = collapseWhitespace(keyword)
+		key := strings.ToLower(keyword)
+		if keyword != "" && !seen[key] {
+			seen[key] = true
+			keywords = append(keywords, keyword)
+		}
+	}
+	return keywords
 }
 
 // isJSONLD reports whether script element n declares
@@ -496,13 +607,4 @@ func parseDelimited(s string) *model.GeoPoint {
 func collapseWhitespace(s string) string {
 	fields := strings.Fields(s)
 	return strings.Join(fields, " ")
-}
-
-func attrValue(n *html.Node, key string) string {
-	for _, attr := range n.Attr {
-		if strings.EqualFold(attr.Key, key) {
-			return strings.TrimSpace(attr.Val)
-		}
-	}
-	return ""
 }

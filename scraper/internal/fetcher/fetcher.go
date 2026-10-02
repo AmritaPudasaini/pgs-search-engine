@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -45,6 +46,31 @@ type Fetcher struct {
 	// second's budget is charged in several chunks of at most this size
 	// instead of a single too-big call.
 	bandwidthChunk int
+
+	domainRequestsPerSecond rate.Limit
+	domainBurst             int
+	defaultPolitenessDelay  time.Duration
+	domainsMu               sync.Mutex
+	domains                 map[string]*domainState
+}
+
+type domainState struct {
+	limiter *rate.Limiter
+	mu      sync.Mutex
+	next    time.Time
+	delay   time.Duration
+}
+
+// Options controls request safety and per-domain politeness.
+type Options struct {
+	Timeout                 time.Duration
+	MaxBandwidthBPS         int
+	DomainRequestsPerSecond float64
+	DomainBurst             int
+	PolitenessDelay         time.Duration
+	// HTTP3 attempts HTTP/3 (QUIC) first on https requests, falling back
+	// to the standard transport. Same effect as the WithHTTP3 option.
+	HTTP3 bool
 }
 
 // redirectChainKey is the context key Get() uses to give its CheckRedirect
@@ -83,19 +109,29 @@ func New(timeout time.Duration, maxBandwidthBPS int, opts ...Option) *Fetcher {
 	for _, opt := range opts {
 		opt(&o)
 	}
+	return NewWithOptions(Options{Timeout: timeout, MaxBandwidthBPS: maxBandwidthBPS, HTTP3: o.http3})
+}
 
+// NewWithOptions builds a Fetcher with independent rate and delay state for
+// each hostname. A zero request rate or delay disables that control.
+func NewWithOptions(opts Options) *Fetcher {
 	var limiter *rate.Limiter
 	chunk := 0
-	if maxBandwidthBPS > 0 {
-		chunk = maxBandwidthBPS
-		limiter = rate.NewLimiter(rate.Limit(maxBandwidthBPS), chunk)
+	if opts.MaxBandwidthBPS > 0 {
+		chunk = opts.MaxBandwidthBPS
+		limiter = rate.NewLimiter(rate.Limit(opts.MaxBandwidthBPS), chunk)
 	}
+	burst := opts.DomainBurst
+	if burst <= 0 {
+		burst = 1
+	}
+	timeout := opts.Timeout
 
 	transport := &http.Transport{
 		DialContext: newDNSCache(dnsCacheTTL).dialContext(&net.Dialer{Timeout: timeout}),
 	}
 	var roundTripper http.RoundTripper = transport
-	if o.http3 {
+	if opts.HTTP3 {
 		roundTripper = &http3FallbackTransport{
 			h3:       &http3.Transport{},
 			fallback: transport,
@@ -103,8 +139,12 @@ func New(timeout time.Duration, maxBandwidthBPS int, opts ...Option) *Fetcher {
 	}
 
 	return &Fetcher{
-		bandwidth:      limiter,
-		bandwidthChunk: chunk,
+		bandwidth:               limiter,
+		bandwidthChunk:          chunk,
+		domainRequestsPerSecond: rate.Limit(opts.DomainRequestsPerSecond),
+		domainBurst:             burst,
+		defaultPolitenessDelay:  opts.PolitenessDelay,
+		domains:                 make(map[string]*domainState),
 		client: &http.Client{
 			Timeout:   timeout,
 			Transport: roundTripper,
@@ -119,6 +159,67 @@ func New(timeout time.Duration, maxBandwidthBPS int, opts ...Option) *Fetcher {
 			},
 		},
 	}
+}
+
+// SetDomainDelay applies a robots.txt Crawl-delay to one hostname. Existing
+// limiter state is retained so changing the delay cannot reset rate limits.
+func (f *Fetcher) SetDomainDelay(rawURL string, delay time.Duration) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Hostname() == "" {
+		return fmt.Errorf("invalid domain URL %q", rawURL)
+	}
+	state := f.domainState(u.Hostname())
+	state.mu.Lock()
+	state.delay = delay
+	state.mu.Unlock()
+	return nil
+}
+
+func (f *Fetcher) domainState(host string) *domainState {
+	f.domainsMu.Lock()
+	defer f.domainsMu.Unlock()
+	if state, ok := f.domains[host]; ok {
+		return state
+	}
+	state := &domainState{delay: f.defaultPolitenessDelay}
+	if f.domainRequestsPerSecond > 0 {
+		state.limiter = rate.NewLimiter(f.domainRequestsPerSecond, f.domainBurst)
+	}
+	f.domains[host] = state
+	return state
+}
+
+func (f *Fetcher) waitForDomain(ctx context.Context, rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Hostname() == "" {
+		return fmt.Errorf("invalid fetch URL %q", rawURL)
+	}
+	state := f.domainState(u.Hostname())
+	if state.limiter != nil {
+		if err := state.limiter.Wait(ctx); err != nil {
+			return fmt.Errorf("domain rate limiter: %w", err)
+		}
+	}
+
+	state.mu.Lock()
+	now := time.Now()
+	startAt := state.next
+	if startAt.Before(now) {
+		startAt = now
+	}
+	state.next = startAt.Add(state.delay)
+	state.mu.Unlock()
+
+	if wait := time.Until(startAt); wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return nil
 }
 
 // dnsCacheEntry is one host's cached resolution.
@@ -249,6 +350,10 @@ func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
 
 	var chain []string
 	ctx = context.WithValue(ctx, redirectChainKey{}, &chain)
+
+	if err := f.waitForDomain(ctx, url); err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

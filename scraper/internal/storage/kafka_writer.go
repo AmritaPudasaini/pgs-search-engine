@@ -21,8 +21,8 @@ type KafkaWriter struct {
 	w *kafka.Writer
 }
 
-// CompletionSignal tells ETL which stored object is ready. Page bytes stay in
-// the object store; Kafka carries only this small durable handoff event.
+// CompletionSignal tells ETL which DFS object is ready. Page bytes stay in
+// MinIO; Kafka carries only this small durable handoff event.
 type CompletionSignal struct {
 	Bucket       string    `json:"bucket"`
 	ObjectKey    string    `json:"object_key"`
@@ -32,6 +32,53 @@ type CompletionSignal struct {
 	ContentType  string    `json:"content_type"`
 	ScrapedAt    time.Time `json:"scraped_at"`
 	CompletedAt  time.Time `json:"completed_at"`
+}
+
+type kafkaMessageWriter interface {
+	WriteMessages(context.Context, ...kafka.Message) error
+	Close() error
+}
+
+type KafkaSignalEmitter struct {
+	w kafkaMessageWriter
+}
+
+func NewKafkaSignalEmitter(brokers []string, topic string) (*KafkaSignalEmitter, error) {
+	if len(brokers) == 0 {
+		return nil, fmt.Errorf("kafka: at least one broker address is required")
+	}
+	if topic == "" {
+		return nil, fmt.Errorf("kafka: topic is required")
+	}
+	return &KafkaSignalEmitter{w: &kafka.Writer{
+		Addr:         kafka.TCP(brokers...),
+		Topic:        topic,
+		Balancer:     &kafka.Hash{},
+		RequiredAcks: kafka.RequireOne,
+		BatchTimeout: 100 * time.Millisecond,
+		Async:        false,
+	}}, nil
+}
+
+func (e *KafkaSignalEmitter) Emit(ctx context.Context, signal CompletionSignal) error {
+	if signal.ObjectKey == "" || signal.ObjectSHA256 == "" {
+		return fmt.Errorf("completion signal requires object key and SHA-256")
+	}
+	if signal.CompletedAt.IsZero() {
+		signal.CompletedAt = time.Now().UTC()
+	}
+	data, err := json.Marshal(signal)
+	if err != nil {
+		return fmt.Errorf("marshal completion signal: %w", err)
+	}
+	if err := e.w.WriteMessages(ctx, kafka.Message{Key: []byte(signal.ObjectSHA256), Value: data}); err != nil {
+		return fmt.Errorf("publish DFS completion signal: %w", err)
+	}
+	return nil
+}
+
+func (e *KafkaSignalEmitter) Close() error {
+	return e.w.Close()
 }
 
 // NewKafkaWriter returns a Writer that publishes to topic on the given
