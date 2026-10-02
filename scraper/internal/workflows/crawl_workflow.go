@@ -27,6 +27,10 @@ import (
 	"search-engine-scraper/internal/simhash"
 )
 
+// sitemapDiscoveryBatch bounds how many seeds' sitemap discovery activities
+// run concurrently at workflow start.
+const sitemapDiscoveryBatch = 100
+
 // TaskQueueName is shared between the worker and the client that starts
 // crawls -- both must point at the same Temporal task queue.
 const TaskQueueName = "scraper-task-queue"
@@ -294,28 +298,44 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 		// Sitemap discovery runs for every seed regardless of whether the
 		// seed page itself was fresh -- a site's sitemap can list new or
 		// changed URLs independent of whether its own front page changed.
-		for _, s := range in.Seeds {
-			var sitemapRes activities.DiscoverSitemapURLsOutput
-			err := workflow.ExecuteActivity(sitemapCtx, act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{
-				SeedURL: s.URL,
-			}).Get(ctx, &sitemapRes)
-			if err != nil {
-				logger.Warn("sitemap discovery failed", "seed", s.URL, "error", err)
-				continue
+		//
+		// Discovery is launched in bounded batches rather than one seed at
+		// a time: with thousands of seeds a serial loop spends hours here
+		// before the first page is fetched, while the activities
+		// themselves are independent network lookups. Results are still
+		// consumed in seed order, so the frontier is built identically.
+		for start := 0; start < len(in.Seeds); start += sitemapDiscoveryBatch {
+			end := start + sitemapDiscoveryBatch
+			if end > len(in.Seeds) {
+				end = len(in.Seeds)
 			}
-			originHost := normalize.Hostname(s.URL)
-			var sitemapCandidates []frontierCandidate
-			for _, u := range sitemapRes.URLs {
-				key := normalize.Canonical(u)
-				if seen[key] {
-					continue
-				}
-				sitemapCandidates = append(sitemapCandidates, frontierCandidate{
-					key:  key,
-					item: FrontierItem{URL: u, Depth: 0, Category: s.Category, OriginHost: originHost, Priority: s.Priority},
+			batch := in.Seeds[start:end]
+			futures := make([]workflow.Future, len(batch))
+			for i, s := range batch {
+				futures[i] = workflow.ExecuteActivity(sitemapCtx, act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{
+					SeedURL: s.URL,
 				})
 			}
-			enqueueFresh(sitemapCandidates)
+			for i, s := range batch {
+				var sitemapRes activities.DiscoverSitemapURLsOutput
+				if err := futures[i].Get(ctx, &sitemapRes); err != nil {
+					logger.Warn("sitemap discovery failed", "seed", s.URL, "error", err)
+					continue
+				}
+				originHost := normalize.Hostname(s.URL)
+				var sitemapCandidates []frontierCandidate
+				for _, u := range sitemapRes.URLs {
+					key := normalize.Canonical(u)
+					if seen[key] {
+						continue
+					}
+					sitemapCandidates = append(sitemapCandidates, frontierCandidate{
+						key:  key,
+						item: FrontierItem{URL: u, Depth: 0, Category: s.Category, OriginHost: originHost, Priority: s.Priority},
+					})
+				}
+				enqueueFresh(sitemapCandidates)
+			}
 		}
 	}
 

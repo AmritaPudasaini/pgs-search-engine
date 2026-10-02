@@ -156,6 +156,8 @@ services:
       - temporal
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
+    volumes:
+      - ./configs:/configs:ro
     profiles: ["tools"]
 
 volumes:
