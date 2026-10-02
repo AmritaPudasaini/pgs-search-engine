@@ -61,6 +61,16 @@ func TaskQueueForHost(host string, shards int) string {
 	return TaskQueueForShard(ShardForHost(host, shards))
 }
 
+const (
+	// maxCarriedURLs is the largest frontier+seen set that is checkpointed
+	// via Continue-As-New every pagesPerRun pages; beyond it the carried
+	// payload would approach Temporal's 2MB payload limit.
+	maxCarriedURLs = 6000
+	// maxHistoryEvents forces a Continue-As-New well before Temporal's
+	// 51200-event history limit.
+	maxHistoryEvents = 45000
+)
+
 // TaskQueueName is shared between the worker and the client that starts
 // crawls -- both must point at the same Temporal task queue.
 const TaskQueueName = "scraper-task-queue"
@@ -175,6 +185,12 @@ type CrawlWorkflowInput struct {
 	// TaskQueueForHost), so a single worker owns a given host. Zero or one
 	// keeps every activity on TaskQueueName, served by any worker replica.
 	TaskQueueShards int
+	// DiscoveryPending/DiscoveryCursor carry sitemap discovery across a
+	// Continue-As-New boundary: discovery runs concurrently with page
+	// fetching, so a segment can end with seeds not yet discovered.
+	// DiscoveryCursor is the index of the next seed to discover.
+	DiscoveryPending bool
+	DiscoveryCursor  int
 	// RevisitAfter enables the revisit/freshness policy: a candidate URL
 	// (seed, sitemap-discovered, or a discovered link) that already has a
 	// document on file fetched more recently than this is skipped rather
@@ -313,17 +329,6 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 
 	isFirstRun := in.PagesProcessed == 0 && len(in.Frontier) == 0 && len(in.Seen) == 0
 	if isFirstRun {
-		// Sitemap discovery gets its own longer timeout/retry policy: it
-		// makes several sequential HTTP fetches (robots.txt + up to
-		// maxChildSitemaps sitemap files), so the default 30s activity
-		// timeout used everywhere else could be too tight, and it's
-		// best-effort (a link-following crawl still works without it) so
-		// there's no need to retry it as hard as ProcessPage.
-		sitemapCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-			StartToCloseTimeout: 60 * time.Second,
-			RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2},
-		})
-
 		var seedCandidates []frontierCandidate
 		for _, s := range in.Seeds {
 			key := normalize.Canonical(s.URL)
@@ -339,49 +344,25 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 		}
 		enqueueFresh(seedCandidates)
 
-		// Sitemap discovery runs for every seed regardless of whether the
-		// seed page itself was fresh -- a site's sitemap can list new or
-		// changed URLs independent of whether its own front page changed.
-		//
-		// Discovery is launched in bounded batches rather than one seed at
-		// a time: with thousands of seeds a serial loop spends hours here
-		// before the first page is fetched, while the activities
-		// themselves are independent network lookups. Results are still
-		// consumed in seed order, so the frontier is built identically.
-		for start := 0; start < len(in.Seeds); start += sitemapDiscoveryBatch {
-			end := start + sitemapDiscoveryBatch
-			if end > len(in.Seeds) {
-				end = len(in.Seeds)
-			}
-			batch := in.Seeds[start:end]
-			futures := make([]workflow.Future, len(batch))
-			for i, s := range batch {
-				futures[i] = workflow.ExecuteActivity(hostCtx(sitemapCtx, normalize.Hostname(s.URL), in.TaskQueueShards), act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{
-					SeedURL: s.URL,
-				})
-			}
-			for i, s := range batch {
-				var sitemapRes activities.DiscoverSitemapURLsOutput
-				if err := futures[i].Get(ctx, &sitemapRes); err != nil {
-					logger.Warn("sitemap discovery failed", "seed", s.URL, "error", err)
-					continue
-				}
-				originHost := normalize.Hostname(s.URL)
-				var sitemapCandidates []frontierCandidate
-				for _, u := range sitemapRes.URLs {
-					key := normalize.Canonical(u)
-					if seen[key] {
-						continue
-					}
-					sitemapCandidates = append(sitemapCandidates, frontierCandidate{
-						key:  key,
-						item: FrontierItem{URL: u, Depth: 0, Category: s.Category, OriginHost: originHost, Priority: s.Priority},
-					})
-				}
-				enqueueFresh(sitemapCandidates)
-			}
-		}
 	}
+
+	// Sitemap discovery runs for every seed regardless of whether the seed
+	// page itself was fresh -- a site's sitemap can list new or changed URLs
+	// independent of whether its own front page changed. It runs
+	// concurrently with page fetching (seeds are already queued above), a
+	// bounded window of seeds at a time, so the first pages are fetched
+	// immediately instead of after every seed's sitemap has been looked up.
+	discoveryPending := isFirstRun || in.DiscoveryPending
+	discCursor := in.DiscoveryCursor
+	sitemapCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 60 * time.Second,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2},
+	})
+	type discInFlight struct {
+		future workflow.Future
+		seed   Seed
+	}
+	var discActive []discInFlight
 
 	stats := in.Stats
 	budgetRemaining := in.MaxPages - in.PagesProcessed
@@ -509,12 +490,32 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 		}
 	}
 
+	// launchDiscovery keeps up to sitemapDiscoveryBatch seed discoveries in
+	// flight. It stops launching once the crawl is checkpointing (continuing)
+	// or no page budget is left to spend on what discovery would find.
+	launchDiscovery := func() {
+		for discoveryPending && !continuing && budgetRemaining > 0 &&
+			discCursor < len(in.Seeds) && len(discActive) < sitemapDiscoveryBatch {
+			sd := in.Seeds[discCursor]
+			discCursor++
+			discActive = append(discActive, discInFlight{
+				future: workflow.ExecuteActivity(hostCtx(sitemapCtx, normalize.Hostname(sd.URL), in.TaskQueueShards),
+					act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{SeedURL: sd.URL}),
+				seed: sd,
+			})
+		}
+	}
+
+	launchDiscovery()
 	fillActive()
-	for len(active) > 0 {
+	for len(active) > 0 || len(discActive) > 0 {
 		sel := workflow.NewSelector(ctx)
 		doneIdx := -1
+		discDoneIdx := -1
 		var res activities.ProcessPageOutput
 		var actErr error
+		var discRes activities.DiscoverSitemapURLsOutput
+		var discErr error
 
 		for i := range active {
 			idx := i
@@ -523,7 +524,41 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 				actErr = f.Get(ctx, &res)
 			})
 		}
+		for i := range discActive {
+			idx := i
+			sel.AddFuture(discActive[idx].future, func(f workflow.Future) {
+				discDoneIdx = idx
+				discErr = f.Get(ctx, &discRes)
+			})
+		}
 		sel.Select(ctx)
+
+		if discDoneIdx >= 0 {
+			sd := discActive[discDoneIdx].seed
+			discActive = append(discActive[:discDoneIdx], discActive[discDoneIdx+1:]...)
+			if discErr != nil {
+				logger.Warn("sitemap discovery failed", "seed", sd.URL, "error", discErr)
+			} else {
+				originHost := normalize.Hostname(sd.URL)
+				var sitemapCandidates []frontierCandidate
+				for _, u := range discRes.URLs {
+					key := normalize.Canonical(u)
+					if seen[key] {
+						continue
+					}
+					sitemapCandidates = append(sitemapCandidates, frontierCandidate{
+						key:  key,
+						item: FrontierItem{URL: u, Depth: 0, Category: sd.Category, OriginHost: originHost, Priority: sd.Priority},
+					})
+				}
+				enqueueFresh(sitemapCandidates)
+			}
+			launchDiscovery()
+			if !continuing {
+				fillActive()
+			}
+			continue
+		}
 
 		doneItem := active[doneIdx].item
 		active = append(active[:doneIdx], active[doneIdx+1:]...)
@@ -645,17 +680,23 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			}
 		}
 
-		if pagesThisRun >= pagesPerRun {
+		// Checkpoint every pagesPerRun pages, but not while the carried
+		// state (frontier + seen set) is too large to fit a Temporal
+		// payload; a large seed list is instead checkpointed only when the
+		// history nears its hard event limit.
+		if (pagesThisRun >= pagesPerRun && len(queue)+len(seenOrder) <= maxCarriedURLs) ||
+			workflow.GetInfo(ctx).GetCurrentHistoryLength() >= maxHistoryEvents {
 			continuing = true
 		}
 		if !continuing {
+			launchDiscovery()
 			fillActive()
 		}
 		// if continuing, we deliberately stop starting new activities and
 		// let `active` drain so nothing is orphaned by Continue-As-New.
 	}
 
-	if continuing && len(queue) > 0 && budgetRemaining > 0 {
+	if continuing && budgetRemaining > 0 && (len(queue) > 0 || (discoveryPending && discCursor < len(in.Seeds))) {
 		willContinueAsNew = true
 		return CrawlResult{}, workflow.NewContinueAsNewError(ctx, CrawlWorkflow, CrawlWorkflowInput{
 			Seeds:                in.Seeds,
@@ -666,6 +707,8 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			MaxPagesPerDomain:    in.MaxPagesPerDomain,
 			MaxConcurrentPerHost: in.MaxConcurrentPerHost,
 			TaskQueueShards:      in.TaskQueueShards,
+			DiscoveryPending:     discoveryPending,
+			DiscoveryCursor:      discCursor,
 			Frontier:             queue,
 			Seen:                 seenOrder,
 			PagesProcessed:       in.PagesProcessed + pagesThisRun,

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/activity"
@@ -105,5 +106,61 @@ func TestCrawlWorkflow_ShardsRouteEachHostToItsOwnQueue(t *testing.T) {
 		if !strings.Contains(q, "-shard-") {
 			t.Errorf("host %s fetched on %q, want a shard queue", host, q)
 		}
+	}
+}
+
+// TestCrawlWorkflow_FetchingStartsBeforeDiscoveryFinishes proves seed pages
+// are fetched while sitemap discovery is still working through later seeds,
+// rather than only after every seed's discovery has completed.
+func TestCrawlWorkflow_FetchingStartsBeforeDiscoveryFinishes(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	const nSeeds = 300
+	var mu sync.Mutex
+	discoveries := 0
+	discoveriesAtFirstFetch := -1
+	fetched := map[string]bool{}
+
+	env.OnActivity(act.DiscoverSitemapURLs, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.DiscoverSitemapURLsInput) (activities.DiscoverSitemapURLsOutput, error) {
+			time.Sleep(5 * time.Millisecond)
+			mu.Lock()
+			discoveries++
+			mu.Unlock()
+			return activities.DiscoverSitemapURLsOutput{}, nil
+		},
+	)
+	env.OnActivity(act.ProcessPage, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.ProcessPageInput) (activities.ProcessPageOutput, error) {
+			mu.Lock()
+			if discoveriesAtFirstFetch < 0 {
+				discoveriesAtFirstFetch = discoveries
+			}
+			fetched[in.URL] = true
+			mu.Unlock()
+			return activities.ProcessPageOutput{URL: in.URL, NormalizedURL: in.URL, Skipped: true, SkipReason: "test"}, nil
+		},
+	)
+	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(0), nil)
+
+	var seeds []Seed
+	for i := 0; i < nSeeds; i++ {
+		seeds = append(seeds, Seed{URL: fmt.Sprintf("https://site-%d.example.np/", i)})
+	}
+	env.ExecuteWorkflow(CrawlWorkflow, CrawlWorkflowInput{
+		Seeds: seeds, MaxDepth: 0, MaxPages: 40, Concurrency: 8, // under pagesPerRun: no Continue-As-New in the test env
+	})
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error: %v", err)
+	}
+	if len(fetched) != 40 {
+		t.Errorf("fetched %d pages, want the full 40-page budget", len(fetched))
+	}
+	if discoveriesAtFirstFetch >= nSeeds {
+		t.Errorf("first fetch happened after %d/%d discoveries, want fetching to start before discovery finishes", discoveriesAtFirstFetch, nSeeds)
 	}
 }
