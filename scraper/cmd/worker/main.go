@@ -37,6 +37,7 @@ import (
 	"search-engine-scraper/internal/activities"
 	"search-engine-scraper/internal/envflag"
 	"search-engine-scraper/internal/fetcher"
+	"search-engine-scraper/internal/render"
 	"search-engine-scraper/internal/robots"
 	"search-engine-scraper/internal/storage"
 	"search-engine-scraper/internal/workflows"
@@ -57,6 +58,10 @@ func main() {
 		taskShards     = envflag.Int("task-queue-shards", 1, "total number of host-shard task queues the crawl uses (1 = off); must match the scraper client's --task-queue-shards")
 		shardIndex     = envflag.Int("shard-index", -1, "which shard's fetch queue this worker polls (0..task-queue-shards-1); -1 = poll every shard queue")
 		shardFromHost  = envflag.Bool("shard-from-hostname", false, "derive --shard-index from the trailing ordinal of the hostname (e.g. worker-2 -> 2, a Kubernetes StatefulSet pod), modulo --task-queue-shards")
+		renderFlag     = envflag.String("render", "auto", "render pages in headless Chrome so JavaScript-built content is captured: off, auto (only pages that look like an empty JS app shell), or always")
+		chromeURL      = envflag.String("chrome-url", "", "DevTools websocket of a headless Chrome, e.g. ws://chrome:9222 (required unless --render=off)")
+		renderConc     = envflag.Int("render-concurrency", 4, "max pages this worker renders in Chrome at once")
+		renderTimeout  = envflag.Duration("render-timeout", 30*time.Second, "per-page render timeout")
 		requestTimeout = envflag.Duration("timeout", 10*time.Second, "per-request HTTP timeout")
 		maxConcurrent  = envflag.Int("max-concurrent-activities", maxConcurrentDefault(), "max activities this worker process executes concurrently (fetching is I/O-bound, so this can safely exceed core count)")
 		userAgent      = envflag.String("user-agent", "search-engine-scraper", "User-Agent / robots.txt group name to identify as")
@@ -85,6 +90,7 @@ func main() {
 		runs      storage.RunRecorder      = storage.NoopRunRecorder{}
 		freshness storage.FreshnessChecker = storage.NoopFreshnessChecker{}
 		htmlStore storage.HTMLWriter       = storage.NoopHTMLWriter{}
+		records   storage.RecordWriter     = storage.NoopRecordWriter{}
 		err       error
 	)
 	if *storageKind == "s3" {
@@ -92,7 +98,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("open s3 storage: %v", err)
 		}
-		primary, runs, freshness, htmlStore = s3b.writer, s3b.runs, s3b.freshness, s3b.html
+		primary, runs, freshness, htmlStore, records = s3b.writer, s3b.runs, s3b.freshness, s3b.html, s3b.records
 	} else {
 		primary, err = buildWriter(*storageKind, *output, *kafkaBrokers, *kafkaTopic)
 		if err != nil {
@@ -127,6 +133,20 @@ func main() {
 	guard := robots.New(f, *userAgent)
 	act := activities.New(f, guard, writer, runs, freshness)
 	act.HTML = htmlStore
+	act.Records = records
+
+	mode, merr := render.ParseMode(*renderFlag)
+	if merr != nil {
+		log.Fatal(merr)
+	}
+	if mode != render.ModeOff {
+		if *chromeURL == "" {
+			log.Fatal("--chrome-url (or CHROME_URL) is required unless --render=off")
+		}
+		ch := render.NewChrome(*chromeURL, *userAgent, *renderConc, *renderTimeout)
+		defer ch.Close()
+		act.Renderer, act.RenderMode = ch, mode
+	}
 
 	if *saveHTMLDir != "" {
 		htmlWriter, err := storage.NewDirHTMLWriter(*saveHTMLDir)
@@ -140,6 +160,7 @@ func main() {
 		MaxConcurrentActivityExecutionSize: *maxConcurrent,
 	})
 	w.RegisterWorkflow(workflows.CrawlWorkflow)
+	w.RegisterWorkflow(workflows.CrawlDomainsWorkflow)
 	w.RegisterActivity(act.ProcessPage)
 	w.RegisterActivity(act.WriteDocument)
 	w.RegisterActivity(act.DiscoverSitemapURLs)
@@ -217,6 +238,7 @@ type s3Backend struct {
 	runs      storage.RunRecorder
 	freshness storage.FreshnessChecker
 	html      storage.HTMLWriter
+	records   storage.RecordWriter
 }
 
 func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error) {
@@ -249,6 +271,10 @@ func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error)
 	if err != nil {
 		return nil, err
 	}
+	rw, err := storage.NewS3RecordWriter(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
 	r, err := storage.NewS3RunRecorder(cfg, bucket, runOpts...)
 	if err != nil {
 		return nil, err
@@ -257,7 +283,7 @@ func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error)
 	if err != nil {
 		return nil, err
 	}
-	return &s3Backend{writer: w, runs: r, freshness: fr, html: h}, nil
+	return &s3Backend{writer: w, runs: r, freshness: fr, html: h, records: rw}, nil
 }
 
 func buildWriter(kind, output, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {

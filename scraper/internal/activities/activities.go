@@ -24,6 +24,7 @@ import (
 	"search-engine-scraper/internal/model"
 	"search-engine-scraper/internal/normalize"
 	"search-engine-scraper/internal/parser"
+	"search-engine-scraper/internal/render"
 	"search-engine-scraper/internal/robots"
 	"search-engine-scraper/internal/sitemap"
 	"search-engine-scraper/internal/storage"
@@ -57,6 +58,14 @@ type Activities struct {
 	// storage.NoopHTMLWriter{} (raw HTML downloads disabled) unless the
 	// caller overrides this field after New.
 	HTML storage.HTMLWriter
+	// Records saves each page's complete structured capture
+	// (model.PageRecord). Defaults to a no-op.
+	Records storage.RecordWriter
+	// Renderer loads pages in a headless browser so JavaScript-rendered
+	// content is captured; RenderMode decides which pages it is used for.
+	// Both default to off.
+	Renderer   render.Renderer
+	RenderMode render.Mode
 
 	mu          sync.Mutex
 	writtenHash map[string]bool // content-hash dedupe, guards WriteDocument against retry double-writes
@@ -73,6 +82,8 @@ func New(f *fetcher.Fetcher, r *robots.Guard, w storage.Writer, runs storage.Run
 		Runs:        runs,
 		Freshness:   freshness,
 		HTML:        storage.NoopHTMLWriter{},
+		Records:     storage.NoopRecordWriter{},
+		RenderMode:  render.ModeOff,
 		writtenHash: make(map[string]bool),
 	}
 }
@@ -126,6 +137,16 @@ type ProcessPageOutput struct {
 	// parsed fine, it just opted out of one or both here.
 	NoIndex  bool
 	NoFollow bool
+
+	// HTMLKey/RenderedHTMLKey/RecordKey locate this page's raw HTML,
+	// browser-rendered HTML and full structured record in the object
+	// store; Rendered reports whether a headless browser was used, and
+	// RenderError why it was wanted but failed (the static HTML was used).
+	HTMLKey         string
+	RenderedHTMLKey string
+	RecordKey       string
+	Rendered        bool
+	RenderError     string
 }
 
 // ProcessPage fetches url (after checking robots.txt and honoring any
@@ -217,17 +238,52 @@ func (a *Activities) ProcessPage(ctx context.Context, in ProcessPageInput) (Proc
 		return out, nil
 	}
 
+	rawBody := res.Body
+	rawHash := out.ContentHash
+	host := normalize.Hostname(out.NormalizedURL)
+
 	// Best-effort: saving the raw document is a bonus alongside the parsed
 	// Document this activity already returns, not a correctness requirement
-	// of the crawl -- a disk error here shouldn't fail (and retry-refetch)
+	// of the crawl -- a storage error here shouldn't fail (and retry-refetch)
 	// an otherwise-successful page.
-	_ = a.HTML.SaveHTML(out.NormalizedURL, out.ContentHash, res.Body)
+	if err := a.HTML.SaveHTML(out.NormalizedURL, rawHash, rawBody); err == nil {
+		out.HTMLKey = storage.S3HTMLObjectKey(out.NormalizedURL, rawHash)
+	}
 
-	parsed, err := parser.Parse(res.Body, in.URL, out.ContentType)
+	body := rawBody
+	parsed, err := parser.Parse(body, in.URL, out.ContentType)
 	if err != nil {
 		out.FetchError = "parse error: " + err.Error()
 		metrics.PagesFetched.WithLabelValues(metrics.OutcomeParseError).Inc()
 		return out, nil
+	}
+
+	// Client-side rendered pages serve an empty shell; load them in a
+	// headless browser and use the resulting DOM instead.
+	renderReason := ""
+	switch a.RenderMode {
+	case render.ModeAlways:
+		renderReason = "always"
+	case render.ModeAuto:
+		renderReason = render.NeedsRender(string(rawBody), len([]rune(parsed.Text)))
+	}
+	if renderReason != "" && a.Renderer != nil {
+		rendered, finalURL, rerr := a.Renderer.Render(ctx, in.URL)
+		if rerr != nil {
+			out.RenderError = rerr.Error()
+		} else if rp, perr := parser.Parse([]byte(rendered), in.URL, "text/html; charset=utf-8"); perr != nil {
+			out.RenderError = "parse rendered: " + perr.Error()
+		} else {
+			_ = finalURL
+			body = []byte(rendered)
+			parsed = rp
+			out.Rendered = true
+			sum := sha256.Sum256(body)
+			out.ContentHash = hex.EncodeToString(sum[:])
+			if err := a.HTML.SaveHTML(out.NormalizedURL, "rendered-"+out.ContentHash, body); err == nil {
+				out.RenderedHTMLKey = storage.S3HTMLObjectKey(out.NormalizedURL, "rendered-"+out.ContentHash)
+			}
+		}
 	}
 
 	out.Title = parsed.Title
@@ -256,6 +312,22 @@ func (a *Activities) ProcessPage(ctx context.Context, in ProcessPageInput) (Proc
 		noindex, nofollow := xRobotsTagDirectives(v)
 		out.NoIndex = out.NoIndex || noindex
 		out.NoFollow = out.NoFollow || nofollow
+	}
+
+	// Full structured capture, saved as its own object; the Document the
+	// workflow writes only carries its key. Best-effort like the HTML.
+	if rec, rerr := parser.BuildPageRecord(body, in.URL, "text/html; charset=utf-8", parsed); rerr == nil {
+		rec.URL, rec.NormalizedURL, rec.FinalURL, rec.Host = in.URL, out.NormalizedURL, out.FinalURL, host
+		if out.CanonicalURL != "" {
+			rec.CanonicalURL = out.CanonicalURL
+		}
+		rec.Depth, rec.StatusCode, rec.ContentType, rec.ContentHash = in.Depth, out.StatusCode, out.ContentType, out.ContentHash
+		rec.FetchedAt = time.Now().UTC()
+		rec.HTMLKey, rec.RenderedHTMLKey, rec.Rendered, rec.RenderReason = out.HTMLKey, out.RenderedHTMLKey, out.Rendered, renderReason
+		rec.NoIndex, rec.NoFollow = out.NoIndex, out.NoFollow
+		if key, serr := a.Records.SaveRecord(rec); serr == nil {
+			out.RecordKey = key
+		}
 	}
 
 	// This is a fetch-level success metric: the HTTP request succeeded and
@@ -315,12 +387,12 @@ func (a *Activities) WriteDocument(ctx context.Context, in WriteDocumentInput) e
 // one seed. Real sitemaps can list up to 50,000 URLs each; the crawl's own
 // MaxPages budget would cap actual fetching regardless, but this keeps one
 // activity result (and the Temporal history event it's recorded in) bounded.
-const maxSitemapURLs = 1000
+const maxSitemapURLs = 50000
 
 // maxChildSitemaps caps how many sitemaps DiscoverSitemapURLs will follow
 // from a sitemapindex, so a pathological or malicious index (thousands of
 // child sitemaps) can't turn one activity call into thousands of fetches.
-const maxChildSitemaps = 10
+const maxChildSitemaps = 50
 
 // DiscoverSitemapURLsInput is the argument to DiscoverSitemapURLs.
 type DiscoverSitemapURLsInput struct {

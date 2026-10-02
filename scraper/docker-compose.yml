@@ -108,6 +108,13 @@ services:
       - "8081:8080"
     restart: unless-stopped
 
+  # Headless Chrome the workers use to render JavaScript-built pages
+  # (--render=auto|always). Not published to the host: only workers talk to it.
+  chrome:
+    image: chromedp/headless-shell:latest
+    shm_size: 1gb
+    restart: unless-stopped
+
   # The Temporal worker: this is what actually fetches pages. Scale it with
   # `docker compose up --build --scale worker=N` (see the Makefile's
   # `make scale N=...` target) -- each replica independently connects to
@@ -120,11 +127,15 @@ services:
     depends_on:
       s3:
         condition: service_healthy
+      chrome:
+        condition: service_started
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - STORAGE=s3
+      - RENDER=auto
+      - CHROME_URL=ws://chrome:9222
       - S3_BUCKET=crawled-pages
       - S3_ENDPOINT=http://s3:4566
       - AWS_REGION=us-east-1
@@ -156,11 +167,15 @@ services:
     depends_on:
       s3:
         condition: service_healthy
+      chrome:
+        condition: service_started
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - STORAGE=s3
+      - RENDER=auto
+      - CHROME_URL=ws://chrome:9222
       - S3_BUCKET=crawled-pages
       - S3_ENDPOINT=http://s3:4566
       - AWS_REGION=us-east-1
@@ -178,11 +193,15 @@ services:
     depends_on:
       s3:
         condition: service_healthy
+      chrome:
+        condition: service_started
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - STORAGE=s3
+      - RENDER=auto
+      - CHROME_URL=ws://chrome:9222
       - S3_BUCKET=crawled-pages
       - S3_ENDPOINT=http://s3:4566
       - AWS_REGION=us-east-1
@@ -200,11 +219,15 @@ services:
     depends_on:
       s3:
         condition: service_healthy
+      chrome:
+        condition: service_started
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - STORAGE=s3
+      - RENDER=auto
+      - CHROME_URL=ws://chrome:9222
       - S3_BUCKET=crawled-pages
       - S3_ENDPOINT=http://s3:4566
       - AWS_REGION=us-east-1

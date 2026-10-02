@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"search-engine-scraper/internal/model"
 )
 
 // S3HTMLWriter uploads each fetched page's complete, unmodified HTML body to
@@ -83,4 +86,69 @@ func (w *S3HTMLWriter) SaveHTML(normalizedURL, contentHash string, body []byte) 
 		return fmt.Errorf("put html for %s to s3://%s/%s: %w", normalizedURL, w.bucket, key, err)
 	}
 	return nil
+}
+
+// RecordWriter saves a page's complete structured capture (model.PageRecord)
+// and returns the key it was stored under.
+type RecordWriter interface {
+	SaveRecord(rec *model.PageRecord) (key string, err error)
+}
+
+// NoopRecordWriter discards records.
+type NoopRecordWriter struct{}
+
+func (NoopRecordWriter) SaveRecord(*model.PageRecord) (string, error) { return "", nil }
+
+// S3RecordObjectKey derives the key a page's record is written to, without
+// the optional environment prefix: "pages/<host>/<content_hash>.json".
+func S3RecordObjectKey(host, contentHash string) string {
+	if host == "" {
+		host = "unknown-host"
+	}
+	return "pages/" + strings.ToLower(host) + "/" + contentHash + ".json"
+}
+
+// S3RecordWriter uploads PageRecords as JSON objects.
+type S3RecordWriter struct {
+	client     s3PutObjectAPI
+	bucket     string
+	keyPrefix  string
+	putTimeout time.Duration
+}
+
+// NewS3RecordWriter builds an S3RecordWriter with the same options as
+// NewS3Writer.
+func NewS3RecordWriter(cfg aws.Config, bucket string, opts ...S3WriterOption) (*S3RecordWriter, error) {
+	h, err := NewS3HTMLWriter(cfg, bucket, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &S3RecordWriter{client: h.client, bucket: h.bucket, keyPrefix: h.keyPrefix, putTimeout: h.putTimeout}, nil
+}
+
+// SaveRecord implements RecordWriter.
+func (w *S3RecordWriter) SaveRecord(rec *model.PageRecord) (string, error) {
+	if rec.ContentHash == "" {
+		return "", fmt.Errorf("s3: record for %s has no content hash to key on", rec.URL)
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		return "", fmt.Errorf("marshal page record: %w", err)
+	}
+	key := S3RecordObjectKey(rec.Host, rec.ContentHash)
+	full := key
+	if w.keyPrefix != "" {
+		full = w.keyPrefix + "/" + key
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), w.putTimeout)
+	defer cancel()
+	if _, err := w.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(w.bucket),
+		Key:         aws.String(full),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String("application/json"),
+	}); err != nil {
+		return "", fmt.Errorf("put record for %s to s3://%s/%s: %w", rec.URL, w.bucket, full, err)
+	}
+	return key, nil
 }

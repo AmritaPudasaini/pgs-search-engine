@@ -195,6 +195,10 @@ type CrawlWorkflowInput struct {
 	// DiscoveryCursor is the index of the next seed to discover.
 	DiscoveryPending bool
 	DiscoveryCursor  int
+	// ChildOfRun marks this crawl as one domain of a CrawlDomainsWorkflow:
+	// CrawlRunID is the parent's run, which the parent starts, aggregates
+	// and finishes, so this workflow must not start or finish it itself.
+	ChildOfRun bool
 	// RevisitAfter enables the revisit/freshness policy: a candidate URL
 	// (seed, sitemap-discovered, or a discovered link) that already has a
 	// document on file fetched more recently than this is skipped rather
@@ -388,7 +392,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 	simHashes := append([]uint64(nil), in.SimHashes...)
 
 	runID := in.CrawlRunID
-	if isFirstRun {
+	if isFirstRun && !in.ChildOfRun {
 		var startErr error
 		if runID, startErr = startCrawlRun(ctx, in); startErr != nil {
 			// Run-tracking is a validation aid, not load-bearing: don't fail
@@ -406,7 +410,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 	// backend configured), so an NDJSON-only deployment doesn't pay for
 	// activities that would just no-op.
 	defer func() {
-		if runID == 0 {
+		if runID == 0 || in.ChildOfRun {
 			return
 		}
 		if willContinueAsNew {
@@ -637,6 +641,10 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 				ContentHash:     res.ContentHash,
 				FetchDurMs:      res.FetchDurMs,
 				FetchedAt:       workflow.Now(ctx).UTC(),
+				HTMLKey:         res.HTMLKey,
+				RenderedHTMLKey: res.RenderedHTMLKey,
+				PageRecordKey:   res.RecordKey,
+				Rendered:        res.Rendered,
 			}
 			if err := workflow.ExecuteActivity(ctx, act.WriteDocument, activities.WriteDocumentInput{Doc: doc}).Get(ctx, nil); err != nil {
 				logger.Warn("write document failed after retries", "url", doc.URL, "error", err)
@@ -712,6 +720,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			MaxPagesPerDomain:    in.MaxPagesPerDomain,
 			MaxConcurrentPerHost: in.MaxConcurrentPerHost,
 			TaskQueueShards:      in.TaskQueueShards,
+			ChildOfRun:           in.ChildOfRun,
 			DiscoveryPending:     discoveryPending,
 			DiscoveryCursor:      discCursor,
 			Frontier:             queue,

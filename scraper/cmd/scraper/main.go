@@ -59,6 +59,8 @@ func main() {
 		maxPerDomain  = flag.Int("max-pages-per-domain", 0, "cap pages fetched from any single host (0 = unlimited, shared budget is first-come-first-served)")
 		concurrency   = flag.Int("concurrency", 0, "max pages a single workflow run has in flight at once (0 = auto-scale with seed count: numSeeds*4, clamped to [8,256])")
 		maxPerHost    = flag.Int("max-concurrent-per-host", 0, "cap concurrent in-flight fetches to any single host (0 = unlimited, --concurrency alone governs total in-flight fetches)")
+		wholeDomains  = flag.Bool("whole-domain", false, "crawl every seed's host completely, all its sub-pages, as its own child workflow; --max-pages and --max-pages-per-domain then mean the page budget of EACH domain, --max-depth is how deep to follow links, --same-host-only is forced on, and --country-filter defaults to empty (store every page)")
+		maxDomains    = flag.Int("max-concurrent-domains", 20, "with --whole-domain: how many domains are crawled at the same time")
 		taskShards    = envflag.Int("task-queue-shards", 1, "pin each host's fetches to one of N shard task queues so a single worker owns a given host (1 = off: any worker replica may fetch any host); must match the worker fleet's --task-queue-shards")
 		revisitAfter  = flag.Duration("revisit-after", 0, "skip (re-)fetching a URL already crawled more recently than this (0 = disabled, always fetch; requires --storage=s3 on the worker to have any effect)")
 		sameHost      = flag.Bool("same-host-only", true, "keep each seed's discovered links on that seed's own host; false = open crawl, follow links anywhere")
@@ -68,6 +70,13 @@ func main() {
 		cron          = flag.String("cron", "", `Temporal cron schedule (standard 5-field crontab syntax, e.g. "*/15 * * * *" for every 15 minutes) to run this crawl automatically and repeatedly instead of once; Temporal itself durably fires each occurrence, so no external scheduler is needed and the crawl keeps recurring even if this client process exits`)
 	)
 	flag.Parse()
+	countryFilterSetV := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "country-filter" {
+			countryFilterSetV = true
+		}
+	})
+	countryFilterSet := &countryFilterSetV
 
 	if (*seedsFlag == "") == (*seedsFile == "") {
 		log.Fatal("pass exactly one of --seeds or --seeds-file")
@@ -133,6 +142,11 @@ func main() {
 		startOpts.CronSchedule = *cron
 	}
 
+	if *wholeDomains {
+		runDomains(c, startOpts, input, *maxDomains, *wait && *cron == "", len(crawlSeeds), *countryFilterSet)
+		return
+	}
+
 	run, err := c.ExecuteWorkflow(context.Background(), startOpts, workflows.CrawlWorkflow, input)
 	if err != nil {
 		log.Fatalf("start workflow: %v", err)
@@ -161,6 +175,44 @@ func main() {
 
 	log.Printf("crawl finished: fetched=%d succeeded=%d failed=%d skipped=%d domain_capped=%d country_filtered=%d",
 		result.Stats.Fetched, result.Stats.Succeeded, result.Stats.Failed, result.Stats.Skipped, result.Stats.DomainCapped, result.Stats.CountryFiltered)
+	if result.RunID != 0 {
+		log.Printf("validation summary: GET /api/v1/crawl-runs/%d", result.RunID)
+	}
+}
+
+// runDomains starts a CrawlDomainsWorkflow: each seed host is crawled
+// completely as its own child workflow, with perDomain as the template for
+// every child's budget and limits.
+func runDomains(c client.Client, startOpts client.StartWorkflowOptions, perDomain workflows.CrawlWorkflowInput, maxDomains int, wait bool, seedCount int, countryFilterSet bool) {
+	seedsForDomains := perDomain.Seeds
+	perDomain.Seeds = nil
+	perDomain.SameHostOnly = true
+	if !countryFilterSet {
+		perDomain.CountryFilter = "" // whole-domain mode stores every page unless told otherwise
+	}
+	if perDomain.Concurrency < 1 || perDomain.Concurrency > 16 {
+		perDomain.Concurrency = 8
+	}
+
+	run, err := c.ExecuteWorkflow(context.Background(), startOpts, workflows.CrawlDomainsWorkflow, workflows.CrawlDomainsInput{
+		Seeds: seedsForDomains, PerDomain: perDomain, MaxConcurrentDomains: maxDomains,
+	})
+	if err != nil {
+		log.Fatalf("start workflow: %v", err)
+	}
+	log.Printf("whole-domain crawl started: workflow_id=%s run_id=%s seeds=%d concurrent_domains=%d pages_per_domain=%d depth=%d",
+		run.GetID(), run.GetRunID(), seedCount, maxDomains, perDomain.MaxPages, perDomain.MaxDepth)
+	log.Printf("inspect with: temporal workflow describe --workflow-id %s", run.GetID())
+	if !wait {
+		return
+	}
+	var result workflows.CrawlDomainsResult
+	if err := run.Get(context.Background(), &result); err != nil {
+		log.Fatalf("crawl failed: %v", err)
+	}
+	log.Printf("crawl finished: domains started=%d completed=%d failed=%d | fetched=%d succeeded=%d failed=%d skipped=%d country_filtered=%d",
+		result.Domains.Started, result.Domains.Completed, result.Domains.Failed,
+		result.Stats.Fetched, result.Stats.Succeeded, result.Stats.Failed, result.Stats.Skipped, result.Stats.CountryFiltered)
 	if result.RunID != 0 {
 		log.Printf("validation summary: GET /api/v1/crawl-runs/%d", result.RunID)
 	}

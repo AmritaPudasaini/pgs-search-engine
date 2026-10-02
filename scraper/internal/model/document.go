@@ -96,13 +96,20 @@ type Document struct {
 	// consumer filter documents down to one validated batch instead of an
 	// entire category's full history -- see GET /api/v1/crawl-runs/{id}
 	// for that run's health/validation summary.
-	CrawlRunID  int64     `json:"crawl_run_id,omitempty"`
-	Depth       int       `json:"depth"`
-	StatusCode  int       `json:"status_code"`
-	ContentType string    `json:"content_type"`
-	ContentHash string    `json:"content_hash"`
-	FetchedAt   time.Time `json:"fetched_at"`
-	FetchDurMs  int64     `json:"fetch_duration_ms"`
+	CrawlRunID int64 `json:"crawl_run_id,omitempty"`
+	// HTMLKey and PageRecordKey point at this page's raw HTML and complete
+	// structured record in the object store (relative to any key prefix);
+	// RenderedHTMLKey is set when a headless browser rendered the page.
+	HTMLKey         string    `json:"html_key,omitempty"`
+	RenderedHTMLKey string    `json:"rendered_html_key,omitempty"`
+	PageRecordKey   string    `json:"page_record_key,omitempty"`
+	Rendered        bool      `json:"rendered,omitempty"`
+	Depth           int       `json:"depth"`
+	StatusCode      int       `json:"status_code"`
+	ContentType     string    `json:"content_type"`
+	ContentHash     string    `json:"content_hash"`
+	FetchedAt       time.Time `json:"fetched_at"`
+	FetchDurMs      int64     `json:"fetch_duration_ms"`
 	// Error is marshalled as "error" here, but openapi.yaml's Document
 	// schema calls this field "fetch_error". See the Text field's comment
 	// above for why this isn't renamed here.
