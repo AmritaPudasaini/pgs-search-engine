@@ -13,9 +13,9 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
-	"github.com/tekraj/pgs-search-engine/scraper/internal/normalize"
-	"github.com/tekraj/pgs-search-engine/scraper/internal/simhash"
+	"search-engine-scraper/internal/model"
+	"search-engine-scraper/internal/normalize"
+	"search-engine-scraper/internal/simhash"
 )
 
 // Parsed holds the extracted fields for one page.

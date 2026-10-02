@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 var (

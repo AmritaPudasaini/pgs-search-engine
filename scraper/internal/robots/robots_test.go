@@ -1,6 +1,14 @@
 package robots
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"search-engine-scraper/internal/fetcher"
+)
 
 func TestParseLongestMatchWins(t *testing.T) {
 	body := `
@@ -79,5 +87,124 @@ Disallow: /private
 	rs := parse(body, "mybot")
 	if len(rs.sitemaps) != 0 {
 		t.Errorf("sitemaps = %v, want none", rs.sitemaps)
+	}
+}
+
+func TestParseCrawlDelayFractionalSeconds(t *testing.T) {
+	body := `
+User-agent: *
+Crawl-delay: 0.5
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 500*time.Millisecond {
+		t.Fatalf("crawlDelay = %v, want 500ms", rs.crawlDelay)
+	}
+}
+
+// TestParseCrawlDelayInvalidValueIsIgnored proves a Crawl-delay line that
+// doesn't parse as a number is dropped rather than left at some corrupted
+// value or fatally rejecting the whole robots.txt -- consistent with the
+// package's fetch-failure/parse-failure behavior elsewhere (see
+// Guard.rulesFor and DiscoverSitemapURLs), where a malformed
+// robots.txt degrades to "no extra rules" rather than blocking the crawl.
+func TestParseCrawlDelayInvalidValueIsIgnored(t *testing.T) {
+	body := `
+User-agent: *
+Crawl-delay: not-a-number
+Disallow: /private
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 0 {
+		t.Fatalf("crawlDelay = %v, want 0 (invalid value should be ignored)", rs.crawlDelay)
+	}
+	if len(rs.disallow) != 1 || rs.disallow[0] != "/private" {
+		t.Fatalf("an invalid Crawl-delay line shouldn't affect other directives in the same group: disallow = %v", rs.disallow)
+	}
+}
+
+func TestParseCrawlDelayAbsentDefaultsToZero(t *testing.T) {
+	body := `
+User-agent: *
+Disallow: /private
+`
+	rs := parse(body, "mybot")
+	if rs.crawlDelay != 0 {
+		t.Fatalf("crawlDelay = %v, want 0 (no Crawl-delay directive present)", rs.crawlDelay)
+	}
+}
+
+func newGuardFor(t *testing.T, robotsBody string, status int) (*Guard, string) {
+	t.Helper()
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/robots.txt" {
+			http.NotFound(w, r)
+			return
+		}
+		hits++
+		w.WriteHeader(status)
+		w.Write([]byte(robotsBody))
+	}))
+	t.Cleanup(srv.Close)
+	g := New(fetcher.New(5*time.Second, 0), "testbot")
+	t.Cleanup(func() {
+		if hits > 1 {
+			t.Errorf("robots.txt fetched %d times, want it cached after the first", hits)
+		}
+	})
+	return g, srv.URL
+}
+
+func TestGuardAllowed_HonorsDisallowAndAllow(t *testing.T) {
+	g, base := newGuardFor(t, "User-agent: *\nDisallow: /private\nAllow: /private/public\n", http.StatusOK)
+	ctx := context.Background()
+
+	if g.Allowed(ctx, base+"/private/secret") {
+		t.Error("/private/secret should be disallowed")
+	}
+	if !g.Allowed(ctx, base+"/private/public/page") {
+		t.Error("/private/public/page should be allowed (longest match wins)")
+	}
+	if !g.Allowed(ctx, base+"/open") {
+		t.Error("/open should be allowed")
+	}
+}
+
+func TestGuardAllowed_MissingRobotsTxtAllowsEverything(t *testing.T) {
+	g, base := newGuardFor(t, "", http.StatusNotFound)
+	if !g.Allowed(context.Background(), base+"/anything") {
+		t.Error("a 404 robots.txt should allow all URLs")
+	}
+}
+
+func TestGuardAllowed_UnparsableURLIsDisallowed(t *testing.T) {
+	g := New(fetcher.New(time.Second, 0), "testbot")
+	if g.Allowed(context.Background(), "http://[::1") {
+		t.Error("an unparsable URL should not be allowed")
+	}
+}
+
+func TestGuardCrawlDelayAndSitemaps(t *testing.T) {
+	g, base := newGuardFor(t, "User-agent: *\nCrawl-delay: 3\nSitemap: https://example.com/sm.xml\n", http.StatusOK)
+	ctx := context.Background()
+
+	if got := g.CrawlDelay(ctx, base+"/"); got != 3*time.Second {
+		t.Errorf("CrawlDelay = %v, want 3s", got)
+	}
+	sm := g.Sitemaps(ctx, base+"/")
+	if len(sm) != 1 || sm[0] != "https://example.com/sm.xml" {
+		t.Errorf("Sitemaps = %v, want [https://example.com/sm.xml]", sm)
+	}
+}
+
+func TestGuardCrawlDelayAndSitemaps_NoRobotsTxt(t *testing.T) {
+	g, base := newGuardFor(t, "", http.StatusNotFound)
+	ctx := context.Background()
+
+	if got := g.CrawlDelay(ctx, base+"/"); got != 0 {
+		t.Errorf("CrawlDelay = %v, want 0", got)
+	}
+	if sm := g.Sitemaps(ctx, base+"/"); sm != nil {
+		t.Errorf("Sitemaps = %v, want nil", sm)
 	}
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 // ObjectStore is the narrow MinIO/S3 operation required by Person 3 storage.

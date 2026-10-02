@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+FROM golang:1.26-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/scraper ./cmd/scraper
+
+# The scraper client only talks to Temporal (gRPC), never to the open web,
+# so it doesn't need CA certs for arbitrary sites -- distroless/static is
+# still the right minimal base for that internal connection.
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/scraper /scraper
+COPY --from=builder /src/configs /configs
+ENTRYPOINT ["/scraper"]

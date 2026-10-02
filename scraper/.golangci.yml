@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - unused
+    - errcheck
+    - staticcheck
+    - govet
+    - ineffassign
+  settings:
+    errcheck:
+      # Deferred Close()/best-effort test-server Write() calls: not actionable
+      # (nothing meaningful to do with a Close error at that point, and the
+      # httptest.ResponseWriter.Write calls are throwaway test fixtures).
+      exclude-functions:
+        - (io.Closer).Close
+        - (net/http.ResponseWriter).Write
+        - (*os.File).Close
+        - (search-engine-scraper/internal/storage.Writer).Close
+
+run:
+  timeout: 5m

@@ -1,0 +1,26 @@
+# Template, not applied by `make k8s-apply` (kubectl skips .tmpl files).
+# Rendered and applied by `make k8s-crawl SEEDS=https://example.com`, which
+# fills in $JOB_NAME and $SEEDS via envsubst -- each invocation creates a
+# fresh, uniquely-named Job so repeated crawls don't collide.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${JOB_NAME}
+  namespace: search-engine-scraper
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: scraper
+          image: search-engine-scraper-scraper:latest
+          args:
+            - "--seeds=${SEEDS}"
+            - "--max-depth=2"
+            - "--max-pages=200"
+            - "--max-pages-per-domain=50"
+            - "--same-host-only=false"
+          envFrom:
+            - configMapRef:
+                name: worker-config

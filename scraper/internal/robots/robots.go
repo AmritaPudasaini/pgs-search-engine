@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/fetcher"
+	"search-engine-scraper/internal/fetcher"
 )
 
 type ruleSet struct {

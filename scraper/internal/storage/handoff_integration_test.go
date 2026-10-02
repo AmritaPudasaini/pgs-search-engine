@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/fetcher"
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
-	"github.com/tekraj/pgs-search-engine/scraper/internal/parser"
+	"search-engine-scraper/internal/fetcher"
+	"search-engine-scraper/internal/model"
+	"search-engine-scraper/internal/parser"
 )
 
 type orderedObjectStore struct {

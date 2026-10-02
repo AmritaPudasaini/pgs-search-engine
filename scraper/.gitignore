@@ -1,7 +1,2 @@
-/search-engine
-*.exe
-
-# Python
-__pycache__/
-*.pyc
-.venv/
+/bin/
+/data/output/*.ndjson

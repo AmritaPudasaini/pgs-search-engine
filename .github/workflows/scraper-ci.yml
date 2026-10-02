@@ -1,0 +1,65 @@
+name: scraper CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "scraper/**"
+      - ".github/workflows/scraper-ci.yml"
+  pull_request:
+    paths:
+      - "scraper/**"
+      - ".github/workflows/scraper-ci.yml"
+
+defaults:
+  run:
+    working-directory: scraper
+
+jobs:
+  build-vet-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: scraper/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: gofmt check
+        run: |
+          fmt_out="$(gofmt -l .)"
+          if [ -n "$fmt_out" ]; then
+            echo "gofmt needs to be run on:"
+            echo "$fmt_out"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1.6
+          working-directory: scraper
+          args: --config=.golangci.yml
+
+      - name: cmd/api independence check
+        # cmd/api is documented as read-only and standalone (Postgres only,
+        # no Temporal): it must never start depending on the
+        # workflow/activity/Temporal-client code that cmd/worker and
+        # cmd/scraper own, or it stops being safe to deploy/scale on its own.
+        run: |
+          coupled="$(go list -deps ./cmd/api | grep -E 'search-engine-scraper/internal/(workflows|activities)|go.temporal.io' || true)"
+          if [ -n "$coupled" ]; then
+            echo "cmd/api must not depend on Temporal/workflow/activity packages, found:"
+            echo "$coupled"
+            exit 1
+          fi
