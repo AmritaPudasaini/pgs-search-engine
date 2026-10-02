@@ -278,6 +278,13 @@ Ref: all of `docs/CRAWLER_ROADMAP.md`.
     cross-package inconsistencies, and grep the whole repo for leftover
     `postgres`/`sqlc`/`migrations` references before closing out the split
 
+**Status (Dinesh, branch `dinesh/activities-testing-docs`):** done so far:
+raw-HTML saving wired into `ProcessPage` with tests (item 1, partial),
+`parseRetryAfter` tests (item 2), `go test ./... -race` clean (item 4),
+`robots` coverage raised from 42.9% (item 5), `docs/TESTING.md` (item 9)
+and a refreshed "Remaining gaps" section (item 7, partial). Items 3, 6, 8
+and 10 are blocked on the S3 backend and the other branches landing.
+
 ---
 
 ## Commit count summary
