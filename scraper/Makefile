@@ -42,8 +42,8 @@ build: ## Build the worker, client, and api binaries locally (not in Docker).
 	go build -o bin/api ./cmd/api
 
 .PHONY: api
-api: ## Run the documents API + Swagger UI locally against APP_DB_URL. Docs at http://localhost:8080/docs.
-	DATABASE_URL="$(APP_DB_URL)" go run ./cmd/api
+api: ## Run the documents API + Swagger UI locally against an S3 bucket (S3_BUCKET, S3_ENDPOINT). Docs at http://localhost:8080/docs.
+	go run ./cmd/api
 
 .PHONY: test
 test:

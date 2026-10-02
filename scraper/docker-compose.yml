@@ -17,22 +17,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Applies migrations/*.sql to the app's `scraper` database, then exits.
-  # `worker` waits on this completing successfully before it starts.
-  migrate:
-    image: migrate/migrate:v4.19.1
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./migrations:/migrations:ro
-    entrypoint:
-      [
-        "migrate", "-path", "/migrations",
-        "-database", "postgres://temporal:temporal@postgres:5432/scraper?sslmode=disable",
-        "up",
-      ]
-
   # Temporal's own persistence, in the sibling `temporal` database on the
   # same postgres instance (temporalio/auto-setup creates its own schema).
   temporal:
@@ -87,38 +71,25 @@ services:
       - "8233:8080"
     restart: unless-stopped
 
-  # S3-compatible object store for local dev. The worker uploads each
-  # crawled page's complete HTML (plus its parsed metadata) here -- nothing
-  # crawled is stored in a database. Console: http://localhost:9001
-  # (minioadmin / minioadmin). In production, point the worker at real S3
-  # by dropping S3_ENDPOINT and the static credentials.
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+  # S3 for local dev (LocalStack). The worker uploads each crawled page's
+  # complete HTML (plus its parsed metadata) here -- nothing crawled is stored
+  # in a database. docker/init-s3-bucket.sh creates the `crawled-pages` bucket
+  # on startup. In production, point the worker at real S3 by dropping
+  # S3_ENDPOINT and the static test credentials.
+  s3:
+    image: localstack/localstack:3.8
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      - SERVICES=s3
     volumes:
-      - miniodata:/data
+      - ./docker/init-s3-bucket.sh:/etc/localstack/init/ready.d/init-s3-bucket.sh:ro
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "4566:4566"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "awslocal s3 ls s3://crawled-pages"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
     restart: unless-stopped
-
-  # Creates the crawl bucket, then exits.
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb --ignore-existing local/crawled-pages"
 
   # The Temporal worker: this is what actually fetches pages. Scale it with
   # `docker compose up --build --scale worker=N` (see the Makefile's
@@ -130,18 +101,18 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     depends_on:
-      minio-init:
-        condition: service_completed_successfully
+      s3:
+        condition: service_healthy
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - STORAGE=s3
       - S3_BUCKET=crawled-pages
-      - S3_ENDPOINT=http://minio:9000
+      - S3_ENDPOINT=http://s3:4566
       - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
       # MAX_CONCURRENT_ACTIVITIES is left unset here on purpose: the binary
       # defaults it to NumCPU * 100, which respects this container's CPU
       # limit (see Dockerfile.worker's automaxprocs import) -- set it
@@ -162,10 +133,14 @@ services:
       context: .
       dockerfile: Dockerfile.api
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      s3:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://temporal:temporal@postgres:5432/scraper?sslmode=disable
+      - S3_BUCKET=crawled-pages
+      - S3_ENDPOINT=http://s3:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -184,5 +159,4 @@ services:
     profiles: ["tools"]
 
 volumes:
-  miniodata:
   pgdata:
