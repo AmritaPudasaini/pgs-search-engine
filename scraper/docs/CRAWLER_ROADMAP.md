@@ -440,13 +440,20 @@ before calling a Postgres-touching change done, not just `go test ./...`.
 
 ## Remaining gaps
 
-None currently identified. Every gap surfaced during the audit that
-produced this document (items 1–18 above) has been addressed. This section
-is kept (rather than deleted) so a future session knows the roadmap was
-worked through to completion, not merely never populated -- if you're
-picking this up next, the natural next step is a fresh audit pass (or
-addressing feedback from whichever team is now consuming this crawler's
-output) rather than assuming there's a backlog waiting here.
+Found while working through the Person 6 section of
+`docs/TASK-SPLIT-search-engine-scraper.md` (2026-10-02):
+
+- Test coverage is uneven. `internal/robots` was at 42.9% before its
+  `Guard` methods got tests; `internal/storage` is still near 18%, and
+  `cmd/*`, `internal/api`, `internal/envflag` and `internal/db` have no
+  tests at all.
+- `CheckFreshness` returns the checker's error to the caller instead of
+  swallowing it. Whether the workflow tolerates that failure should be
+  verified before the storage backend changes.
+- `ProcessPage` has no outcome distinct from fetch/parse failures for a
+  storage-write failure (`s3_error` in the task split). Not applicable
+  until the S3 writer lands.
+- `docs/RESILIENCE.md` has not been re-run since the other branches landed.
 
 ## Explicitly out of scope for this crawler
 
