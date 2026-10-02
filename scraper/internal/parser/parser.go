@@ -497,3 +497,12 @@ func collapseWhitespace(s string) string {
 	fields := strings.Fields(s)
 	return strings.Join(fields, " ")
 }
+
+func attrValue(n *html.Node, key string) string {
+	for _, attr := range n.Attr {
+		if strings.EqualFold(attr.Key, key) {
+			return strings.TrimSpace(attr.Val)
+		}
+	}
+	return ""
+}

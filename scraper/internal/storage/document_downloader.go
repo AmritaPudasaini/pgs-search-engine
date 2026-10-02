@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 const DefaultMaxDocumentBytes int64 = 32 << 20

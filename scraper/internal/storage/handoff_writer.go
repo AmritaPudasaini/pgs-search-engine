@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 type pageWriter interface {

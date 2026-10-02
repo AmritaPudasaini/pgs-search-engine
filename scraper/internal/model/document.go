@@ -39,7 +39,11 @@ type Document struct {
 	// og:description when the page declares only the Open Graph variant --
 	// the snippet a real search engine shows under a result's title, so
 	// it's carried as its own field rather than left buried in Text.
-	MetaDescription string `json:"meta_description,omitempty"`
+	MetaDescription string            `json:"meta_description,omitempty"`
+	MetaKeywords    []string          `json:"meta_keywords,omitempty"`
+	OpenGraph       map[string]string `json:"open_graph,omitempty"`
+	ContactInfo     ContactInfo       `json:"contact_info,omitempty"`
+	SocialLinks     []string          `json:"social_links,omitempty"`
 	// Text is marshalled as "text" here, but internal/api/openapi.yaml's
 	// Document schema calls this field "body_text" -- a pre-existing drift
 	// that didn't matter while the API read from Postgres (its response
@@ -57,6 +61,12 @@ type Document struct {
 	// has no ranking value and would bloat every document for no benefit.
 	Headings []Heading `json:"headings,omitempty"`
 	Links    []string  `json:"links"`
+	// InternalLinks/ExternalLinks split Links by whether they share the
+	// page's host; ImageLinks/VideoLinks are media URLs found on the page.
+	InternalLinks []string `json:"internal_links,omitempty"`
+	ExternalLinks []string `json:"external_links,omitempty"`
+	ImageLinks    []string `json:"image_links,omitempty"`
+	VideoLinks    []string `json:"video_links,omitempty"`
 	// AnchorTexts is parallel to Links (same index, same length): the
 	// visible anchor text used to link to each URL, or "" if none.
 	AnchorTexts []string `json:"anchor_texts,omitempty"`
@@ -110,6 +120,13 @@ type Document struct {
 // serving an S3 GetObject response's real LastModified for created_at, or
 // by dropping these three properties from openapi.yaml as no-longer-
 // applicable under S3 storage.
+
+// ContactInfo contains public contact details extracted from a page.
+type ContactInfo struct {
+	Emails  []string `json:"emails,omitempty"`
+	Phones  []string `json:"phones,omitempty"`
+	Address string   `json:"address,omitempty"`
+}
 
 // Heading is one h1-h6 element from a page's outline.
 type Heading struct {

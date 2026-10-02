@@ -21,6 +21,19 @@ type KafkaWriter struct {
 	w *kafka.Writer
 }
 
+// CompletionSignal tells ETL which stored object is ready. Page bytes stay in
+// the object store; Kafka carries only this small durable handoff event.
+type CompletionSignal struct {
+	Bucket       string    `json:"bucket"`
+	ObjectKey    string    `json:"object_key"`
+	ObjectSHA256 string    `json:"object_sha256"`
+	PageURL      string    `json:"page_url"`
+	TargetDomain string    `json:"target_domain"`
+	ContentType  string    `json:"content_type"`
+	ScrapedAt    time.Time `json:"scraped_at"`
+	CompletedAt  time.Time `json:"completed_at"`
+}
+
 // NewKafkaWriter returns a Writer that publishes to topic on the given
 // brokers (comma-separated host:port list). Messages are keyed by
 // NormalizedURL so Kafka's own partitioning keeps every version of the same
