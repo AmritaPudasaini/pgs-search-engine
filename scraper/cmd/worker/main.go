@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -52,6 +54,9 @@ func main() {
 		awsRegion      = envflag.String("aws-region", "", "AWS region (empty = resolve from AWS_REGION / shared config)")
 		kafkaBrokers   = envflag.String("kafka-brokers", "", "comma-separated Kafka broker addresses, e.g. kafka-1:9092,kafka-2:9092 (used when --storage=kafka)")
 		kafkaTopic     = envflag.String("kafka-topic", "crawled-documents", "Kafka topic to publish crawled documents to (used when --storage=kafka) -- the hand-off point to the ETL pipeline")
+		taskShards     = envflag.Int("task-queue-shards", 1, "total number of host-shard task queues the crawl uses (1 = off); must match the scraper client's --task-queue-shards")
+		shardIndex     = envflag.Int("shard-index", -1, "which shard's fetch queue this worker polls (0..task-queue-shards-1); -1 = poll every shard queue")
+		shardFromHost  = envflag.Bool("shard-from-hostname", false, "derive --shard-index from the trailing ordinal of the hostname (e.g. worker-2 -> 2, a Kubernetes StatefulSet pod), modulo --task-queue-shards")
 		requestTimeout = envflag.Duration("timeout", 10*time.Second, "per-request HTTP timeout")
 		maxConcurrent  = envflag.Int("max-concurrent-activities", maxConcurrentDefault(), "max activities this worker process executes concurrently (fetching is I/O-bound, so this can safely exceed core count)")
 		userAgent      = envflag.String("user-agent", "search-engine-scraper", "User-Agent / robots.txt group name to identify as")
@@ -143,8 +148,36 @@ func main() {
 	w.RegisterActivity(act.UpdateCrawlRunStats)
 	w.RegisterActivity(act.FinishCrawlRun)
 
-	log.Printf("worker started: task_queue=%s temporal=%s storage=%s gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d http3=%v save_html_dir=%q",
-		workflows.TaskQueueName, *hostPort, *storageKind, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth, *enableHTTP3, *saveHTMLDir)
+	// Host-sharded fetching: besides the shared queue (workflow tasks and
+	// storage/run activities), poll the shard queue(s) this worker owns for
+	// ProcessPage/DiscoverSitemapURLs, so all fetches for one host run here.
+	idx := *shardIndex
+	if *shardFromHost {
+		hn, _ := os.Hostname()
+		idx = ordinalFromHostname(hn, *taskShards)
+	}
+	var shardWorkers []worker.Worker
+	if *taskShards > 1 {
+		for i := 0; i < *taskShards; i++ {
+			if idx >= 0 && i != idx%*taskShards {
+				continue
+			}
+			sw := worker.New(c, workflows.TaskQueueForShard(i), worker.Options{
+				MaxConcurrentActivityExecutionSize: *maxConcurrent,
+			})
+			sw.RegisterActivity(act.ProcessPage)
+			sw.RegisterActivity(act.DiscoverSitemapURLs)
+			if err := sw.Start(); err != nil {
+				log.Fatalf("start shard worker %d: %v", i, err)
+			}
+			defer sw.Stop()
+			shardWorkers = append(shardWorkers, sw)
+		}
+		log.Printf("host sharding: %d shard queues total, polling %d of them (shard-index=%d)", *taskShards, len(shardWorkers), idx)
+	}
+
+	log.Printf("worker started: task_queue=%s temporal=%s storage=%s task_queue_shards=%d gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d http3=%v save_html_dir=%q",
+		workflows.TaskQueueName, *hostPort, *storageKind, *taskShards, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth, *enableHTTP3, *saveHTMLDir)
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		log.Fatalf("worker stopped: %v", err)
@@ -157,6 +190,20 @@ func main() {
 // activities spend almost all their time blocked on network I/O, so far
 // more of them can be in flight than there are cores -- the real ceiling is
 // the target sites' response times and robots.txt Crawl-delay, not CPU.
+// ordinalFromHostname returns the trailing integer of hostname modulo
+// shards, or -1 if the hostname doesn't end in one.
+func ordinalFromHostname(hostname string, shards int) int {
+	i := len(hostname)
+	for i > 0 && hostname[i-1] >= '0' && hostname[i-1] <= '9' {
+		i--
+	}
+	n, err := strconv.Atoi(hostname[i:])
+	if err != nil || shards < 1 {
+		return -1
+	}
+	return n % shards
+}
+
 func maxConcurrentDefault() int {
 	return runtime.NumCPU() * 100
 }

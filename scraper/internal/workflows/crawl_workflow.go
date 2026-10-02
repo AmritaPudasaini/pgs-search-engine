@@ -14,6 +14,7 @@ package workflows
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -30,6 +31,35 @@ import (
 // sitemapDiscoveryBatch bounds how many seeds' sitemap discovery activities
 // run concurrently at workflow start.
 const sitemapDiscoveryBatch = 100
+
+// ShardForHost maps a hostname to one of shards task-queue shards using a
+// stable hash, so every fetch for a given host lands on the same shard.
+func ShardForHost(host string, shards int) int {
+	if shards <= 1 {
+		return 0
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.ToLower(host)))
+	return int(h.Sum32() % uint32(shards))
+}
+
+// TaskQueueForShard is the task queue workers pinned to shard i poll for
+// fetch activities.
+func TaskQueueForShard(i int) string {
+	return fmt.Sprintf("%s-shard-%d", TaskQueueName, i)
+}
+
+// TaskQueueForHost returns the queue a host's fetch activities run on:
+// TaskQueueName itself when sharding is off (shards <= 1), otherwise the
+// host's shard queue. All fetches for one host then run in one worker
+// process, so that host's rate limit, Crawl-delay, robots.txt cache and DNS
+// cache are enforced in a single place instead of once per replica.
+func TaskQueueForHost(host string, shards int) string {
+	if shards <= 1 {
+		return TaskQueueName
+	}
+	return TaskQueueForShard(ShardForHost(host, shards))
+}
 
 // TaskQueueName is shared between the worker and the client that starts
 // crawls -- both must point at the same Temporal task queue.
@@ -140,6 +170,11 @@ type CrawlWorkflowInput struct {
 	// budget and starve fetches meant for other hosts. Set this (e.g. 1-2)
 	// on multi-seed/open crawls so a single site can't do that.
 	MaxConcurrentPerHost int
+	// TaskQueueShards pins each host's fetch activities (ProcessPage,
+	// DiscoverSitemapURLs) to one of this many shard task queues (see
+	// TaskQueueForHost), so a single worker owns a given host. Zero or one
+	// keeps every activity on TaskQueueName, served by any worker replica.
+	TaskQueueShards int
 	// RevisitAfter enables the revisit/freshness policy: a candidate URL
 	// (seed, sitemap-discovered, or a discovered link) that already has a
 	// document on file fetched more recently than this is skipped rather
@@ -194,6 +229,15 @@ type CrawlResult struct {
 	// RunID is the crawl_runs row other teams can query for this run's
 	// validation summary (0 if no run-tracking backend is configured).
 	RunID int64
+}
+
+// hostCtx routes activities started with the returned context to host's
+// shard queue; with sharding off it returns ctx unchanged.
+func hostCtx(ctx workflow.Context, host string, shards int) workflow.Context {
+	if shards <= 1 {
+		return ctx
+	}
+	return workflow.WithTaskQueue(ctx, TaskQueueForHost(host, shards))
 }
 
 // CrawlWorkflow is the Temporal workflow entrypoint for a crawl.
@@ -312,7 +356,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			batch := in.Seeds[start:end]
 			futures := make([]workflow.Future, len(batch))
 			for i, s := range batch {
-				futures[i] = workflow.ExecuteActivity(sitemapCtx, act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{
+				futures[i] = workflow.ExecuteActivity(hostCtx(sitemapCtx, normalize.Hostname(s.URL), in.TaskQueueShards), act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{
 					SeedURL: s.URL,
 				})
 			}
@@ -454,7 +498,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 		budgetRemaining--
 		domainCounts[host]++
 		activeHostCounts[host]++
-		fut := workflow.ExecuteActivity(ctx, act.ProcessPage, activities.ProcessPageInput{
+		fut := workflow.ExecuteActivity(hostCtx(ctx, host, in.TaskQueueShards), act.ProcessPage, activities.ProcessPageInput{
 			URL: item.URL, Depth: item.Depth,
 		})
 		active = append(active, inFlight{future: fut, item: item})
@@ -621,6 +665,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			SameHostOnly:         in.SameHostOnly,
 			MaxPagesPerDomain:    in.MaxPagesPerDomain,
 			MaxConcurrentPerHost: in.MaxConcurrentPerHost,
+			TaskQueueShards:      in.TaskQueueShards,
 			Frontier:             queue,
 			Seen:                 seenOrder,
 			PagesProcessed:       in.PagesProcessed + pagesThisRun,

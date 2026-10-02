@@ -125,6 +125,79 @@ services:
     # wait-for-it script.
     restart: on-failure
 
+  # Host-sharded workers (opt-in: `docker compose --profile sharded up`).
+  # With TASK_QUEUE_SHARDS=3 each host's fetches are routed by hash to one of
+  # three shard queues and each of these workers owns exactly one shard, so a
+  # given host is only ever fetched -- and rate-limited, robots-checked and
+  # DNS-cached -- by a single container. Start the crawl with
+  # `--task-queue-shards=3` so the client and fleet agree.
+  worker-shard-0:
+    profiles: ["sharded"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      s3:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - STORAGE=s3
+      - S3_BUCKET=crawled-pages
+      - S3_ENDPOINT=http://s3:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - TASK_QUEUE_SHARDS=3
+      - SHARD_INDEX=0
+      - METRICS_ADDRESS=
+    restart: on-failure
+  worker-shard-1:
+    profiles: ["sharded"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      s3:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - STORAGE=s3
+      - S3_BUCKET=crawled-pages
+      - S3_ENDPOINT=http://s3:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - TASK_QUEUE_SHARDS=3
+      - SHARD_INDEX=1
+      - METRICS_ADDRESS=
+    restart: on-failure
+  worker-shard-2:
+    profiles: ["sharded"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      s3:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - STORAGE=s3
+      - S3_BUCKET=crawled-pages
+      - S3_ENDPOINT=http://s3:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - TASK_QUEUE_SHARDS=3
+      - SHARD_INDEX=2
+      - METRICS_ADDRESS=
+    restart: on-failure
+
   # Read-only HTTP API + Swagger UI over the documents table. Browse
   # http://localhost:8080/docs to preview crawled data and try the
   # endpoints; it doesn't start crawls itself (see `scraper` below).
