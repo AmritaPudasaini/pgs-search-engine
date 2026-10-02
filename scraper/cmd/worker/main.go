@@ -11,19 +11,21 @@
 //     replica count or HPA).
 //
 // Every flag can also be set via an environment variable of the same name
-// (upper-cased, dashes to underscores, e.g. --database-url ==
-// DATABASE_URL), which is how the Docker/Kubernetes deployment configures
+// (upper-cased, dashes to underscores, e.g. --s3-bucket ==
+// S3_BUCKET), which is how the Docker/Kubernetes deployment configures
 // this binary without a wrapper script.
 package main
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"runtime"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "go.uber.org/automaxprocs" // sets GOMAXPROCS from the container's cgroup CPU quota, not the host's core count
 
@@ -42,9 +44,12 @@ func main() {
 	var (
 		hostPort       = envflag.String("temporal-address", "localhost:7233", "Temporal frontend address")
 		namespace      = envflag.String("namespace", "default", "Temporal namespace")
-		storageKind    = envflag.String("storage", "ndjson", "where to write crawled documents: ndjson, postgres, or kafka")
+		storageKind    = envflag.String("storage", "s3", "where to write crawled data: s3 (complete HTML + metadata objects, no database), ndjson (local dev), or kafka")
 		output         = envflag.String("output", "data/output/documents.ndjson", "NDJSON output path (used when --storage=ndjson)")
-		databaseURL    = envflag.String("database-url", "", "Postgres connection string (used when --storage=postgres), e.g. postgres://user:pass@host:5432/scraper")
+		s3Bucket       = envflag.String("s3-bucket", "", "S3 bucket crawled pages are uploaded to (required when --storage=s3)")
+		s3Prefix       = envflag.String("s3-prefix", "", "optional key prefix inside the bucket, e.g. an environment name")
+		s3Endpoint     = envflag.String("s3-endpoint", "", "S3-compatible endpoint URL for LocalStack/MinIO (empty = real AWS S3)")
+		awsRegion      = envflag.String("aws-region", "", "AWS region (empty = resolve from AWS_REGION / shared config)")
 		kafkaBrokers   = envflag.String("kafka-brokers", "", "comma-separated Kafka broker addresses, e.g. kafka-1:9092,kafka-2:9092 (used when --storage=kafka)")
 		kafkaTopic     = envflag.String("kafka-topic", "crawled-documents", "Kafka topic to publish crawled documents to (used when --storage=kafka) -- the hand-off point to the ETL pipeline")
 		requestTimeout = envflag.Duration("timeout", 10*time.Second, "per-request HTTP timeout")
@@ -70,22 +75,31 @@ func main() {
 		log.Printf("metrics: http://%s/metrics", *metricsAddress)
 	}
 
-	primary, err := buildWriter(*storageKind, *output, *databaseURL, *kafkaBrokers, *kafkaTopic)
-	if err != nil {
-		log.Fatalf("open storage writer: %v", err)
+	var (
+		primary   storage.Writer
+		runs      storage.RunRecorder      = storage.NoopRunRecorder{}
+		freshness storage.FreshnessChecker = storage.NoopFreshnessChecker{}
+		htmlStore storage.HTMLWriter       = storage.NoopHTMLWriter{}
+		err       error
+	)
+	if *storageKind == "s3" {
+		s3b, err := buildS3Backend(*s3Bucket, *s3Prefix, *s3Endpoint, *awsRegion)
+		if err != nil {
+			log.Fatalf("open s3 storage: %v", err)
+		}
+		primary, runs, freshness, htmlStore = s3b.writer, s3b.runs, s3b.freshness, s3b.html
+	} else {
+		primary, err = buildWriter(*storageKind, *output, *kafkaBrokers, *kafkaTopic)
+		if err != nil {
+			log.Fatalf("open storage writer: %v", err)
+		}
 	}
-	// runRecorder/freshnessChecker must be derived from primary before it's
-	// potentially wrapped in a MultiWriter below -- MultiWriter doesn't
-	// itself implement storage.RunRecorder/FreshnessChecker, only whichever
-	// single backend (Postgres) actually does.
-	runs := runRecorder(primary)
-	freshness := freshnessChecker(primary)
 
 	writer := primary
 	if *storageKind != "kafka" && *kafkaBrokers != "" {
 		// Fan out to Kafka in addition to the primary backend, so the ETL
 		// team gets a live document stream even when the primary store
-		// (Postgres/NDJSON) is what the crawler's own API/tooling reads.
+		// (S3/NDJSON) is what the crawler's own API/tooling reads.
 		kw, err := storage.NewKafkaWriter(storage.ParseBrokers(*kafkaBrokers), *kafkaTopic)
 		if err != nil {
 			log.Fatalf("open kafka writer: %v", err)
@@ -107,6 +121,7 @@ func main() {
 	f := fetcher.New(*requestTimeout, *maxBandwidth, fetcherOpts...)
 	guard := robots.New(f, *userAgent)
 	act := activities.New(f, guard, writer, runs, freshness)
+	act.HTML = htmlStore
 
 	if *saveHTMLDir != "" {
 		htmlWriter, err := storage.NewDirHTMLWriter(*saveHTMLDir)
@@ -146,43 +161,69 @@ func maxConcurrentDefault() int {
 	return runtime.NumCPU() * 100
 }
 
-// runRecorder returns writer itself when it's Postgres-backed (it already
-// implements storage.RunRecorder on the same pool), or a no-op when running
-// with --storage=ndjson, which has no database to track crawl runs in.
-func runRecorder(writer storage.Writer) storage.RunRecorder {
-	if pg, ok := writer.(storage.RunRecorder); ok {
-		return pg
-	}
-	return storage.NoopRunRecorder{}
+// s3Backend bundles everything --storage=s3 needs. Nothing here touches a
+// database: the complete HTML of each page and its parsed metadata are
+// objects in the bucket, and run/freshness state are manifest/HEAD lookups
+// against the same bucket.
+type s3Backend struct {
+	writer    storage.Writer
+	runs      storage.RunRecorder
+	freshness storage.FreshnessChecker
+	html      storage.HTMLWriter
 }
 
-// freshnessChecker returns writer itself when it's Postgres-backed (it
-// already implements storage.FreshnessChecker on the same pool), or a
-// no-op when running with --storage=ndjson, which has no queryable history
-// to check freshness against.
-func freshnessChecker(writer storage.Writer) storage.FreshnessChecker {
-	if pg, ok := writer.(storage.FreshnessChecker); ok {
-		return pg
+func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error) {
+	if bucket == "" {
+		return nil, fmt.Errorf("--s3-bucket (or S3_BUCKET) is required when --storage=s3")
 	}
-	return storage.NoopFreshnessChecker{}
+	var loadOpts []func(*config.LoadOptions) error
+	if region != "" {
+		loadOpts = append(loadOpts, config.WithRegion(region))
+	}
+	cfg, err := config.LoadDefaultConfig(context.Background(), loadOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("load aws config: %w", err)
+	}
+
+	writerOpts := []storage.S3WriterOption{storage.WithS3KeyPrefix(prefix)}
+	runOpts := []storage.S3RunRecorderOption{storage.WithS3RunRecorderKeyPrefix(prefix)}
+	freshOpts := []storage.S3FreshnessOption{storage.WithS3FreshnessKeyPrefix(prefix)}
+	if endpoint != "" {
+		writerOpts = append(writerOpts, storage.WithS3Endpoint(endpoint))
+		runOpts = append(runOpts, storage.WithS3RunRecorderEndpoint(endpoint))
+		freshOpts = append(freshOpts, storage.WithS3FreshnessEndpoint(endpoint))
+	}
+
+	w, err := storage.NewS3Writer(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
+	h, err := storage.NewS3HTMLWriter(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
+	r, err := storage.NewS3RunRecorder(cfg, bucket, runOpts...)
+	if err != nil {
+		return nil, err
+	}
+	fr, err := storage.NewS3FreshnessChecker(cfg, bucket, freshOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return &s3Backend{writer: w, runs: r, freshness: fr, html: h}, nil
 }
 
-func buildWriter(kind, output, databaseURL, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {
+func buildWriter(kind, output, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {
 	switch kind {
 	case "ndjson":
 		return storage.NewNDJSONWriter(output)
-	case "postgres":
-		if databaseURL == "" {
-			log.Fatal("--database-url (or DATABASE_URL) is required when --storage=postgres")
-		}
-		return storage.NewPostgresWriter(context.Background(), databaseURL)
 	case "kafka":
 		if kafkaBrokers == "" {
 			log.Fatal("--kafka-brokers (or KAFKA_BROKERS) is required when --storage=kafka")
 		}
 		return storage.NewKafkaWriter(storage.ParseBrokers(kafkaBrokers), kafkaTopic)
 	default:
-		log.Fatalf("unknown --storage %q: must be ndjson, postgres, or kafka", kind)
+		log.Fatalf("unknown --storage %q: must be s3, ndjson, or kafka", kind)
 		return nil, nil
 	}
 }

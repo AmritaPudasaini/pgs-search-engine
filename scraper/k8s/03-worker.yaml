@@ -12,7 +12,11 @@ data:
   # Cloud, etc).
   TEMPORAL_ADDRESS: "temporal-frontend.temporal.svc.cluster.local:7233"
   NAMESPACE: "default"
-  STORAGE: "postgres"
+  STORAGE: "s3"
+  # Crawled pages (complete HTML + metadata) go to this bucket. Pods reach it
+  # through their IAM role (IRSA), so no static credentials are set here.
+  S3_BUCKET: "crawled-pages"
+  AWS_REGION: "us-east-1"
   # Uncomment to also fan out every crawled document to the ETL team's
   # Kafka cluster (see internal/storage/kafka_writer.go) alongside Postgres:
   # KAFKA_BROKERS: "kafka-0.kafka.svc.cluster.local:9092"
@@ -40,11 +44,6 @@ spec:
             - configMapRef:
                 name: worker-config
           env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-credentials
-                  key: DATABASE_URL
             # MAX_CONCURRENT_ACTIVITIES is intentionally unset: the binary
             # defaults it to NumCPU * 100 using the CPU limit below (via
             # automaxprocs), so raising `resources.limits.cpu` alone raises

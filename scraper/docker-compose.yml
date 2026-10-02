@@ -87,24 +87,61 @@ services:
       - "8233:8080"
     restart: unless-stopped
 
+  # S3-compatible object store for local dev. The worker uploads each
+  # crawled page's complete HTML (plus its parsed metadata) here -- nothing
+  # crawled is stored in a database. Console: http://localhost:9001
+  # (minioadmin / minioadmin). In production, point the worker at real S3
+  # by dropping S3_ENDPOINT and the static credentials.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Creates the crawl bucket, then exits.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/crawled-pages"
+
   # The Temporal worker: this is what actually fetches pages. Scale it with
   # `docker compose up --build --scale worker=N` (see the Makefile's
   # `make scale N=...` target) -- each replica independently connects to
-  # the same Temporal task queue and the same Postgres, so they load-balance
+  # the same Temporal task queue and the same S3 bucket, so they load-balance
   # automatically with no coordination between them.
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
     depends_on:
-      migrate:
+      minio-init:
         condition: service_completed_successfully
       temporal:
         condition: service_started
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
-      - STORAGE=postgres
-      - DATABASE_URL=postgres://temporal:temporal@postgres:5432/scraper?sslmode=disable
+      - STORAGE=s3
+      - S3_BUCKET=crawled-pages
+      - S3_ENDPOINT=http://minio:9000
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
       # MAX_CONCURRENT_ACTIVITIES is left unset here on purpose: the binary
       # defaults it to NumCPU * 100, which respects this container's CPU
       # limit (see Dockerfile.worker's automaxprocs import) -- set it
@@ -147,4 +184,5 @@ services:
     profiles: ["tools"]
 
 volumes:
+  miniodata:
   pgdata:

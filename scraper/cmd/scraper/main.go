@@ -59,7 +59,7 @@ func main() {
 		maxPerDomain  = flag.Int("max-pages-per-domain", 0, "cap pages fetched from any single host (0 = unlimited, shared budget is first-come-first-served)")
 		concurrency   = flag.Int("concurrency", 0, "max pages a single workflow run has in flight at once (0 = auto-scale with seed count: numSeeds*4, clamped to [8,256])")
 		maxPerHost    = flag.Int("max-concurrent-per-host", 0, "cap concurrent in-flight fetches to any single host (0 = unlimited, --concurrency alone governs total in-flight fetches)")
-		revisitAfter  = flag.Duration("revisit-after", 0, "skip (re-)fetching a URL already crawled more recently than this (0 = disabled, always fetch; requires --storage=postgres on the worker to have any effect)")
+		revisitAfter  = flag.Duration("revisit-after", 0, "skip (re-)fetching a URL already crawled more recently than this (0 = disabled, always fetch; requires --storage=s3 on the worker to have any effect)")
 		sameHost      = flag.Bool("same-host-only", true, "keep each seed's discovered links on that seed's own host; false = open crawl, follow links anywhere")
 		countryFilter = envflag.String("country-filter", "NP", "ISO 3166-1 alpha-2 country code: only pages detected as this country are written as documents (others are still fetched and followed for links, just not stored); empty = no filter, store every page regardless of detected country")
 		workflowID    = flag.String("workflow-id", "", "Temporal workflow ID (default: derived from seeds + timestamp)")
