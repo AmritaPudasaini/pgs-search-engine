@@ -11,6 +11,8 @@ from .create_index import INDEX_NAME, ensure_index
 
 
 DEFAULT_JSONL = Path("/data/transformed_documents.jsonl")
+DEFAULT_MAX_CHUNK_BYTES = 10 * 1024 * 1024
+
 
 def make_client() -> OpenSearch:
     url = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
@@ -52,15 +54,19 @@ def index_jsonl(
     client: OpenSearch,
     index_name: str = INDEX_NAME,
     batch_size: int = 500,
+    max_chunk_bytes: int = DEFAULT_MAX_CHUNK_BYTES,
 ) -> tuple[int, int]:
     """Create the mapping if needed and index records idempotently by document_id."""
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
+    if max_chunk_bytes < 1:
+        raise ValueError("max_chunk_bytes must be positive")
     ensure_index(client, index_name)
     return helpers.bulk(
         client,
         read_actions(path, index_name),
         chunk_size=batch_size,
+        max_chunk_bytes=max_chunk_bytes,
         stats_only=True,
         raise_on_error=True,
         raise_on_exception=True,
@@ -74,10 +80,13 @@ def main() -> None:
     parser.add_argument("--input", default=os.getenv("JSONL_PATH", str(DEFAULT_JSONL)))
     parser.add_argument("--index", default=INDEX_NAME)
     parser.add_argument("--batch-size", type=int, default=500)
+    parser.add_argument("--max-chunk-bytes", type=int, default=DEFAULT_MAX_CHUNK_BYTES)
     args = parser.parse_args()
 
     client = make_client()
-    succeeded, errors = index_jsonl(args.input, client, args.index, args.batch_size)
+    succeeded, errors = index_jsonl(
+        args.input, client, args.index, args.batch_size, args.max_chunk_bytes
+    )
     print(f"Indexed {succeeded} documents into {args.index}; errors: {errors}")
 
 
