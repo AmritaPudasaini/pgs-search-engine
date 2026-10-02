@@ -326,6 +326,13 @@ const maxChildSitemaps = 10
 type DiscoverSitemapURLsInput struct {
 	// SeedURL is used only for its scheme+host; any path is ignored.
 	SeedURL string
+	// MaxURLs caps how many page URLs are returned for this seed (0 = the
+	// package default, maxSitemapURLs). The workflow sets it to the
+	// per-domain page cap: URLs beyond it would be dropped anyway, but
+	// returning them bloats workflow history -- thousands of seeds each
+	// returning up to maxSitemapURLs URLs can exceed Temporal's history size
+	// limit.
+	MaxURLs int
 }
 
 // DiscoverSitemapURLsOutput is the result of DiscoverSitemapURLs.
@@ -360,10 +367,14 @@ func (a *Activities) DiscoverSitemapURLs(ctx context.Context, in DiscoverSitemap
 	visited := make(map[string]bool)
 	var pageURLs []string
 	childrenFetched := 0
+	limit := maxSitemapURLs
+	if in.MaxURLs > 0 && in.MaxURLs < limit {
+		limit = in.MaxURLs
+	}
 
 	var fetchSitemap func(sitemapURL string)
 	fetchSitemap = func(sitemapURL string) {
-		if visited[sitemapURL] || len(pageURLs) >= maxSitemapURLs {
+		if visited[sitemapURL] || len(pageURLs) >= limit {
 			return
 		}
 		visited[sitemapURL] = true
@@ -377,7 +388,7 @@ func (a *Activities) DiscoverSitemapURLs(ctx context.Context, in DiscoverSitemap
 			return
 		}
 		for _, u := range urls {
-			if len(pageURLs) >= maxSitemapURLs {
+			if len(pageURLs) >= limit {
 				break
 			}
 			pageURLs = append(pageURLs, u)

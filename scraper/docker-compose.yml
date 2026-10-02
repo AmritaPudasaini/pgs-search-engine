@@ -91,6 +91,23 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Browser for the bucket: http://localhost:8081 -- open crawled-pages, then
+  # html/<host>/ to view or download each page's complete HTML.
+  s3-browser:
+    image: cloudlena/s3manager:latest
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      - ENDPOINT=s3:4566
+      - REGION=us-east-1
+      - ACCESS_KEY_ID=test
+      - SECRET_ACCESS_KEY=test
+      - USE_SSL=false
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
   # The Temporal worker: this is what actually fetches pages. Scale it with
   # `docker compose up --build --scale worker=N` (see the Makefile's
   # `make scale N=...` target) -- each replica independently connects to

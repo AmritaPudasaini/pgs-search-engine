@@ -69,6 +69,10 @@ const (
 	// maxHistoryEvents forces a Continue-As-New well before Temporal's
 	// 51200-event history limit.
 	maxHistoryEvents = 45000
+	// maxHistoryBytes does the same against Temporal's 50MB history size
+	// limit, which large sitemap/page results can reach well before the
+	// event-count limit.
+	maxHistoryBytes = 30 << 20
 )
 
 // TaskQueueName is shared between the worker and the client that starts
@@ -500,7 +504,7 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			discCursor++
 			discActive = append(discActive, discInFlight{
 				future: workflow.ExecuteActivity(hostCtx(sitemapCtx, normalize.Hostname(sd.URL), in.TaskQueueShards),
-					act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{SeedURL: sd.URL}),
+					act.DiscoverSitemapURLs, activities.DiscoverSitemapURLsInput{SeedURL: sd.URL, MaxURLs: in.MaxPagesPerDomain}),
 				seed: sd,
 			})
 		}
@@ -685,7 +689,8 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 		// payload; a large seed list is instead checkpointed only when the
 		// history nears its hard event limit.
 		if (pagesThisRun >= pagesPerRun && len(queue)+len(seenOrder) <= maxCarriedURLs) ||
-			workflow.GetInfo(ctx).GetCurrentHistoryLength() >= maxHistoryEvents {
+			workflow.GetInfo(ctx).GetCurrentHistoryLength() >= maxHistoryEvents ||
+			workflow.GetInfo(ctx).GetCurrentHistorySize() >= maxHistoryBytes {
 			continuing = true
 		}
 		if !continuing {
