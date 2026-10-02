@@ -52,6 +52,11 @@ type Activities struct {
 	Writer    storage.Writer
 	Runs      storage.RunRecorder
 	Freshness storage.FreshnessChecker
+	// HTML saves each fetched page's raw HTML body, separately from the
+	// parsed Document metadata Writer persists. Defaults to
+	// storage.NoopHTMLWriter{} (raw HTML downloads disabled) unless the
+	// caller overrides this field after New.
+	HTML storage.HTMLWriter
 
 	mu          sync.Mutex
 	writtenHash map[string]bool // content-hash dedupe, guards WriteDocument against retry double-writes
@@ -67,6 +72,7 @@ func New(f *fetcher.Fetcher, r *robots.Guard, w storage.Writer, runs storage.Run
 		Writer:      w,
 		Runs:        runs,
 		Freshness:   freshness,
+		HTML:        storage.NoopHTMLWriter{},
 		writtenHash: make(map[string]bool),
 	}
 }
@@ -210,6 +216,12 @@ func (a *Activities) ProcessPage(ctx context.Context, in ProcessPageInput) (Proc
 		metrics.PagesFetched.WithLabelValues(metrics.OutcomeSkippedNonHTML).Inc()
 		return out, nil
 	}
+
+	// Best-effort: saving the raw document is a bonus alongside the parsed
+	// Document this activity already returns, not a correctness requirement
+	// of the crawl -- a disk error here shouldn't fail (and retry-refetch)
+	// an otherwise-successful page.
+	_ = a.HTML.SaveHTML(out.NormalizedURL, out.ContentHash, res.Body)
 
 	parsed, err := parser.Parse(res.Body, in.URL, out.ContentType)
 	if err != nil {
