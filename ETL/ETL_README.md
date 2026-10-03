@@ -30,6 +30,24 @@ stand-in, not the final wiring.**
 Kafka, Airflow and the Kafka consumer are part of the stack in the
 repository-root `docker-compose.yml`; every service shares its network, so
 Airflow reaches Kafka as `kafka:29092`. From the repository root:
+ETL for a Nepali/English search engine. This folder is self-contained for
+development: it uses local sample files instead of the scraper, JSONL as the
+intermediate output instead of PostgreSQL, an optional local OpenSearch index,
+and Kafka signals to simulate the scraper handoff.
+
+## Current Workflow
+
+```text
+manual Kafka signal -> local file store -> transform -> duplicate check -> LaBSE embedding -> JSONL output
+```
+
+The implementation follows the text architecture direction: transformation
+logic lives in Spark-facing code, Airflow is the orchestrator for this
+runnable phase, and the isolated OpenSearch step consumes the resulting JSONL.
+
+## Run The Stack
+
+From `ETL/`:
 
 ```bash
 cp .env.example .env     # once; set AIRFLOW_UID to `id -u`
@@ -78,21 +96,11 @@ Scripts in `kafka/phase1_testing/`:
 Proves Airflow, Kafka, and Spark can pass data to each other end to
 end. Four tasks, run in sequence:
 
-```
-poll_kafka_signal -> fetch_from_dfs -> run_spark_transform -> log_result
+```text
+ETL/airflow/data/processed/transformed_documents.jsonl
 ```
 
-1. **poll_kafka_signal** — reads one "file ready" message off topic
-   `scraped_files_topic` (8s timeout; skips the run if nothing's there).
-2. **fetch_from_dfs** — reads the referenced file from
-   `local_dfs_store/`, standing in for a MinIO `GetObject` call.
-3. **run_spark_transform** — runs `spark/transform.py`'s
-   `analyze_text()` on the fetched content, inside Airflow's embedded
-   PySpark. This is a **placeholder** (char/word count) — see Known
-   gaps below.
-4. **log_result** — prints the result to the task's Airflow logs.
-
-### Running it
+To index those transformed records after the DAG succeeds:
 
 ```bash
 cd ETL/kafka

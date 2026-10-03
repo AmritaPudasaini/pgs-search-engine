@@ -11,19 +11,23 @@
 //     replica count or HPA).
 //
 // Every flag can also be set via an environment variable of the same name
-// (upper-cased, dashes to underscores, e.g. --database-url ==
-// DATABASE_URL), which is how the Docker/Kubernetes deployment configures
+// (upper-cased, dashes to underscores, e.g. --s3-bucket ==
+// S3_BUCKET), which is how the Docker/Kubernetes deployment configures
 // this binary without a wrapper script.
 package main
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "go.uber.org/automaxprocs" // sets GOMAXPROCS from the container's cgroup CPU quota, not the host's core count
 
@@ -33,6 +37,7 @@ import (
 	"search-engine-scraper/internal/activities"
 	"search-engine-scraper/internal/envflag"
 	"search-engine-scraper/internal/fetcher"
+	"search-engine-scraper/internal/render"
 	"search-engine-scraper/internal/robots"
 	"search-engine-scraper/internal/storage"
 	"search-engine-scraper/internal/workflows"
@@ -42,16 +47,28 @@ func main() {
 	var (
 		hostPort       = envflag.String("temporal-address", "localhost:7233", "Temporal frontend address")
 		namespace      = envflag.String("namespace", "default", "Temporal namespace")
-		storageKind    = envflag.String("storage", "ndjson", "where to write crawled documents: ndjson, postgres, or kafka")
+		storageKind    = envflag.String("storage", "s3", "where to write crawled data: s3 (complete HTML + metadata objects, no database), ndjson (local dev), or kafka")
 		output         = envflag.String("output", "data/output/documents.ndjson", "NDJSON output path (used when --storage=ndjson)")
-		databaseURL    = envflag.String("database-url", "", "Postgres connection string (used when --storage=postgres), e.g. postgres://user:pass@host:5432/scraper")
+		s3Bucket       = envflag.String("s3-bucket", "", "S3 bucket crawled pages are uploaded to (required when --storage=s3)")
+		s3Prefix       = envflag.String("s3-prefix", "", "optional key prefix inside the bucket, e.g. an environment name")
+		s3Endpoint     = envflag.String("s3-endpoint", "", "S3-compatible endpoint URL for LocalStack/MinIO (empty = real AWS S3)")
+		awsRegion      = envflag.String("aws-region", "", "AWS region (empty = resolve from AWS_REGION / shared config)")
 		kafkaBrokers   = envflag.String("kafka-brokers", "", "comma-separated Kafka broker addresses, e.g. kafka-1:9092,kafka-2:9092 (used when --storage=kafka)")
 		kafkaTopic     = envflag.String("kafka-topic", "crawled-documents", "Kafka topic to publish crawled documents to (used when --storage=kafka) -- the hand-off point to the ETL pipeline")
+		taskShards     = envflag.Int("task-queue-shards", 1, "total number of host-shard task queues the crawl uses (1 = off); must match the scraper client's --task-queue-shards")
+		shardIndex     = envflag.Int("shard-index", -1, "which shard's fetch queue this worker polls (0..task-queue-shards-1); -1 = poll every shard queue")
+		shardFromHost  = envflag.Bool("shard-from-hostname", false, "derive --shard-index from the trailing ordinal of the hostname (e.g. worker-2 -> 2, a Kubernetes StatefulSet pod), modulo --task-queue-shards")
+		renderFlag     = envflag.String("render", "auto", "render pages in headless Chrome so JavaScript-built content is captured: off, auto (only pages that look like an empty JS app shell), or always")
+		chromeURL      = envflag.String("chrome-url", "", "DevTools websocket of a headless Chrome, e.g. ws://chrome:9222 (required unless --render=off)")
+		renderConc     = envflag.Int("render-concurrency", 4, "max pages this worker renders in Chrome at once")
+		renderTimeout  = envflag.Duration("render-timeout", 30*time.Second, "per-page render timeout")
 		requestTimeout = envflag.Duration("timeout", 10*time.Second, "per-request HTTP timeout")
 		maxConcurrent  = envflag.Int("max-concurrent-activities", maxConcurrentDefault(), "max activities this worker process executes concurrently (fetching is I/O-bound, so this can safely exceed core count)")
 		userAgent      = envflag.String("user-agent", "search-engine-scraper", "User-Agent / robots.txt group name to identify as")
 		metricsAddress = envflag.String("metrics-address", ":9090", "address to serve Prometheus metrics on (GET /metrics); empty disables it")
 		maxBandwidth   = envflag.Int("max-bandwidth-bytes-per-sec", 0, "cap this worker process's aggregate download rate in bytes/sec across all concurrent fetches (0 = unlimited)")
+		enableHTTP3    = envflag.Bool("http3", false, "attempt HTTP/3 (QUIC) first on https requests, falling back to HTTP/1.1 or HTTP/2 for sites that don't support it")
+		saveHTMLDir    = envflag.String("save-html-dir", "", "directory to save each crawled page's raw HTML body to, named by content hash (empty = don't save raw HTML)")
 	)
 	flag.Parse()
 
@@ -68,22 +85,32 @@ func main() {
 		log.Printf("metrics: http://%s/metrics", *metricsAddress)
 	}
 
-	primary, err := buildWriter(*storageKind, *output, *databaseURL, *kafkaBrokers, *kafkaTopic)
-	if err != nil {
-		log.Fatalf("open storage writer: %v", err)
+	var (
+		primary   storage.Writer
+		runs      storage.RunRecorder      = storage.NoopRunRecorder{}
+		freshness storage.FreshnessChecker = storage.NoopFreshnessChecker{}
+		htmlStore storage.HTMLWriter       = storage.NoopHTMLWriter{}
+		records   storage.RecordWriter     = storage.NoopRecordWriter{}
+		err       error
+	)
+	if *storageKind == "s3" {
+		s3b, err := buildS3Backend(*s3Bucket, *s3Prefix, *s3Endpoint, *awsRegion)
+		if err != nil {
+			log.Fatalf("open s3 storage: %v", err)
+		}
+		primary, runs, freshness, htmlStore, records = s3b.writer, s3b.runs, s3b.freshness, s3b.html, s3b.records
+	} else {
+		primary, err = buildWriter(*storageKind, *output, *kafkaBrokers, *kafkaTopic)
+		if err != nil {
+			log.Fatalf("open storage writer: %v", err)
+		}
 	}
-	// runRecorder/freshnessChecker must be derived from primary before it's
-	// potentially wrapped in a MultiWriter below -- MultiWriter doesn't
-	// itself implement storage.RunRecorder/FreshnessChecker, only whichever
-	// single backend (Postgres) actually does.
-	runs := runRecorder(primary)
-	freshness := freshnessChecker(primary)
 
 	writer := primary
 	if *storageKind != "kafka" && *kafkaBrokers != "" {
 		// Fan out to Kafka in addition to the primary backend, so the ETL
 		// team gets a live document stream even when the primary store
-		// (Postgres/NDJSON) is what the crawler's own API/tooling reads.
+		// (S3/NDJSON) is what the crawler's own API/tooling reads.
 		kw, err := storage.NewKafkaWriter(storage.ParseBrokers(*kafkaBrokers), *kafkaTopic)
 		if err != nil {
 			log.Fatalf("open kafka writer: %v", err)
@@ -98,14 +125,42 @@ func main() {
 	}
 	defer c.Close()
 
-	f := fetcher.New(*requestTimeout, *maxBandwidth)
+	var fetcherOpts []fetcher.Option
+	if *enableHTTP3 {
+		fetcherOpts = append(fetcherOpts, fetcher.WithHTTP3())
+	}
+	f := fetcher.New(*requestTimeout, *maxBandwidth, fetcherOpts...)
 	guard := robots.New(f, *userAgent)
 	act := activities.New(f, guard, writer, runs, freshness)
+	act.HTML = htmlStore
+	act.Records = records
+
+	mode, merr := render.ParseMode(*renderFlag)
+	if merr != nil {
+		log.Fatal(merr)
+	}
+	if mode != render.ModeOff {
+		if *chromeURL == "" {
+			log.Fatal("--chrome-url (or CHROME_URL) is required unless --render=off")
+		}
+		ch := render.NewChrome(*chromeURL, *userAgent, *renderConc, *renderTimeout)
+		defer ch.Close()
+		act.Renderer, act.RenderMode = ch, mode
+	}
+
+	if *saveHTMLDir != "" {
+		htmlWriter, err := storage.NewDirHTMLWriter(*saveHTMLDir)
+		if err != nil {
+			log.Fatalf("open html output dir: %v", err)
+		}
+		act.HTML = htmlWriter
+	}
 
 	w := worker.New(c, workflows.TaskQueueName, worker.Options{
 		MaxConcurrentActivityExecutionSize: *maxConcurrent,
 	})
 	w.RegisterWorkflow(workflows.CrawlWorkflow)
+	w.RegisterWorkflow(workflows.CrawlDomainsWorkflow)
 	w.RegisterActivity(act.ProcessPage)
 	w.RegisterActivity(act.WriteDocument)
 	w.RegisterActivity(act.DiscoverSitemapURLs)
@@ -114,8 +169,36 @@ func main() {
 	w.RegisterActivity(act.UpdateCrawlRunStats)
 	w.RegisterActivity(act.FinishCrawlRun)
 
-	log.Printf("worker started: task_queue=%s temporal=%s storage=%s gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d",
-		workflows.TaskQueueName, *hostPort, *storageKind, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth)
+	// Host-sharded fetching: besides the shared queue (workflow tasks and
+	// storage/run activities), poll the shard queue(s) this worker owns for
+	// ProcessPage/DiscoverSitemapURLs, so all fetches for one host run here.
+	idx := *shardIndex
+	if *shardFromHost {
+		hn, _ := os.Hostname()
+		idx = ordinalFromHostname(hn, *taskShards)
+	}
+	var shardWorkers []worker.Worker
+	if *taskShards > 1 {
+		for i := 0; i < *taskShards; i++ {
+			if idx >= 0 && i != idx%*taskShards {
+				continue
+			}
+			sw := worker.New(c, workflows.TaskQueueForShard(i), worker.Options{
+				MaxConcurrentActivityExecutionSize: *maxConcurrent,
+			})
+			sw.RegisterActivity(act.ProcessPage)
+			sw.RegisterActivity(act.DiscoverSitemapURLs)
+			if err := sw.Start(); err != nil {
+				log.Fatalf("start shard worker %d: %v", i, err)
+			}
+			defer sw.Stop()
+			shardWorkers = append(shardWorkers, sw)
+		}
+		log.Printf("host sharding: %d shard queues total, polling %d of them (shard-index=%d)", *taskShards, len(shardWorkers), idx)
+	}
+
+	log.Printf("worker started: task_queue=%s temporal=%s storage=%s task_queue_shards=%d gomaxprocs=%d max_concurrent_activities=%d max_bandwidth_bytes_per_sec=%d http3=%v save_html_dir=%q",
+		workflows.TaskQueueName, *hostPort, *storageKind, *taskShards, runtime.GOMAXPROCS(0), *maxConcurrent, *maxBandwidth, *enableHTTP3, *saveHTMLDir)
 
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		log.Fatalf("worker stopped: %v", err)
@@ -128,47 +211,92 @@ func main() {
 // activities spend almost all their time blocked on network I/O, so far
 // more of them can be in flight than there are cores -- the real ceiling is
 // the target sites' response times and robots.txt Crawl-delay, not CPU.
+// ordinalFromHostname returns the trailing integer of hostname modulo
+// shards, or -1 if the hostname doesn't end in one.
+func ordinalFromHostname(hostname string, shards int) int {
+	i := len(hostname)
+	for i > 0 && hostname[i-1] >= '0' && hostname[i-1] <= '9' {
+		i--
+	}
+	n, err := strconv.Atoi(hostname[i:])
+	if err != nil || shards < 1 {
+		return -1
+	}
+	return n % shards
+}
+
 func maxConcurrentDefault() int {
 	return runtime.NumCPU() * 100
 }
 
-// runRecorder returns writer itself when it's Postgres-backed (it already
-// implements storage.RunRecorder on the same pool), or a no-op when running
-// with --storage=ndjson, which has no database to track crawl runs in.
-func runRecorder(writer storage.Writer) storage.RunRecorder {
-	if pg, ok := writer.(storage.RunRecorder); ok {
-		return pg
-	}
-	return storage.NoopRunRecorder{}
+// s3Backend bundles everything --storage=s3 needs. Nothing here touches a
+// database: the complete HTML of each page and its parsed metadata are
+// objects in the bucket, and run/freshness state are manifest/HEAD lookups
+// against the same bucket.
+type s3Backend struct {
+	writer    storage.Writer
+	runs      storage.RunRecorder
+	freshness storage.FreshnessChecker
+	html      storage.HTMLWriter
+	records   storage.RecordWriter
 }
 
-// freshnessChecker returns writer itself when it's Postgres-backed (it
-// already implements storage.FreshnessChecker on the same pool), or a
-// no-op when running with --storage=ndjson, which has no queryable history
-// to check freshness against.
-func freshnessChecker(writer storage.Writer) storage.FreshnessChecker {
-	if pg, ok := writer.(storage.FreshnessChecker); ok {
-		return pg
+func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error) {
+	if bucket == "" {
+		return nil, fmt.Errorf("--s3-bucket (or S3_BUCKET) is required when --storage=s3")
 	}
-	return storage.NoopFreshnessChecker{}
+	var loadOpts []func(*config.LoadOptions) error
+	if region != "" {
+		loadOpts = append(loadOpts, config.WithRegion(region))
+	}
+	cfg, err := config.LoadDefaultConfig(context.Background(), loadOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("load aws config: %w", err)
+	}
+
+	writerOpts := []storage.S3WriterOption{storage.WithS3KeyPrefix(prefix)}
+	runOpts := []storage.S3RunRecorderOption{storage.WithS3RunRecorderKeyPrefix(prefix)}
+	freshOpts := []storage.S3FreshnessOption{storage.WithS3FreshnessKeyPrefix(prefix)}
+	if endpoint != "" {
+		writerOpts = append(writerOpts, storage.WithS3Endpoint(endpoint))
+		runOpts = append(runOpts, storage.WithS3RunRecorderEndpoint(endpoint))
+		freshOpts = append(freshOpts, storage.WithS3FreshnessEndpoint(endpoint))
+	}
+
+	w, err := storage.NewS3Writer(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
+	h, err := storage.NewS3HTMLWriter(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
+	rw, err := storage.NewS3RecordWriter(cfg, bucket, writerOpts...)
+	if err != nil {
+		return nil, err
+	}
+	r, err := storage.NewS3RunRecorder(cfg, bucket, runOpts...)
+	if err != nil {
+		return nil, err
+	}
+	fr, err := storage.NewS3FreshnessChecker(cfg, bucket, freshOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return &s3Backend{writer: w, runs: r, freshness: fr, html: h, records: rw}, nil
 }
 
-func buildWriter(kind, output, databaseURL, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {
+func buildWriter(kind, output, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {
 	switch kind {
 	case "ndjson":
 		return storage.NewNDJSONWriter(output)
-	case "postgres":
-		if databaseURL == "" {
-			log.Fatal("--database-url (or DATABASE_URL) is required when --storage=postgres")
-		}
-		return storage.NewPostgresWriter(context.Background(), databaseURL)
 	case "kafka":
 		if kafkaBrokers == "" {
 			log.Fatal("--kafka-brokers (or KAFKA_BROKERS) is required when --storage=kafka")
 		}
 		return storage.NewKafkaWriter(storage.ParseBrokers(kafkaBrokers), kafkaTopic)
 	default:
-		log.Fatalf("unknown --storage %q: must be ndjson, postgres, or kafka", kind)
+		log.Fatalf("unknown --storage %q: must be s3, ndjson, or kafka", kind)
 		return nil, nil
 	}
 }

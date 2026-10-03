@@ -1,0 +1,28 @@
+CREATE TABLE documents (
+    id               BIGSERIAL PRIMARY KEY,
+    url              TEXT NOT NULL,
+    normalized_url   TEXT NOT NULL,
+    category         TEXT NOT NULL DEFAULT '',
+    title            TEXT NOT NULL DEFAULT '',
+    body_text        TEXT NOT NULL DEFAULT '',
+    links            TEXT[] NOT NULL DEFAULT '{}',
+    depth            INTEGER NOT NULL DEFAULT 0,
+    status_code      INTEGER NOT NULL DEFAULT 0,
+    content_type     TEXT NOT NULL DEFAULT '',
+    content_hash     TEXT NOT NULL DEFAULT '',
+    fetch_duration_ms BIGINT NOT NULL DEFAULT 0,
+    fetch_error      TEXT NOT NULL DEFAULT '',
+    fetched_at       TIMESTAMPTZ NOT NULL,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- One row per (page, content version): re-crawling an unchanged page is
+    -- a no-op upsert instead of a new row; a changed page gets its content
+    -- fields refreshed in place. This is also what makes WriteDocument
+    -- fully idempotent under Temporal activity retries -- the NDJSON
+    -- writer could only approximate this with an in-memory dedupe set.
+    UNIQUE (normalized_url, content_hash)
+);
+
+CREATE INDEX idx_documents_category ON documents (category);
+CREATE INDEX idx_documents_normalized_url ON documents (normalized_url);

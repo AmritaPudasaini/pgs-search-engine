@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/text/encoding/charmap"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/simhash"
+	"search-engine-scraper/internal/simhash"
 )
 
 func TestParse_JSONLDAndGeo_NestedGeoCoordinatesWins(t *testing.T) {

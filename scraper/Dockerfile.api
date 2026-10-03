@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+FROM golang:1.26-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# CGO_ENABLED=0 for a fully static binary -- required for the distroless
+# base below, which has no libc.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+
+# distroless/static: no shell, no package manager, just the binary and CA
+# certs. The Swagger UI page it serves loads its JS/CSS from a CDN in the
+# browser, not from this container, so no static assets need to ship here.
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/api /api
+EXPOSE 8080
+ENTRYPOINT ["/api"]

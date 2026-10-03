@@ -9,7 +9,7 @@ import (
 
 	kafka "github.com/segmentio/kafka-go"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 // KafkaWriter publishes each crawled Document as a JSON message to a Kafka

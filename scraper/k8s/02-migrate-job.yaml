@@ -1,0 +1,40 @@
+# One-shot Job that applies migrations/*.sql to Postgres before the worker
+# Deployment comes up. Re-running `kubectl apply` re-creates this Job (its
+# name doesn't change), so `kubectl delete job/migrate` before re-applying
+# if you've added new migration files and want to re-run it.
+#
+# migrations/ isn't baked into any image here -- it's mounted from a
+# ConfigMap generated at apply time. Regenerate it after editing
+# migrations/*.sql with:
+#   kubectl create configmap migrations --from-file=../migrations -n search-engine-scraper \
+#     --dry-run=client -o yaml | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: search-engine-scraper
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: migrate/migrate:v4.19.1
+          args:
+            - "-path=/migrations"
+            - "-database=$(DATABASE_URL)"
+            - "up"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DATABASE_URL
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      volumes:
+        - name: migrations
+          configMap:
+            name: migrations

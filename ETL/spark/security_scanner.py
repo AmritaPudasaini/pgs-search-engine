@@ -1,38 +1,59 @@
-"""Spark Security Scanner - basic, harmless checks on a file before it
-enters the pipeline (extension, size, filename, hash). This is NOT a
-real virus scanner - it's a simple rule-based check for a university
-project demo. Real malware scanning (ClamAV) is separate, later work.
+"""Spark Security Scanner - two layers of checks on a file before it
+enters the pipeline:
+
+  Layer 1: basic, metadata-only checks (extension, size, filename, hash).
+  Layer 2: real content scanning via ClamAV (the clamd daemon).
+
+Layer 1 alone cannot see inside a file - a file called invoice.pdf could
+still contain a real payload. Layer 2 closes that gap using an actual
+antivirus engine instead of us trying to write one.
 """
 
 import hashlib
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+import io
+import os
+from typing import Any, TypedDict
 
-try:
-    from pyspark.sql import DataFrame
-except ImportError:  # pragma: no cover - optional dependency for type checking/runtime
-    DataFrame = Any  # type: ignore[misc,assignment]
 
-if TYPE_CHECKING:
-    from pyspark.sql import DataFrame as SparkDataFrame
+class ScanResult(TypedDict):
+    filename: str
+    extension: str
+    size_bytes: int
+    sha256: str
+    verdict: str
+    reasons: list[str]
+
 
 # Extensions we treat as risky to auto-run/auto-open.
 SUSPICIOUS_EXTENSIONS = {
-    "exe", "bat", "cmd", "com", "scr", "msi", "vbs", "js", "jar", "ps1", "sh"
+    "exe", "bat", "cmd", "com", "scr",
+    "msi", "vbs", "js", "jar", "ps1", "sh",
 }
 
 # Extensions we expect to see routinely from the web crawler.
 EXPECTED_EXTENSIONS = {
-    "html", "htm", "pdf", "txt", "json", "png", "jpg", "jpeg", "gif", "docx", "csv"
+    "html", "htm", "pdf", "txt", "json",
+    "png", "jpg", "jpeg", "gif", "docx", "csv",
 }
 
 MAX_SAFE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 MAX_FILENAME_LENGTH = 100
 
+# ClamAV (clamd) connection settings. Overridable via environment variables
+# so the same code works whether the scanner runs directly on the host
+# (CLAMD_HOST=localhost) or inside a Docker container that needs to reach
+# the host (CLAMD_HOST=host.docker.internal).
+CLAMD_HOST = os.environ.get("CLAMD_HOST", "localhost")
+CLAMD_PORT = int(os.environ.get("CLAMD_PORT", "3310"))
+CLAMD_TIMEOUT_SECONDS = 15
+
 
 def get_extension(filename: str) -> str:
-    if "." not in filename:
+    name = filename.lstrip(".")  # ignore one leading dot, e.g. hidden files like .gitattributes
+    if "." not in name:
         return ""
-    return filename.rsplit(".", 1)[-1].lower()
+    return name.rsplit(".", 1)[-1].lower()
+
 
 def get_file_size(content: bytes) -> int:
     return len(content)
@@ -46,20 +67,15 @@ def get_sha256(content: bytes) -> str:
     """
     return hashlib.sha256(content).hexdigest()
 
+
 def has_double_extension(filename: str) -> bool:
     parts = filename.split(".")
     return len(parts) > 2
 
-class ScanResult(TypedDict):
-    filename: str
-    extension: str
-    size_bytes: int
-    sha256: str
-    verdict: str
-    reasons: list[str]
-
 
 def scan_file(filename: str, content: bytes) -> ScanResult:
+    """Layer 1: fast, metadata-only checks. No network access, no ClamAV -
+    kept pure and easy to unit test on its own."""
     suspicious_reasons: list[str] = []
     unknown_reasons: list[str] = []
 
@@ -101,45 +117,114 @@ def scan_file(filename: str, content: bytes) -> ScanResult:
         "verdict": verdict,
         "reasons": reasons,
     }
-    
-def scan_file_spark(spark: Any, filename: str, content: bytes) -> "DataFrame":
-    """Same as scan_file(), but wraps the result in a Spark DataFrame -
-    matches the pattern used by analyze_text() in transform.py so both
-    modules look and behave the same way."""
+
+
+def scan_with_clamav(content: bytes) -> dict[str, Any]:
+    """Layer 2: send the actual file bytes to ClamAV (clamd) over the
+    network and ask it to scan them. This is real antivirus scanning -
+    we are not attempting to detect malware ourselves.
+
+    Returns one of:
+      {"status": "CLEAN",    "signature": None}
+      {"status": "INFECTED", "signature": "<threat name>"}
+      {"status": "ERROR",    "signature": None, "error": "<message>"}
+
+    A connection failure or any unexpected response is always ERROR,
+    never CLEAN - a security check that fails open is not a security
+    check.
+    """
+    import clamd
+
+    try:
+        client = clamd.ClamdNetworkSocket(
+            host=CLAMD_HOST, port=CLAMD_PORT, timeout=CLAMD_TIMEOUT_SECONDS
+        )
+        response = client.instream(io.BytesIO(content))
+        status, signature = response["stream"]
+    except Exception as exc:  # clamd down, connection refused, timeout, etc.
+        return {"status": "ERROR", "signature": None, "error": str(exc)}
+
+    if status == "OK":
+        return {"status": "CLEAN", "signature": None}
+    if status == "FOUND":
+        return {"status": "INFECTED", "signature": signature}
+    return {"status": "ERROR", "signature": None, "error": f"unexpected clamd status: {status!r}"}
+
+
+def inspect_file(path: str) -> dict[str, Any]:
+    """Return the intake-check contract consumed by transform_file().
+
+    Combines Layer 1 (basic checks) and Layer 2 (ClamAV content scan)
+    into one verdict: SAFE, SUSPICIOUS, INFECTED, or UNKNOWN.
+
+    accepted is True only when Layer 1 found nothing AND ClamAV actively
+    confirmed the content is clean. If ClamAV can't be reached, the file
+    is NOT accepted - an unreachable scanner is not the same as a clean
+    result.
+    """
+    from pathlib import Path
+
+    file_path = Path(path)
+    content = file_path.read_bytes()
+    result = scan_file(file_path.name, content)
+
+    findings: list[str] = []
+    extension = result["extension"]
+    if extension in SUSPICIOUS_EXTENSIONS:
+        findings.append("suspicious_extension")
+    if extension not in EXPECTED_EXTENSIONS:
+        findings.append("unexpected_extension")
+    if result["size_bytes"] == 0:
+        findings.append("empty_file")
+    elif result["size_bytes"] > MAX_SAFE_SIZE_BYTES:
+        findings.append("file_too_large")
+    if len(file_path.name) > MAX_FILENAME_LENGTH:
+        findings.append("filename_too_long")
+    if has_double_extension(file_path.name):
+        findings.append("multiple_extensions")
+
+    clamav_result = scan_with_clamav(content)
+    clamav_status = clamav_result["status"]
+
+    if clamav_status == "INFECTED":
+        findings.append(f"clamav_infected:{clamav_result['signature']}")
+        verdict = "INFECTED"
+    elif clamav_status == "ERROR":
+        findings.append("clamav_unavailable")
+        verdict = "UNKNOWN"
+    elif findings:
+        verdict = "SUSPICIOUS"
+    else:
+        verdict = "SAFE"
+
+    accepted = clamav_status == "CLEAN" and not findings
+
+    return {
+        "accepted": accepted,
+        "filename": result["filename"],
+        "extension": extension,
+        "size_bytes": result["size_bytes"],
+        "sha256": result["sha256"],
+        "findings": findings,
+        "verdict": verdict,
+        "clamav_status": clamav_status,
+    }
+
+
+def scan_file_spark(spark: Any, filename: str, content: bytes) -> Any:
+    """Same as scan_file(), but wraps the Layer-1 result in a Spark
+    DataFrame - matches the pattern used by analyze_text() in
+    transform.py. Kept to Layer 1 only (no ClamAV) since this is used
+    for the Docker Spark smoke test, not the real ingestion path;
+    inspect_file() is the function the real pipeline calls."""
     result = scan_file(filename, content)
-    result["reasons"] = ", ".join(result["reasons"])  # flatten list for DataFrame
-    df = spark.createDataFrame([result])
-    # put columns in a sensible reading order (Spark would otherwise sort them A-Z)
+    spark_result: dict[str, Any] = dict(result)
+    spark_result["reasons"] = ", ".join(result["reasons"])  # flatten list for DataFrame
+    df = spark.createDataFrame([spark_result])
     return df.select("filename", "extension", "size_bytes", "sha256", "verdict", "reasons")
+
 
 if __name__ == "__main__":
     # Quick manual check, no Spark/Docker needed: python3 security_scanner.py
     sample = scan_file("hello.txt", b"This is a normal file used to test the Spark Security Scanner.")
     print(sample)
-
-    from pyspark.sql import SparkSession
-    from security_scanner import scan_file_spark
-
-    spark: SparkSession = (
-        SparkSession.builder
-        .appName("SecurityScannerTest")
-        .master("local[*]")
-        .getOrCreate()
-    )
-
-    # Every file below is 100% harmless. Verdicts are triggered by
-    # filename/size patterns only, never by actual malicious content.
-    test_files = {
-        "hello.txt": b"This is a normal file used to test the Spark Security Scanner.",
-        "notice.pdf": b"%PDF-1.4 dummy pdf content for testing",
-        "photo.jpg": b"dummy jpeg bytes for testing",
-        "weird_report.xyz": b"harmless content with an unusual extension",
-        "a_very_long_filename_that_someone_might_accidentally_save_from_a_browser_download_dialog_without_editing_it.txt": b"short harmless content",
-    }
-
-    for filename, content in test_files.items():
-        df = scan_file_spark(spark, filename, content)
-        df.show(truncate=60)  # type: ignore[union-attr]
-
-    spark.stop()
-        

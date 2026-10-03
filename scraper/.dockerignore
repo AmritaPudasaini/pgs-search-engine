@@ -16,3 +16,7 @@ Makefile
 Dockerfile
 .dockerignore
 .gitignore
+bin/
+data/
+.git/
+*.log
