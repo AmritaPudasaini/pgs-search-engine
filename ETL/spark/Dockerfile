@@ -13,8 +13,10 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 # Set working directory
 WORKDIR /app
 
-# Install PySpark
-RUN pip install pyspark==3.5.3
+# Install Spark and local parser dependencies
+RUN pip install pyspark==3.5.3 pypdf==5.1.0
+RUN pip install --no-cache-dir sentence-transformers==3.3.1
+RUN pip install clamd==1.0.2
 
 # Copy your ETL code into the container
 COPY . .

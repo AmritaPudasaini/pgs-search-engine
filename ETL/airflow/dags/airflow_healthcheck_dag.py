@@ -4,12 +4,12 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 
 with DAG(
-    dag_id="dummy_test_dag",
-    description="Phase 1 dummy DAG - verifies Airflow Docker setup works",
+    dag_id="airflow_healthcheck",
+    description="Verifies Airflow scheduling and worker execution",
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["phase1", "dummy", "etl-setup"],
+    tags=["etl", "healthcheck"],
 ) as dag:
 
     say_hello = BashOperator(
@@ -18,6 +18,6 @@ with DAG(
     )
     say_goodbye = BashOperator(
         task_id="say_goodbye",
-        bash_command="echo 'Task 2 complete - dummy DAG finished successfully.'",
+        bash_command="echo 'Task 2 complete - Airflow healthcheck finished successfully.'",
     )
     say_hello >> say_goodbye

@@ -2,6 +2,9 @@
 logs/*
 !logs/.gitkeep
 
+# Runtime ETL output
+data/processed/
+
 # Python cache
 __pycache__/
 *.pyc
