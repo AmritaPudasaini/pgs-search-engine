@@ -1,0 +1,15 @@
+# Prometheus metrics of the worker pods (GET :9090/metrics).
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraper-worker-metrics
+  labels:
+    app.kubernetes.io/name: scraper-worker
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: scraper-worker
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics

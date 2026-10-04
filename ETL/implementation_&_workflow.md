@@ -23,7 +23,8 @@ Kafka file-ready signal
 ## Docker Services
 
 - `kafka`: local Kafka broker exposed on `localhost:9092`.
-- `postgres`: Airflow metadata database.
+- `clamav`: ClamAV daemon used by the intake scanner (`clamav:3310`).
+- `airflow-db`: Airflow metadata database.
 - `redis`: Celery broker for Airflow workers.
 - `airflow-webserver`: Airflow UI at `http://localhost:8080`.
 - `airflow-scheduler`: schedules DAG work.
@@ -31,10 +32,11 @@ Kafka file-ready signal
 - `ingestion-signal-publisher`: one-shot utility that publishes a file-ready
   signal to Kafka.
 
-Start everything from `ETL/`:
+All of them are defined in the repository-root `docker-compose.yml` (one image,
+`ETL/Dockerfile`). Start everything from the repository root:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 Publish a file-ready signal:
@@ -106,7 +108,7 @@ python -B ETL/spark/test_transform.py
 python -B ETL/spark/test_spark.py
 ```
 
-From `ETL/`:
+From the repository root:
 
 ```bash
 docker compose config --quiet

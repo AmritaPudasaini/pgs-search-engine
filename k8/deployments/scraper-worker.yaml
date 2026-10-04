@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraper-worker
+  labels:
+    app.kubernetes.io/name: scraper-worker
+spec:
+  # Scale with `kubectl -n pgs-search-engine scale deploy/scraper-worker --replicas=N`:
+  # replicas share the Temporal task queue and load-balance automatically.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scraper-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scraper-worker
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532 # distroless nonroot
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-temporal
+          image: temporalio/auto-setup:1.24.2
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until temporal operator namespace describe --namespace default --address temporal:7233 > /dev/null 2>&1; do
+                echo "waiting for temporal"; sleep 5
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+        - name: wait-for-s3
+          image: localstack/localstack:3.8
+          imagePullPolicy: IfNotPresent
+          command:
+            - python3
+            - -c
+            - |
+              import time, urllib.request
+              while True:
+                  try:
+                      urllib.request.urlopen("http://s3:4566/crawled-pages", timeout=3)
+                      break
+                  except Exception:
+                      print("waiting for the crawled-pages bucket", flush=True)
+                      time.sleep(5)
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+        - name: wait-for-topic
+          image: apache/kafka:3.8.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -c
+            - |
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe --topic crawled-documents > /dev/null 2>&1; do
+                echo "waiting for kafka-init"; sleep 5
+              done
+          env:
+            - { name: KAFKA_HEAP_OPTS, value: "-Xmx128m" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 384Mi }
+      containers:
+        - name: worker
+          image: pgs-search-engine/scraper-worker
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: scraper-config
+          # MAX_CONCURRENT_ACTIVITIES is left to the binary's default (NumCPU * 100, from the
+          # CPU limit below via automaxprocs).
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 250m, memory: 128Mi }
+            limits: { cpu: "2", memory: 512Mi }

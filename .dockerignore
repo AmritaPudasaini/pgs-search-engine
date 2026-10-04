@@ -31,9 +31,12 @@ database/tests
 database/docs
 database/*.png
 
-# ETL/: runtime state written by Airflow and the Kafka consumer
+# ETL/: runtime state written by Airflow, the DAGs and the Kafka consumer; docs
 ETL/airflow/logs/*
+ETL/airflow/data/processed
 ETL/kafka/*.sqlite3*
+ETL/*.png
+ETL/**/*.md
 
 # search-engine/: tests are not shipped
 search-engine/tests

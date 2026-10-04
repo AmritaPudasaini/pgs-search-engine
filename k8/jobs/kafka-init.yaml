@@ -1,0 +1,49 @@
+# Creates the topics the code uses (idempotent): crawled-documents (scraper -> ETL
+# consumer) and scraped_files_topic (the file-ready signal the etl_ingestion_pipeline DAG
+# polls). Deletes itself 10 minutes after finishing, so each `kubectl apply` re-runs it.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  labels:
+    app.kubernetes.io/name: kafka-init
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-init
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: create-topics
+          image: apache/kafka:3.8.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 > /dev/null 2>&1; do
+                echo "waiting for kafka"; sleep 3
+              done
+              for topic in crawled-documents scraped_files_topic; do
+                /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
+                  --create --if-not-exists --topic "$topic" \
+                  --partitions 1 --replication-factor 1
+              done
+          env:
+            - { name: KAFKA_HEAP_OPTS, value: "-Xmx128m" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 384Mi }

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensearch-dashboards
+  labels:
+    app.kubernetes.io/name: opensearch-dashboards
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opensearch-dashboards
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opensearch-dashboards
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dashboards
+          image: opensearchproject/opensearch-dashboards:2.19.6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5601
+          env:
+            - { name: OPENSEARCH_HOSTS, value: '["http://opensearch:9200"]' }
+            - { name: DISABLE_SECURITY_DASHBOARDS_PLUGIN, value: "true" }
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { memory: 1Gi }

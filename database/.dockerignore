@@ -1,4 +1,4 @@
-# Build context: database/ -- shared by Dockerfile (PostgreSQL image, copies nothing)
+# Build context: database/ -- shared by Dockerfile (PostgreSQL image, copies sql/)
 # and migrate.Dockerfile (needs pyproject.toml, README.md, constraints.txt, src/,
 # alembic.ini, migrations/, scripts/ and data/).
 

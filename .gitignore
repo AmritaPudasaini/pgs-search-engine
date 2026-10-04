@@ -221,3 +221,5 @@ __marimo__/
 .claude/
 node_modules/
 dist/
+# Kubernetes secrets (template: k8/secrets/secrets.env.example)
+k8/secrets/secrets.env

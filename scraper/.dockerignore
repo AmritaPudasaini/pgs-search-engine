@@ -1,10 +1,12 @@
-# Build context: scraper/ -- the Go module (go.mod, go.sum, cmd/, internal/, proto/).
+# Build context: scraper/ -- the Go module (go.mod, go.sum, cmd/, internal/, proto/,
+# scripts/) plus configs/ (seed lists, copied into the `cli` target).
 .git
 .env
 *.log
-/search-engine
 *.exe
-data/output
+bin/
+data/
+/search-engine
 
 # Not part of the Go build
 python
@@ -12,11 +14,13 @@ python
 **/*.py[cod]
 .venv
 *.md
+docs
+k8s
+docker
+migrations
+sqlc.yaml
+.golangci.yml
 Makefile
 Dockerfile
 .dockerignore
 .gitignore
-bin/
-data/
-.git/
-*.log

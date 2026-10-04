@@ -1,0 +1,16 @@
+# Search engine core (image: search-engine/Dockerfile). The API reaches it at
+# search-engine:50051; from the host:
+#   kubectl -n pgs-search-engine port-forward svc/search-engine 50051:50051
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-engine
+  labels:
+    app.kubernetes.io/name: search-engine
+spec:
+  selector:
+    app.kubernetes.io/name: search-engine
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

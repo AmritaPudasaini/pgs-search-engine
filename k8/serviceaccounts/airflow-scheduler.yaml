@@ -1,0 +1,9 @@
+# KubernetesExecutor: the scheduler launches one pod per DAG task (pod template:
+# configmaps/airflow-pod-template.yaml), watches it and deletes it when the task is done. The webserver only
+# reads logs of running task pods. Task pods themselves get no API access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airflow-scheduler
+  labels:
+    app.kubernetes.io/name: airflow

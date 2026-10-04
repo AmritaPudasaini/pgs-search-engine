@@ -1,0 +1,15 @@
+# Headless Chrome the workers use to render JavaScript-built pages (RENDER=auto), at
+# ws://chrome:9222. Internal only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: chrome
+  labels:
+    app.kubernetes.io/name: chrome
+spec:
+  selector:
+    app.kubernetes.io/name: chrome
+  ports:
+    - name: devtools
+      port: 9222
+      targetPort: devtools

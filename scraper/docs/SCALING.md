@@ -25,8 +25,9 @@ Worker flags:
 | `--shard-index` | shard this worker polls; `-1` = all shards |
 | `--shard-from-hostname` | take the shard from the hostname's trailing ordinal (`worker-sharded-3` -> 3) |
 
-Local: `docker compose --profile sharded up -d` starts three shard workers,
-then crawl with `--task-queue-shards=3`. Kubernetes: `k8s/06-worker-sharded.yaml`
+Local (from the repository root): `docker compose --profile scraper-sharded up -d`
+starts three shard workers (`scraper-worker-shard-{0,1,2}`),
+then crawl with `--task-queue-shards=3`. Kubernetes: the `scraper-sharded` component in the repository's `k8/`
 (StatefulSet, one pod per shard).
 
 Notes:

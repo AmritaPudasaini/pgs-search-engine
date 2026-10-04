@@ -3,8 +3,9 @@
 ## Crawl every page of each domain
 
 ```bash
-docker compose --profile sharded up -d --build        # stack + Chrome + shard workers
-docker compose run --rm scraper --seeds-file=/configs/seeds.example.txt \
+# from the repository root
+docker compose --profile scraper-sharded up -d --build   # stack + Chrome + shard workers
+docker compose run --rm scraper-cli --seeds-file=/configs/seeds.example.txt \
   --whole-domain --max-depth=8 --max-pages=2000 --max-concurrent-domains=20 \
   --task-queue-shards=3
 ```

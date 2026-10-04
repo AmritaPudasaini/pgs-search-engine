@@ -23,7 +23,7 @@ A real-time, geographically aware, cross-lingual (Nepali + English) search engin
 | [`ETL/`](ETL/) | Extraction/transform pipelines (text cleaning, geo-tagging, embedding generation) feeding the search index. |
 | [`search-engine/`](search-engine/) | Search/ranking index configuration (Elasticsearch/Qdrant) and hybrid BM25 + dense-embedding scoring. |
 | [`terraform/`](terraform/) | Infrastructure as code for provisioning (bare-metal and cloud). |
-| [`k8/`](k8/) | Kubernetes manifests for container orchestration. |
+| [`k8/`](k8/) | Kubernetes manifests (Kustomize) for the whole stack; see `k8/README.md`. |
 
 ## Getting started
 
@@ -48,22 +48,36 @@ creates the Kafka topics (`kafka-init`). Only then do the services that depend o
 | API | http://localhost:8000 | `api/Dockerfile` |
 | Airflow | http://localhost:8080 | ETL orchestration (`ETL/Dockerfile`); login from `.env` |
 | PostgreSQL 16 + PostGIS + pgvector | `localhost:5432` | `database/Dockerfile`; schema owned by `pgs-db` migrations |
-| OpenSearch 3.8 | http://localhost:9200 | security plugin disabled (local only) |
+| OpenSearch 2.19 | http://localhost:9200 | security plugin disabled (local only); 2.x for the ETL index's `nmslib` k-NN engine |
 | Kafka 3.8 (KRaft) | `localhost:9092` | containers use `kafka:29092` |
+| ClamAV | `localhost:3310` | malware scan for ETL intake; first start downloads signatures |
 
 Optional parts are behind Compose profiles. Enable them with `--profile <name>`, or set
 `COMPOSE_PROFILES` in `.env`:
 
-| Profile | Adds | Status |
+| Profile | Adds | Notes |
 | --- | --- | --- |
+| `scraper` | Go crawler (`scraper/Dockerfile`): Temporal + UI (http://localhost:8233), LocalStack S3 + browser (http://localhost:8081), headless Chrome, worker, documents API (http://localhost:8082/docs) | start a crawl with `docker compose run --rm scraper-cli --seeds=<url>` |
+| `scraper-sharded` | the same, with three host-sharded workers | see `scraper/docs/SCALING.md` |
 | `search` | gRPC search engine (`search-engine/Dockerfile`, :50051) + index setup | needs ~3 GB RAM; downloads ~2.5 GB of models on first start |
 | `ui` | Next.js UI on http://localhost:3000 (`ui/Dockerfile`) | build fails until `ui/src/lib` and the UI's npm dependencies are in the repo |
-| `scraper` | Go crawler (`scraper/Dockerfile`) + Temporal dev server (http://localhost:8233) | build fails until `cmd/worker`'s missing packages are in the repo |
-| `tools` | OpenSearch Dashboards (http://localhost:5601), `etl-spark-test` | |
+| `tools` | OpenSearch Dashboards (http://localhost:5601), `opensearch-indexer`, `ingestion-signal-publisher`, `etl-spark-test` | one-shot tools run with `docker compose run --rm <name>` |
 
 All published ports bind to `127.0.0.1`. Containers reach each other by service name
-(`postgres`, `kafka`, `opensearch`, `search-engine`). `docker compose down` stops the stack;
+(`postgres`, `kafka`, `opensearch`, `clamav`, `temporal`, `s3`, `search-engine`). `docker compose down` stops the stack;
 `docker compose down -v` also deletes its data volumes.
+
+### Run on Kubernetes
+
+[`k8/`](k8/) has Kustomize manifests for the same stack (single node, non-HA, e.g. Docker
+Desktop's Kubernetes). Airflow uses the KubernetesExecutor there, so every DAG task runs in
+its own pod. See [`k8/README.md`](k8/README.md):
+
+```bash
+docker compose build
+cp k8/secrets/secrets.env.example k8/secrets/secrets.env
+kubectl apply -k k8/
+```
 
 ### Run services individually
 

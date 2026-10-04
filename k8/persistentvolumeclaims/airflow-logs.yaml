@@ -1,0 +1,15 @@
+# Volumes shared by the ETL pods. ReadWriteOnce volumes can be mounted by several pods on
+# the same node, which is what this single-node setup relies on for the shared ones
+# (airflow-logs, etl-processed, etl-models). On a multi-node cluster switch those to a
+# ReadWriteMany storage class (NFS, CephFS, ...) or to remote task logging.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airflow-logs # task logs, written by task pods, read by scheduler and webserver
+  labels:
+    app.kubernetes.io/name: airflow
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi

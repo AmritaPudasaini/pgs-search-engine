@@ -6,7 +6,7 @@ the indexer safely replaces the same documents instead of creating copies.
 
 ## Start OpenSearch
 
-From `ETL/`:
+From the repository root (the services live in the root `docker-compose.yml`):
 
 ```powershell
 docker compose up -d opensearch

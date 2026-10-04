@@ -8,8 +8,8 @@ itself is not part of this local ETL setup.
 Preferred:
 
 ```bash
-cd ETL
-docker compose up --build
+# from the repository root
+docker compose up -d --build
 ```
 
 Kafka is exposed on `localhost:9092`.
@@ -19,7 +19,7 @@ Kafka is exposed on `localhost:9092`.
 This is the main signal used by the Airflow DAG `etl_ingestion_pipeline`.
 
 ```bash
-cd ETL
+# from the repository root
 docker compose run --rm ingestion-signal-publisher
 ```
 

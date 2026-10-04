@@ -1,0 +1,16 @@
+# Airflow UI. Reach it from the host with
+#   kubectl -n pgs-search-engine port-forward svc/airflow-webserver 8080:8080
+# (login from k8/secrets/secrets.env). Task logs are read from the shared airflow-logs volume.
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  labels:
+    app.kubernetes.io/name: airflow-webserver
+spec:
+  selector:
+    app.kubernetes.io/name: airflow-webserver
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

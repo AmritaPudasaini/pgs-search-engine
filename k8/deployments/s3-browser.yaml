@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-browser
+  labels:
+    app.kubernetes.io/name: s3-browser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s3-browser
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s3-browser
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: s3manager
+          image: cloudlena/s3manager:v0.11.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - { name: ENDPOINT, value: "s3:4566" }
+            - { name: REGION, value: us-east-1 }
+            - { name: ACCESS_KEY_ID, value: test }
+            - { name: SECRET_ACCESS_KEY, value: test }
+            - { name: USE_SSL, value: "false" }
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }

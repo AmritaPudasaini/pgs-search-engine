@@ -5,32 +5,37 @@ SCALE      ?= 3
 SEEDS      ?=
 SEEDS_FILE ?=
 
+# The scraper runs in the repository-root docker-compose.yml (profile `scraper`):
+# Temporal (+UI), LocalStack S3 (+browser), headless Chrome, the worker and the API,
+# next to the rest of the stack.
+COMPOSE := docker compose -f ../docker-compose.yml --profile scraper
+
 .PHONY: run
-run: ## One command to bring up the whole stack: Postgres, Temporal, Temporal UI, and a worker. Ctrl-C to stop.
-	docker compose up --build
+run: ## Bring up the stack with the scraper (Temporal, Temporal UI, S3, Chrome, worker, API). Ctrl-C to stop.
+	$(COMPOSE) up --build
 
 .PHONY: up
 up: ## Same as `run` but detached (background).
-	docker compose up --build -d
+	$(COMPOSE) up --build -d
 
 .PHONY: down
-down: ## Stop and remove all containers + volumes (wipes Postgres data).
-	docker compose down -v
+down: ## Stop and remove the stack's containers (volumes are kept; the stack is shared).
+	$(COMPOSE) down
 
 .PHONY: scale
 scale: ## Scale worker replicas: make scale SCALE=5
-	docker compose up --build -d --scale worker=$(SCALE)
+	$(COMPOSE) up --build -d --scale scraper-worker=$(SCALE)
 
 .PHONY: logs
 logs:
-	docker compose logs -f worker
+	$(COMPOSE) logs -f scraper-worker
 
 .PHONY: crawl
-crawl: ## Start a crawl against the running compose stack: make crawl SEEDS=https://example.com
+crawl: ## Start a crawl against the running stack: make crawl SEEDS=https://example.com
 	@if [ -z "$(SEEDS)" ] && [ -z "$(SEEDS_FILE)" ]; then \
 		echo "usage: make crawl SEEDS=https://example.com   (or SEEDS_FILE=configs/seeds.example.txt)"; exit 1; \
 	fi
-	docker compose run --rm scraper \
+	docker compose -f ../docker-compose.yml run --rm scraper-cli \
 		$(if $(SEEDS),--seeds=$(SEEDS)) \
 		$(if $(SEEDS_FILE),--seeds-file=/$(SEEDS_FILE)) \
 		--same-host-only=false --max-depth=2 --max-pages=200 --max-pages-per-domain=50
@@ -81,23 +86,21 @@ devdb-up: ## Start a standalone local Postgres for `go test`/manual runs against
 devdb-down:
 	docker rm -f scraper-devdb
 
-.PHONY: k8s-migrations-configmap
-k8s-migrations-configmap: ## Regenerate k8s/04-migrations-configmap.yaml from migrations/*.sql (run after editing migrations).
-	kubectl create configmap migrations --from-file=migrations -n search-engine-scraper \
-		--dry-run=client -o yaml > k8s/04-migrations-configmap.yaml
-
+# Kubernetes manifests for the whole project live in ../k8 (Kustomize); the scraper is
+# its `scraper` component -- enable it in ../k8/kustomization.yaml. Its migrations/ are not
+# applied there: the Python pgs-db migrations own the database schema.
 .PHONY: k8s-apply
-k8s-apply: k8s-migrations-configmap ## Deploy to the current kubectl context.
-	kubectl apply -f k8s/
+k8s-apply: ## Deploy the project (incl. enabled components) to the current kubectl context.
+	kubectl apply -k ../k8
 
 .PHONY: k8s-delete
 k8s-delete:
-	kubectl delete -f k8s/ --ignore-not-found
+	kubectl delete -k ../k8 --ignore-not-found
 
 .PHONY: k8s-crawl
 k8s-crawl: ## Run a one-off crawl Job in the cluster: make k8s-crawl SEEDS=https://example.com
 	@test -n "$(SEEDS)" || (echo "usage: make k8s-crawl SEEDS=https://example.com" && exit 1)
-	JOB_NAME=crawl-$$(date +%s) SEEDS="$(SEEDS)" envsubst < k8s/scraper-job.yaml.tmpl | kubectl apply -f -
+	SEEDS="$(SEEDS)" envsubst < ../k8/jobs/on-demand/scraper-crawl.yaml.tmpl | kubectl create -f -
 
 .PHONY: help
 help:

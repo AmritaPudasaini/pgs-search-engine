@@ -1,0 +1,106 @@
+# Airflow scheduler with the KubernetesExecutor: it runs no tasks itself, it launches a pod
+# per task instance from the pod template (configmaps/airflow-pod-template.yaml) and tracks
+# it through the Kubernetes API (RBAC: roles/airflow-pod-launcher.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  labels:
+    app.kubernetes.io/name: airflow-scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: airflow-scheduler
+    spec:
+      serviceAccountName: airflow-scheduler
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 50000
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Waits (up to 5 minutes per attempt) until airflow-init has migrated the database.
+        - name: wait-for-migrations
+          image: pgs-search-engine/etl
+          imagePullPolicy: IfNotPresent
+          args: ["airflow", "db", "check-migrations", "--migration-wait-timeout=300"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          env:
+            - name: AIRFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_DB_PASSWORD }
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflow:$(AIRFLOW_DB_PASSWORD)@airflow-db/airflow
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 768Mi }
+      containers:
+        - name: scheduler
+          image: pgs-search-engine/etl
+          imagePullPolicy: IfNotPresent
+          args: ["scheduler"]
+          ports:
+            - name: health
+              containerPort: 8974
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          env:
+            - name: AIRFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_DB_PASSWORD }
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflow:$(AIRFLOW_DB_PASSWORD)@airflow-db/airflow
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_FERNET_KEY }
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_SECRET_KEY }
+          volumeMounts:
+            - name: pod-template
+              mountPath: /opt/airflow/pod_templates
+              readOnly: true
+            - name: logs
+              mountPath: /opt/airflow/logs
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: health
+            periodSeconds: 20
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits: { memory: 1536Mi }
+      volumes:
+        - name: pod-template
+          configMap:
+            name: airflow-pod-template
+        - name: logs
+          persistentVolumeClaim:
+            claimName: airflow-logs
