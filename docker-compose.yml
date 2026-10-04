@@ -98,7 +98,7 @@ services:
   # =================================================================================
   # PostgreSQL 16 + PostGIS + pgvector (database/Dockerfile)
   # =================================================================================
-  postgres1:
+  postgres:
     build:
       context: ./database
       dockerfile: Dockerfile
