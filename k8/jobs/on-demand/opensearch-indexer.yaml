@@ -31,7 +31,7 @@ spec:
           image: pgs-search-engine/etl:local
           imagePullPolicy: IfNotPresent
           command: ["/usr/bin/dumb-init", "--", "/opt/etl-venv/bin/python", "-m", "opensearch.index_documents"]
-          workingDir: /opt/etl/OpenSearch
+          workingDir: /opt/etl/open_search
           env:
             - { name: OPENSEARCH_URL, value: "http://opensearch:9200" }
             - { name: OPENSEARCH_INDEX, value: pgs_documents }

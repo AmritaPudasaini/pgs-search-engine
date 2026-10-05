@@ -65,7 +65,7 @@ spec:
         - name: seed
           image: pgs-search-engine/db-migrate
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "python scripts/seed_geography.py && python scripts/seed_boundaries.py"]
+          command: ["sh", "-c", "python scripts/seed_geography.py && python scripts/seed_boundaries.py && python scripts/seed_domains.py"]
           env:
             - name: POSTGRES_USER
               valueFrom:

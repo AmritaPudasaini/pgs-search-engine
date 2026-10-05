@@ -12,33 +12,29 @@ type Querier interface {
 	CountDocuments(ctx context.Context) (int64, error)
 	CountDocumentsByCategory(ctx context.Context) ([]CountDocumentsByCategoryRow, error)
 	CreateCrawlRun(ctx context.Context, arg CreateCrawlRunParams) (int64, error)
+	// status is 'completed' or 'failed' (any case; a trigger upper-cases it). error is
+	// NULL for a run that completed.
 	FinishCrawlRun(ctx context.Context, arg FinishCrawlRunParams) error
 	GetCrawlRun(ctx context.Context, id int64) (CrawlRun, error)
 	ListCrawlRuns(ctx context.Context, arg ListCrawlRunsParams) ([]CrawlRun, error)
-	// crawl_run_id and country are optional additional filters: pass NULL to
-	// ignore either (all documents in the category), or a specific run's ID /
-	// ISO 3166-1 alpha-2 country code to narrow further -- e.g. an ETL
-	// consumer scoped to only Nepal-origin documents (country = 'NP').
-	ListDocumentsByCategory(ctx context.Context, arg ListDocumentsByCategoryParams) ([]Document, error)
-	// Given a batch of candidate normalized URLs, returns the subset that
-	// already have a document fetched more recently than `since` -- the
-	// revisit/freshness policy's core check: skip re-fetching a URL that was
-	// crawled recently enough, but allow one that's stale or was never crawled
-	// (never crawled simply won't appear in the result, which is what
-	// "startable" means to the caller).
+	// crawl_run_id and country are optional filters: NULL ignores them.
+	ListDocumentsByCategory(ctx context.Context, arg ListDocumentsByCategoryParams) ([]CrawledDocument, error)
+	// The subset of the candidate URLs with any version fetched after `since`: the
+	// revisit policy skips those; a URL never crawled simply isn't returned.
 	ListFreshDocumentURLs(ctx context.Context, arg ListFreshDocumentURLsParams) ([]string, error)
-	// Called after every page processed within a run (including mid-run, before
-	// Continue-As-New) so a run's progress is visible while it's still going,
-	// not just after it finishes.
+	// Called during a run (including before a Continue-As-New), so a run's progress
+	// is visible while it is still going.
 	UpdateCrawlRunStats(ctx context.Context, arg UpdateCrawlRunStatsParams) error
-	// Idempotent write: a retried WriteDocument activity (Temporal at-least-once
-	// semantics) lands on the same row instead of inserting a duplicate,
-	// because normalized_url is unique -- one row per URL, always reflecting
-	// its most recently crawled state. A retry with unchanged content is a
-	// no-op update; a genuinely changed page (recrawled after RevisitAfter,
-	// see CheckFreshness) has its fields refreshed in place rather than
-	// accumulating a second row for the same URL.
-	UpsertDocument(ctx context.Context, arg UpsertDocumentParams) (int64, error)
+	// Queries against the shared schema, owned by database/ (pgs_db models + Alembic);
+	// sqlc reads it from database/sql/scraper_schema.sql, exported from those models. The writes are the statements of
+	// database/docs/scraper-db-contract.md.
+	// Keyed on (normalized_url, content_hash): a retried WriteDocument activity
+	// (Temporal at-least-once) or a re-crawl of unchanged content updates the same
+	// row; changed content adds a new version row. domain_id is resolved from the
+	// host, without www. (domains are stored that way, see pgs_db site_host); NULL for
+	// a host that isn't a registered domain -- the page still stores.
+	// inserted is true only for a genuinely new row.
+	UpsertCrawledDocument(ctx context.Context, arg UpsertCrawledDocumentParams) (UpsertCrawledDocumentRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

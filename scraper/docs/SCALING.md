@@ -2,7 +2,8 @@
 
 ## Default: identical replicas
 
-`make scale SCALE=N` runs N identical workers on one task queue
+`docker compose --profile scraper up -d --scale scraper-worker=N` (from the repository
+root) runs N identical workers on one task queue
 (`scraper-task-queue`). Temporal gives each fetch to whichever worker is
 free. Simple and fast to scale, but a host's fetches spread over all
 replicas, so per-host politeness (rate limit, `Crawl-delay`, robots cache,

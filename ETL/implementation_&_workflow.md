@@ -2,62 +2,62 @@
 
 ## Current Scope
 
-The ETL section is self-contained for development. It does not depend on the
-scraper, real MinIO, or PostgreSQL application schemas. Kafka signals are
-produced manually, files are read from the local ETL file store, transformed
-records are written to JSONL, and an isolated OpenSearch service can index that
-output.
+The ETL starts where the scraper stops: when the crawl of one website has
+finished, the scraper publishes one `site_crawl_completed` event to Kafka, and
+Airflow runs the PySpark pipeline for that whole site. Pages are read from the
+scraper's S3 bucket (LocalStack locally), transformed records are written to
+JSONL (not yet PostgreSQL), and an OpenSearch service can index that output.
 
 ## Implemented Workflow
 
 ```text
-Kafka file-ready signal
-  -> Airflow DAG: etl_ingestion_pipeline
-  -> local file store: ETL/airflow/data/local_dfs_store/
-  -> rule-based file intake check
-  -> Spark-facing transformation logic
+Airflow DAG scraper_crawl_schedule (every 30 min)
+  -> Temporal CrawlDomainsWorkflow over every website in `domains` (Go scraper worker)
+  -> Kafka scraped_files_topic: one site_crawl_completed event per crawled website
+  -> Airflow DAG etl_ingestion_pipeline: once 100 events are waiting
+  -> Temporal EtlBatchWorkflow (etl-worker = Spark driver), one activity per site
+  -> PySpark pipeline ETL/spark/site_pipeline.py on the Spark cluster, in order:
+       the site's pages from S3 (<key_prefix>/<crawl_run_id>/<host>/)
+       -> rule-based intake check + ClamAV scan
+       -> text extraction and transformation
+       -> dedup, LaBSE embedding
   -> JSONL output: ETL/airflow/data/processed/transformed_documents.jsonl
-  -> OpenSearch ingestion: ETL/OpenSearch/opensearch/index_documents.py
+  -> OpenSearch ingestion: ETL/open_search/opensearch/index_documents.py
 ```
 
 ## Docker Services
 
 - `kafka`: local Kafka broker exposed on `localhost:9092`.
 - `clamav`: ClamAV daemon used by the intake scanner (`clamav:3310`).
-- `airflow-db`: Airflow metadata database.
-- `redis`: Celery broker for Airflow workers.
+- `db-roles`: creates Airflow's and Temporal's databases and roles in the
+  shared `postgres` server.
 - `airflow-webserver`: Airflow UI at `http://localhost:8080`.
-- `airflow-scheduler`: schedules DAG work.
-- `airflow-worker`: executes DAG tasks.
-- `ingestion-signal-publisher`: one-shot utility that publishes a file-ready
-  signal to Kafka.
+- `airflow-scheduler`: schedules the DAGs and runs their tasks (LocalExecutor).
+- `temporal`, `temporal-ui`: workflow engine (UI at
+  `http://localhost:8233`).
+- `etl-worker`: Temporal worker for `EtlBatchWorkflow`, the Spark driver.
+- `spark-master`, `spark-worker`: Spark standalone cluster (UI at
+  `http://localhost:8090`).
 
 All of them are defined in the repository-root `docker-compose.yml` (one image,
 `ETL/Dockerfile`). Start everything from the repository root:
 
 ```bash
-docker compose up -d --build
+docker compose --profile scraper up -d --build
+docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule   # crawl now
 ```
-
-Publish a file-ready signal:
-
-```bash
-docker compose run --rm ingestion-signal-publisher
-```
-
-Then trigger `etl_ingestion_pipeline` in Airflow.
 
 ## Airflow DAGs
 
-- `etl_ingestion_pipeline`: main ETL flow.
-- `airflow_healthcheck`: confirms Airflow scheduling and worker execution.
-- `document_extraction_check`: validates simple local HTML/TXT extraction
-  through Airflow workers.
+- `scraper_crawl_schedule`: starts the crawl of every website every 30 minutes.
+- `etl_ingestion_pipeline`: main ETL flow, in batches of 100 crawled sites.
+- `airflow_healthcheck`: confirms Airflow scheduling and task execution.
+- `document_extraction_check`: validates simple local HTML/TXT extraction.
 
 Main DAG tasks:
 
 ```text
-poll_kafka_signal -> transform_document -> persist_transformed_document
+poll_batch -> process_batch (EtlBatchWorkflow on Temporal) -> commit_offsets
 ```
 
 ## Transformation Features
@@ -78,11 +78,11 @@ The OpenSearch integration reads the existing transformed JSONL; it
 does not create another transformation pipeline. `document_id` from
 `ETL/spark/transform.py` is used as the OpenSearch `_id`, making repeated
 ingestion idempotent. The index mapping is defined in
-`ETL/OpenSearch/opensearch/create_index.py` and covers the actual transformed
+`ETL/open_search/opensearch/create_index.py` and covers the actual transformed
 fields, including text, keyword, numeric, boolean, and object fields.
 
 Start the OpenSearch service and index the output with the Windows commands in
-`ETL/OpenSearch/OpenSearch.md`.
+`ETL/open_search/OpenSearch.md`.
 
 ## File Intake Checks
 
@@ -95,14 +95,15 @@ Implemented in `ETL/spark/security_scanner.py`:
 - Filename length check.
 - SHA256 audit hash.
 
-This is a rule-based intake guard only. It is not a replacement for ClamAV.
+These rule checks run together with the ClamAV scan (`inspect_bytes`), as the
+first step of the per-site pipeline.
 
 ## Verification Commands
 
 From the repository root:
 
 ```bash
-python -B ETL/kafka/test_consumer.py
+python -B ETL/spark/test_site_pipeline.py
 python -B ETL/spark/test_security_scanner.py
 python -B ETL/spark/test_transform.py
 python -B ETL/spark/test_spark.py
@@ -118,15 +119,12 @@ When the stack is running:
 
 ```bash
 docker compose ps
-docker compose run --rm ingestion-signal-publisher
 docker compose exec -T airflow-scheduler airflow dags list
 docker compose exec -T airflow-scheduler airflow dags list-runs -d etl_ingestion_pipeline
 ```
 
 ## Remaining Work
 
-- Replace the local file store with MinIO once available.
-- Add real ClamAV malware scanning.
 - Add the final PostgreSQL write path.
 - Add embeddings only if the existing transformation produces them.
 - Replace seed geo rules with an official Nepal administrative gazetteer.

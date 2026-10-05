@@ -1,78 +1,105 @@
--- name: UpsertDocument :one
--- Idempotent write: a retried WriteDocument activity (Temporal at-least-once
--- semantics) lands on the same row instead of inserting a duplicate,
--- because normalized_url is unique -- one row per URL, always reflecting
--- its most recently crawled state. A retry with unchanged content is a
--- no-op update; a genuinely changed page (recrawled after RevisitAfter,
--- see CheckFreshness) has its fields refreshed in place rather than
--- accumulating a second row for the same URL.
-INSERT INTO documents (
-    url, normalized_url, category, title, body_text, links, depth,
-    status_code, content_type, content_hash, fetch_duration_ms, fetch_error,
-    fetched_at, json_ld, geo_lat, geo_lng, anchor_texts, crawl_run_id,
-    canonical_url, final_url, sim_hash, meta_description, headings, host,
-    country
+-- Queries against the shared schema, owned by database/ (pgs_db models + Alembic);
+-- sqlc reads it from database/sql/scraper_schema.sql, exported from those models. The writes are the statements of
+-- database/docs/scraper-db-contract.md.
+
+-- name: UpsertCrawledDocument :one
+-- Keyed on (normalized_url, content_hash): a retried WriteDocument activity
+-- (Temporal at-least-once) or a re-crawl of unchanged content updates the same
+-- row; changed content adds a new version row. domain_id is resolved from the
+-- host, without www. (domains are stored that way, see pgs_db site_host); NULL for
+-- a host that isn't a registered domain -- the page still stores.
+-- inserted is true only for a genuinely new row.
+INSERT INTO crawled_documents (
+    crawl_run_id, domain_id, url, normalized_url, final_url, canonical_url, host, category,
+    title, meta_description, meta_keywords, open_graph, text, headings, json_ld,
+    emails, phones, address, social_links, links, anchor_texts,
+    internal_links, external_links, image_links, video_links,
+    geo_lat, geo_lng, country, sim_hash, depth, status_code, content_type,
+    content_hash, fetched_at, fetch_duration_ms, error
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+    sqlc.narg('crawl_run_id'),
+    (SELECT d.id FROM domains d WHERE d.domain = regexp_replace(lower(sqlc.narg('host')::text), '^www\.', '')),
+    sqlc.arg('url'), sqlc.arg('normalized_url'), sqlc.narg('final_url'), sqlc.narg('canonical_url'),
+    sqlc.narg('host'), sqlc.narg('category'),
+    sqlc.narg('title'), sqlc.narg('meta_description'), sqlc.narg('meta_keywords'),
+    sqlc.narg('open_graph'), sqlc.narg('text'), sqlc.narg('headings'), sqlc.narg('json_ld'),
+    sqlc.narg('emails'), sqlc.narg('phones'), sqlc.narg('address'), sqlc.narg('social_links'),
+    sqlc.narg('links'), sqlc.narg('anchor_texts'),
+    sqlc.narg('internal_links'), sqlc.narg('external_links'), sqlc.narg('image_links'),
+    sqlc.narg('video_links'),
+    sqlc.narg('geo_lat'), sqlc.narg('geo_lng'), sqlc.narg('country'), sqlc.narg('sim_hash'),
+    sqlc.arg('depth'), sqlc.narg('status_code'), sqlc.narg('content_type'),
+    sqlc.arg('content_hash'), sqlc.arg('fetched_at'), sqlc.narg('fetch_duration_ms'),
+    sqlc.narg('error')
 )
-ON CONFLICT (normalized_url) DO UPDATE SET
+ON CONFLICT (normalized_url, content_hash) DO UPDATE SET
+    crawl_run_id      = EXCLUDED.crawl_run_id,
+    domain_id         = EXCLUDED.domain_id,
     url               = EXCLUDED.url,
+    final_url         = EXCLUDED.final_url,
+    canonical_url     = EXCLUDED.canonical_url,
+    host              = EXCLUDED.host,
     category          = EXCLUDED.category,
     title             = EXCLUDED.title,
-    body_text         = EXCLUDED.body_text,
+    meta_description  = EXCLUDED.meta_description,
+    meta_keywords     = EXCLUDED.meta_keywords,
+    open_graph        = EXCLUDED.open_graph,
+    text              = EXCLUDED.text,
+    headings          = EXCLUDED.headings,
+    json_ld           = EXCLUDED.json_ld,
+    emails            = EXCLUDED.emails,
+    phones            = EXCLUDED.phones,
+    address           = EXCLUDED.address,
+    social_links      = EXCLUDED.social_links,
     links             = EXCLUDED.links,
+    anchor_texts      = EXCLUDED.anchor_texts,
+    internal_links    = EXCLUDED.internal_links,
+    external_links    = EXCLUDED.external_links,
+    image_links       = EXCLUDED.image_links,
+    video_links       = EXCLUDED.video_links,
+    geo_lat           = EXCLUDED.geo_lat,
+    geo_lng           = EXCLUDED.geo_lng,
+    country           = EXCLUDED.country,
+    sim_hash          = EXCLUDED.sim_hash,
     depth             = EXCLUDED.depth,
     status_code       = EXCLUDED.status_code,
     content_type      = EXCLUDED.content_type,
-    content_hash      = EXCLUDED.content_hash,
-    fetch_duration_ms = EXCLUDED.fetch_duration_ms,
-    fetch_error       = EXCLUDED.fetch_error,
     fetched_at        = EXCLUDED.fetched_at,
-    json_ld           = EXCLUDED.json_ld,
-    geo_lat           = EXCLUDED.geo_lat,
-    geo_lng           = EXCLUDED.geo_lng,
-    anchor_texts      = EXCLUDED.anchor_texts,
-    crawl_run_id      = EXCLUDED.crawl_run_id,
-    canonical_url     = EXCLUDED.canonical_url,
-    final_url         = EXCLUDED.final_url,
-    sim_hash          = EXCLUDED.sim_hash,
-    meta_description  = EXCLUDED.meta_description,
-    headings          = EXCLUDED.headings,
-    host              = EXCLUDED.host,
-    country           = EXCLUDED.country,
-    updated_at        = now()
-RETURNING id;
+    fetch_duration_ms = EXCLUDED.fetch_duration_ms,
+    error             = EXCLUDED.error
+RETURNING id, (xmax = 0)::boolean AS inserted;
 
 -- name: CreateCrawlRun :one
-INSERT INTO crawl_runs (seed_count, max_depth, max_pages)
-VALUES ($1, $2, $3)
+INSERT INTO crawl_runs (
+    status, started_at, seed_count, max_depth, max_pages,
+    fetched_count, succeeded_count, failed_count, skipped_count, unique_url_count
+) VALUES ('RUNNING', now(), $1, $2, $3, 0, 0, 0, 0, 0)
 RETURNING id;
 
 -- name: UpdateCrawlRunStats :exec
--- Called after every page processed within a run (including mid-run, before
--- Continue-As-New) so a run's progress is visible while it's still going,
--- not just after it finishes.
+-- Called during a run (including before a Continue-As-New), so a run's progress
+-- is visible while it is still going.
 UPDATE crawl_runs SET
-    fetched       = $2,
-    succeeded     = $3,
-    failed        = $4,
-    skipped       = $5,
-    domain_capped = $6,
-    updated_at    = now()
+    fetched_count       = $2,
+    succeeded_count     = $3,
+    failed_count        = $4,
+    skipped_count       = $5,
+    domain_capped_count = $6
 WHERE id = $1;
 
 -- name: FinishCrawlRun :exec
+-- status is 'completed' or 'failed' (any case; a trigger upper-cases it). error is
+-- NULL for a run that completed.
 UPDATE crawl_runs SET
-    status        = $2,
-    fetched       = $3,
-    succeeded     = $4,
-    failed        = $5,
-    skipped       = $6,
-    domain_capped = $7,
-    error         = $8,
-    finished_at   = now(),
-    updated_at    = now()
-WHERE id = $1;
+    status              = sqlc.arg('status'),
+    fetched_count       = sqlc.arg('fetched_count'),
+    succeeded_count     = sqlc.arg('succeeded_count'),
+    failed_count        = sqlc.arg('failed_count'),
+    skipped_count       = sqlc.arg('skipped_count'),
+    domain_capped_count = sqlc.arg('domain_capped_count'),
+    error               = sqlc.narg('error'),
+    finished_at         = now()
+WHERE id = sqlc.arg('id');
 
 -- name: GetCrawlRun :one
 SELECT * FROM crawl_runs WHERE id = $1;
@@ -81,29 +108,23 @@ SELECT * FROM crawl_runs WHERE id = $1;
 SELECT * FROM crawl_runs ORDER BY started_at DESC LIMIT $1 OFFSET $2;
 
 -- name: CountDocuments :one
-SELECT count(*) FROM documents;
+SELECT count(*) FROM crawled_documents;
 
 -- name: CountDocumentsByCategory :many
-SELECT category, count(*) AS total FROM documents GROUP BY category ORDER BY category;
+SELECT coalesce(category, '')::text AS category, count(*) AS total
+FROM crawled_documents GROUP BY 1 ORDER BY 1;
 
 -- name: ListFreshDocumentURLs :many
--- Given a batch of candidate normalized URLs, returns the subset that
--- already have a document fetched more recently than `since` -- the
--- revisit/freshness policy's core check: skip re-fetching a URL that was
--- crawled recently enough, but allow one that's stale or was never crawled
--- (never crawled simply won't appear in the result, which is what
--- "startable" means to the caller).
-SELECT normalized_url FROM documents
+-- The subset of the candidate URLs with any version fetched after `since`: the
+-- revisit policy skips those; a URL never crawled simply isn't returned.
+SELECT DISTINCT normalized_url FROM crawled_documents
 WHERE normalized_url = ANY(sqlc.arg(normalized_urls)::text[])
   AND fetched_at > sqlc.arg(since)::timestamptz;
 
 -- name: ListDocumentsByCategory :many
--- crawl_run_id and country are optional additional filters: pass NULL to
--- ignore either (all documents in the category), or a specific run's ID /
--- ISO 3166-1 alpha-2 country code to narrow further -- e.g. an ETL
--- consumer scoped to only Nepal-origin documents (country = 'NP').
-SELECT * FROM documents
-WHERE category = $1
+-- crawl_run_id and country are optional filters: NULL ignores them.
+SELECT * FROM crawled_documents
+WHERE category = sqlc.arg('category')::text
   AND (sqlc.narg('crawl_run_id')::bigint IS NULL OR crawl_run_id = sqlc.narg('crawl_run_id'))
   AND (sqlc.narg('country')::text IS NULL OR country = sqlc.narg('country'))
-ORDER BY fetched_at DESC LIMIT $2 OFFSET $3;
+ORDER BY fetched_at DESC LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');

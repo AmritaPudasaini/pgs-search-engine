@@ -1,5 +1,5 @@
 -- Sets the login password of each service's database role from the environment
--- (run with psql after the migrations: the db-role-passwords service of the root
+-- (run with psql after the migrations: the db-roles service of the root
 -- docker-compose.yml, and the db-bootstrap Job in k8/). Baked into the PostgreSQL image
 -- (database/Dockerfile) at /opt/pgs/set-role-passwords.sql.
 --

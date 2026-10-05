@@ -30,7 +30,6 @@ resources:
   - persistentvolumeclaims/airflow-logs.yaml
   - persistentvolumeclaims/etl-processed.yaml
   - persistentvolumeclaims/etl-models.yaml
-  - persistentvolumeclaims/etl-consumer-data.yaml
   - persistentvolumeclaims/clamav-db.yaml
 
   # --- Access control (Airflow's KubernetesExecutor launches task pods) ------------
@@ -60,7 +59,6 @@ resources:
   # --- Deployments ---------------------------------------------------------------
   - deployments/api.yaml
   - deployments/clamav.yaml
-  - deployments/etl-consumer.yaml
   - deployments/airflow-scheduler.yaml
   - deployments/airflow-webserver.yaml
 
@@ -80,8 +78,9 @@ resources:
   # - deployments/search-engine.yaml
 
   # --- scraper: Go crawler with Temporal (+UI, own PostgreSQL), LocalStack S3
-  #     (+browser) and headless Chrome. The worker writes pages to S3 and fans them out
-  #     to Kafka (crawled-documents) for the ETL consumer; it never writes PostgreSQL.
+  #     (+browser) and headless Chrome. The worker writes pages to S3 and publishes one
+  #     event per crawled website to Kafka (scraped_files_topic) for the ETL DAG; it
+  #     never writes PostgreSQL.
   #     Start a crawl with jobs/on-demand/scraper-crawl.yaml.tmpl.
   # - configmaps/scraper-config.yaml
   # - configmaps/s3-init.yaml

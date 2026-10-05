@@ -39,9 +39,10 @@ docker compose up -d --build
 docker compose ps             # wait until services are "healthy"
 ```
 
-On every start, the stack migrates the database with Alembic (`db-migrate`), seeds the
-reference data (`db-seed`) and sets each service role's password (`db-role-passwords`). It also
-creates the Kafka topics (`kafka-init`). Only then do the services that depend on those start.
+On every start, the stack migrates the database with Alembic and seeds the reference data
+(`db-migrate`), then sets each service role's password and creates Airflow's and Temporal's
+databases in the same PostgreSQL server (`db-roles`). Only then do the services that depend on
+those start. The Kafka topic is created by its first event.
 
 | Service | URL on the host | Notes |
 | --- | --- | --- |
@@ -57,15 +58,19 @@ Optional parts are behind Compose profiles. Enable them with `--profile <name>`,
 
 | Profile | Adds | Notes |
 | --- | --- | --- |
-| `scraper` | Go crawler (`scraper/Dockerfile`): Temporal + UI (http://localhost:8233), LocalStack S3 + browser (http://localhost:8081), headless Chrome, worker, documents API (http://localhost:8082/docs) | start a crawl with `docker compose run --rm scraper-cli --seeds=<url>` |
+| `scraper` | Go crawler (`scraper/Dockerfile`): LocalStack S3 + browser (http://localhost:8081), headless Chrome, worker, documents API (http://localhost:8082/docs) | Airflow's `scraper_crawl_schedule` crawls every website in `domains` every 30 minutes; crawl now with `docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule` |
 | `scraper-sharded` | the same, with three host-sharded workers | see `scraper/docs/SCALING.md` |
 | `search` | gRPC search engine (`search-engine/Dockerfile`, :50051) + index setup | needs ~3 GB RAM; downloads ~2.5 GB of models on first start |
-| `ui` | Next.js UI on http://localhost:3000 (`ui/Dockerfile`) | build fails until `ui/src/lib` and the UI's npm dependencies are in the repo |
-| `tools` | OpenSearch Dashboards (http://localhost:5601), `opensearch-indexer`, `ingestion-signal-publisher`, `etl-spark-test` | one-shot tools run with `docker compose run --rm <name>` |
+| `ui` | Next.js UI (`ui/Dockerfile`) behind nginx on http://localhost (port 80, `HTTP_PORT`; any domain pointed at the machine works too, `nginx/default.conf`), and directly on http://localhost:3000 (`UI_PORT`) | |
+| `tools` | OpenSearch Dashboards (http://localhost:5601), `opensearch-indexer` | one-shot tools run with `docker compose run --rm <name>` |
 
 All published ports bind to `127.0.0.1`. Containers reach each other by service name
 (`postgres`, `kafka`, `opensearch`, `clamav`, `temporal`, `s3`, `search-engine`). `docker compose down` stops the stack;
-`docker compose down -v` also deletes its data volumes.
+all persistent state stays on the host under `./data/<dir>` (`postgres`, `opensearch`, `kafka`,
+`clamav`, `localstack`, `etl-models`, `search-models`, `airflow-logs`; git-ignored), through the
+volumes declared at the end of `docker-compose.yml`. Even `docker compose down -v` keeps those
+files; delete a directory there (`sudo rm -rf data/postgres`; some are owned by the container's
+user) to reset that service.
 
 ### Run on Kubernetes
 

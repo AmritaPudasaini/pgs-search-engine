@@ -10,7 +10,7 @@ metadata:
   labels:
     app.kubernetes.io/name: s3
 data:
-  # Same as scraper/docker/init-s3-bucket.sh (compose): LocalStack runs ready.d hooks
+  # Same as the s3-create-bucket config in docker-compose.yml: LocalStack runs ready.d hooks
   # once S3 is up.
   init-s3-bucket.sh: |
     #!/bin/sh

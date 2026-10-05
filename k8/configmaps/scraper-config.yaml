@@ -19,6 +19,6 @@ data:
   # LocalStack accepts any credentials; these are not secrets.
   AWS_ACCESS_KEY_ID: test
   AWS_SECRET_ACCESS_KEY: test
-  # Also publish every document to Kafka for the ETL consumer (empty = S3 only).
+  # Publish one event per website whose crawl finished, for the ETL DAG (empty = S3 only).
   KAFKA_BROKERS: kafka:29092
-  KAFKA_TOPIC: crawled-documents
+  KAFKA_TOPIC: scraped_files_topic

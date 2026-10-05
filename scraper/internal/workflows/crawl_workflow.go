@@ -15,6 +15,7 @@ package workflows
 import (
 	"fmt"
 	"hash/fnv"
+	"sort"
 	"strings"
 	"time"
 
@@ -409,11 +410,18 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 	// finalizes the row. Skipped entirely when runID == 0 (no run-tracking
 	// backend configured), so an NDJSON-only deployment doesn't pay for
 	// activities that would just no-op.
+	//
+	// The segment that terminates also publishes one "site crawled" event per
+	// website this crawl fetched (one for a CrawlDomainsWorkflow child): the
+	// hand-off that starts ETL for that whole site.
 	defer func() {
-		if runID == 0 || in.ChildOfRun {
+		if runID == 0 {
 			return
 		}
 		if willContinueAsNew {
+			if in.ChildOfRun {
+				return
+			}
 			if updErr := updateCrawlRunStats(ctx, runID, stats); updErr != nil {
 				logger.Warn("failed to update crawl run stats", "run_id", runID, "error", updErr)
 			}
@@ -425,9 +433,12 @@ func CrawlWorkflow(ctx workflow.Context, in CrawlWorkflowInput) (result CrawlRes
 			status = "failed"
 			errMsg = err.Error()
 		}
-		if finErr := finishCrawlRun(ctx, runID, status, stats, errMsg); finErr != nil {
-			logger.Warn("failed to finish crawl run", "run_id", runID, "error", finErr)
+		if !in.ChildOfRun {
+			if finErr := finishCrawlRun(ctx, runID, status, stats, errMsg); finErr != nil {
+				logger.Warn("failed to finish crawl run", "run_id", runID, "error", finErr)
+			}
 		}
+		publishSitesCrawled(ctx, runID, domainCounts, status, errMsg, logger)
 	}()
 
 	type inFlight struct {
@@ -774,6 +785,41 @@ func checkFreshness(ctx workflow.Context, revisitAfter time.Duration, candidates
 		return nil
 	}
 	return out.Fresh
+}
+
+// publishSitesCrawled publishes a SiteCrawled event for every host the
+// crawl fetched pages from, in sorted order (workflow code must be
+// deterministic, and map iteration isn't). The activity retries for up to an
+// hour: a lost event means ETL never processes that site. A failure after
+// that is logged, not returned, so it can't mask the crawl's own outcome.
+func publishSitesCrawled(ctx workflow.Context, runID int64, domainCounts map[string]int, status, errMsg string, logger sdklog.Logger) {
+	hosts := make([]string, 0, len(domainCounts))
+	for host, n := range domainCounts {
+		if host != "" && n > 0 {
+			hosts = append(hosts, host)
+		}
+	}
+	sort.Strings(hosts)
+	pubCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
+		RetryPolicy:            &temporal.RetryPolicy{InitialInterval: time.Second, BackoffCoefficient: 2, MaximumInterval: time.Minute},
+	})
+	workflowID := workflow.GetInfo(ctx).WorkflowExecution.ID
+	for _, host := range hosts {
+		err := workflow.ExecuteActivity(pubCtx, act.PublishSiteCrawled, activities.PublishSiteCrawledInput{
+			RunID:        runID,
+			WorkflowID:   workflowID,
+			Host:         host,
+			Status:       status,
+			Error:        errMsg,
+			PagesFetched: domainCounts[host],
+			CompletedAt:  workflow.Now(ctx),
+		}).Get(ctx, nil)
+		if err != nil {
+			logger.Error("failed to publish site-crawled event; ETL will not process this site", "run_id", runID, "host", host, "error", err)
+		}
+	}
 }
 
 // startCrawlRun, updateCrawlRunStats, and finishCrawlRun wrap the

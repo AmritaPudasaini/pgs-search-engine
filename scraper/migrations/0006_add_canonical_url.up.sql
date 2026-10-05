@@ -1,1 +1,0 @@
-ALTER TABLE documents ADD COLUMN canonical_url TEXT NOT NULL DEFAULT '';

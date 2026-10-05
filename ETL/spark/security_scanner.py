@@ -165,8 +165,12 @@ def inspect_file(path: str) -> dict[str, Any]:
     from pathlib import Path
 
     file_path = Path(path)
-    content = file_path.read_bytes()
-    result = scan_file(file_path.name, content)
+    return inspect_bytes(file_path.name, file_path.read_bytes())
+
+
+def inspect_bytes(filename: str, content: bytes) -> dict[str, Any]:
+    """inspect_file() for content already in memory (an object read from S3)."""
+    result = scan_file(filename, content)
 
     findings: list[str] = []
     extension = result["extension"]
@@ -178,9 +182,9 @@ def inspect_file(path: str) -> dict[str, Any]:
         findings.append("empty_file")
     elif result["size_bytes"] > MAX_SAFE_SIZE_BYTES:
         findings.append("file_too_large")
-    if len(file_path.name) > MAX_FILENAME_LENGTH:
+    if len(filename) > MAX_FILENAME_LENGTH:
         findings.append("filename_too_long")
-    if has_double_extension(file_path.name):
+    if has_double_extension(filename):
         findings.append("multiple_extensions")
 
     clamav_result = scan_with_clamav(content)

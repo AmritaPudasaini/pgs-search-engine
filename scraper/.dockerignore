@@ -16,8 +16,6 @@ python
 *.md
 docs
 k8s
-docker
-migrations
 sqlc.yaml
 .golangci.yml
 Makefile

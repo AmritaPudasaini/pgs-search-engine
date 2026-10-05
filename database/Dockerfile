@@ -23,6 +23,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Run after the migrations (not at init: the roles do not exist yet) by the compose
-# db-role-passwords service and the k8s db-bootstrap Job: sets each service role's login
+# db-roles service and the k8s db-bootstrap Job: sets each service role's login
 # password from the environment.
 COPY sql/set-role-passwords.sql /opt/pgs/set-role-passwords.sql

@@ -69,7 +69,7 @@ spec:
             - bash
             - -c
             - |
-              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe --topic crawled-documents > /dev/null 2>&1; do
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe --topic scraped_files_topic > /dev/null 2>&1; do
                 echo "waiting for kafka-init"; sleep 5
               done
           env:

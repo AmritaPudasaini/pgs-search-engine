@@ -10,9 +10,10 @@ product overview. Each service's own README is the spec for that service.
 | `database/` | `pgs-db`: SQLAlchemy models, Pydantic schemas, repositories, **Alembic migrations**, seed scripts and data. **The source of truth for the PostgreSQL schema.** | Python 3.11 |
 | `api/` | FastAPI gateway (`api.main:app`); calls the search engine over gRPC (`api/grpc_client.py`) | Python 3.11 |
 | `search-engine/` | gRPC `SearchService` on :50051 (BM25 on OpenSearch, pgvector, NLLB translation, LightGBM rerank) | Python 3.11 |
-| `ETL/` | `airflow/` (DAGs; main one `etl_ingestion_pipeline`), `spark/` (`transform.py`, `security_scanner.py` → ClamAV), `kafka/` (`consumer.py`, `tools/`), `OpenSearch/` (JSONL → index) | Python 3.11, Airflow 2.10.4, PySpark 3.5.3 |
+| `ETL/` | `airflow/` (DAGs; main one `etl_ingestion_pipeline`), `spark/` (`transform.py`, `security_scanner.py` → ClamAV), `kafka/` (`consumer.py`, `tools/`), `open_search/` (JSONL → index) | Python 3.11, Airflow 2.10.4, PySpark 3.5.3 |
 | `scraper/` | Go crawler: `cmd/worker` (Temporal worker → S3 / Kafka), `cmd/api` (read-only API over S3), `cmd/scraper` (starts crawls) | Go 1.26 |
 | `ui/` | Next.js 16 app (App Router, `src/`) | Node 24 |
+| `nginx/` | `default.conf` for the `nginx` service: reverse proxy on port 80 in front of `ui` | nginx 1.27 |
 | `k8/` | Kubernetes manifests (Kustomize), grouped by resource kind; single-node, non-HA; Airflow on the KubernetesExecutor. See `k8/README.md`. | |
 
 ## Running the stack
@@ -25,27 +26,45 @@ existing one, using build targets if a service ships several binaries). The dev 
 ```bash
 cp .env.example .env
 docker compose up -d --build                         # default stack
-docker compose --profile scraper up -d --build       # + crawler (Temporal, S3, Chrome, worker, API)
+docker compose --profile scraper up -d --build       # + crawler (S3, Chrome, worker, API)
 docker compose --profile search up -d                # + search engine (heavy)
-docker compose run --rm scraper-cli --seeds=https://example.gov.np   # start a crawl
-docker compose run --rm ingestion-signal-publisher   # file-ready signal for the ETL DAG
+docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule   # crawl now
 docker compose run --rm opensearch-indexer           # index the ETL JSONL output
-docker compose run --rm etl-spark-test               # standalone Spark check
 docker compose run --rm db-migrate python scripts/create_admin.py <user> --email <addr>
 docker compose config --quiet                        # validate after editing compose
 ```
 
 - **Profiles:** `search`, `scraper`, `scraper-sharded` (three host-sharded workers),
-  `scraper-cli`, `ui`, `tools`. A service targeted by `docker compose run` gets its profile
-  automatically. `ui` doesn't build yet (see "Known breakages").
+  `ui`, `tools`. A service targeted by `docker compose run` gets its profile
+  automatically. Nothing in a profile starts with a plain `docker compose up`: set
+  `COMPOSE_PROFILES` in `.env` (e.g. `scraper,ui`) to include the crawler, S3 + its browser UI
+  (`localhost:8081`), the UI and nginx (`localhost`).
 - **Startup order** comes from health checks plus `depends_on` conditions:
-  `postgres` → `db-migrate` → `db-seed` + `db-role-passwords` → app services; `kafka` →
-  `kafka-init`; `airflow-db` + `redis` → `airflow-init` → Airflow; `temporal-db` → `temporal`
-  (healthy once its `default` namespace exists) → scraper. Never add `sleep`-based waits.
-- **One-shot tasks** (`db-migrate`, `db-seed`, `db-role-passwords`, `kafka-init`,
-  `airflow-init`, `search-index-init`) re-run on every `up` and must stay idempotent.
+  `postgres` → `db-migrate` (migrations + seed) → `db-roles` (role passwords; Airflow's and
+  Temporal's roles and databases) → app services, `temporal` (healthy once its `default`
+  namespace exists) and `airflow-scheduler` (migrates Airflow's database and creates the admin
+  on start) → `airflow-webserver`; `spark-master` → `spark-worker`, `etl-worker`. There is no
+  init container per service: fold setup into the service (or into `db-migrate`/`db-roles`)
+  rather than adding one. Never add `sleep`-based waits.
+- **Volumes and network are declared once, at the end of `docker-compose.yml`.** Every volume
+  is a bind-type local volume (`driver_opts: {type: none, o: bind, device: ./data/<dir>}`), so
+  all state is on the host under `./data/` (git-ignored except `data/.gitkeep`, which must
+  stay: the `data-root` volume needs the directory). Services mount them by name with
+  `volume: {nocopy: true}`, which defers the mount to container start, after the one-shot
+  `data-dirs` has created the directory and given it the user the container runs as. A new
+  service that keeps state gets a `data-<name>` volume, a line in `data-dirs` and a
+  `depends_on` on it. Every service is attached to the one bridge network, `pgs-network`.
+  `docker compose down -v` removes the volume objects only; delete `./data/<dir>` to reset.
+- **One-shot tasks** (`data-dirs`, `db-migrate`, `db-roles`) and the setup steps services run on start
+  (Airflow's migration, the search engine's index creation) re-run on every `up` and must stay
+  idempotent. Kafka creates `scraped_files_topic` on the scraper's first event
+  (`KAFKA_AUTO_CREATE_TOPICS_ENABLE`); consumers must not auto-create topics.
 - **Ports:** host ports bind to `127.0.0.1` and are all set in `.env` (Airflow owns 8080, so the
-  scraper API is on 8082). Inside the network, use service names (`postgres:5432`,
+  scraper API is on 8082). The one exception is `nginx` (profile `ui`), the web entry point:
+  `HTTP_PORT` (80) on all interfaces (`HTTP_BIND_ADDRESS`), so a domain can point at it. nginx
+  listens on 80 inside its container too, as a non-root user (the container's
+  `net.ipv4.ip_unprivileged_port_start=0` sysctl, not root or a capability). The UI is also
+  published directly on `127.0.0.1:3000` (`UI_PORT`). Inside the network, use service names (`postgres:5432`,
   `kafka:29092`, `opensearch:9200`, `clamav:3310`, `temporal:7233`, `s3:4566`), never
   `localhost`. Kafka's `localhost:9092` listener exists only for host-side scripts.
 - **Config:** all variables live in `.env` (template: `.env.example`). Secrets use
@@ -53,13 +72,17 @@ docker compose config --quiet                        # validate after editing co
 
 ## Docker conventions
 
+- **Service folders hold code and their one Dockerfile, no Docker infrastructure:** no compose
+  files, container init scripts or `docker compose` wrapper targets inside `scraper/` (or any
+  service). Container setup lives in the root `docker-compose.yml` (inline files go in its
+  `configs:`, e.g. LocalStack's bucket hook `s3-create-bucket`) and in `k8/`.
 - **One Dockerfile per application service:** `api/`, `ETL/`, `search-engine/`, `scraper/`, `ui/`.
   `scraper/Dockerfile` has one target per binary (`worker`, `api`, `cli`; compose sets
   `build.target`). `ETL/Dockerfile` is one image for Airflow, the consumer, the indexer and the
   Spark check. `database/` has two: `Dockerfile` is the PostgreSQL server image;
-  `migrate.Dockerfile` is the migration/bootstrap image (also used by `db-seed`). The
+  `migrate.Dockerfile` is the migration/bootstrap image (`db-migrate`: migrate + seed). The
   role-password SQL (`database/sql/set-role-passwords.sql`) is baked into the PostgreSQL image
-  and run with `psql` by compose's `db-role-passwords` and the k8s `db-bootstrap` Job.
+  and run with `psql` by compose's `db-roles` and the k8s `db-bootstrap` Job.
 - **Build contexts:** `api`, `ETL` and `search-engine` build from the **repository root**,
   because they need `database/` as well. The root `.dockerignore` is an allow-list; re-include
   any new top-level directory one of them must copy. `ui`, `scraper` and `database` use their own
@@ -102,25 +125,57 @@ kubectl kustomize k8/ | kubeconform -strict -kubernetes-version 1.30.0 -summary 
 ## Things that are easy to get wrong
 
 - **Schema changes go only through Alembic migrations in `database/`.** The Go scraper and the
-  search engine never create tables or extensions; `scraper/migrations/` (and its Makefile
-  `migrate-*` targets) are not used by the stack. A new table also needs the `updated_at`
+  search engine never create tables or extensions, and the scraper has no migrations at all.
+  The Go models in `scraper/internal/db` are generated by sqlc (`scraper/sqlc.yaml`) from
+  `database/sql/scraper_schema.sql`, which `database/scripts/export_scraper_schema.py`
+  generates from the pgs_db models of the tables the scraper uses (`crawl_runs`,
+  `crawled_documents`, `stored_files`, `domains`); it is never executed. After a change to one
+  of those tables: model + migration, re-run the export script, then `make sqlc` in
+  `scraper/`. `database/tests/test_scraper_schema_sync.py` fails while the file is stale or the
+  models disagree with the migrated database. Go writes follow
+  `database/docs/scraper-db-contract.md`. A new table also needs the `updated_at`
   trigger, an entry in `pgs_db/grants.py`, and a bump of `pgs_db.health.EXPECTED_REVISION` (see
   `database/README.md` §7). Extensions (`vector`, `postgis`) are created by the migrations, not
-  by the Postgres image. Temporal keeps its own database in `temporal-db`.
+  by the Postgres image. Airflow and Temporal keep their own databases (`airflow`,
+  `temporal`, `temporal_visibility`) and roles in the same server, created by `db-roles`.
+- **The websites to crawl are database seed data:** `database/data/domains.json` (built by
+  `database/scripts/build_domains.py` from `scraper/configs/seeds.example.txt` plus every local
+  body's website, each linked to its local body = its geolocation), seeded into `domains` by
+  `db-migrate` (`scripts/seed_domains.py`, never overriding admin edits). The scraper does not
+  seed anything; Airflow's `scraper_crawl_schedule` crawls what is in `domains`.
 - **Services connect as their own DB role** (`pgs_api`, `pgs_etl`, `pgs_search`), never as the
-  schema owner. Only `db-migrate`/`db-seed` use `POSTGRES_USER`. URL forms: Python uses
+  schema owner. Only `db-migrate`/`db-roles` use `POSTGRES_USER`. URL forms: Python uses
   `postgresql+psycopg://`, Go uses `postgres://...?sslmode=disable`.
 - **Airflow 2.10 requires SQLAlchemy < 2; `pgs-db` requires SQLAlchemy 2**, so they can never
   share an environment. In the ETL image, `pgs_db` (plus the Kafka and OpenSearch clients) lives
-  in `/opt/etl-venv`. Run DB-writing ETL code with `/opt/etl-venv/bin/python` (as `etl-consumer`
-  and `opensearch-indexer` do), or from a DAG via
+  in `/opt/etl-venv`. Run DB-writing ETL code with `/opt/etl-venv/bin/python` (as
+  `opensearch-indexer` does), or from a DAG via
   `@task.external_python(python="/opt/etl-venv/bin/python")`. Don't `pip install` pgs-db into
   Airflow's own environment. Packages DAG tasks import go into Airflow's environment in
   `ETL/Dockerfile`, with `apache-airflow==${AIRFLOW_VERSION}` in the same `pip install`.
+- **Airflow schedules, Temporal executes, Spark computes** (compose): Airflow runs on the
+  LocalExecutor (no Celery, no Redis) and stores its metadata in the shared `postgres` server
+  (database and role `airflow`, created by `db-roles`; there is no `airflow-db`).
+  `scraper_crawl_schedule` (every 30 min, `SCRAPER_CRAWL_SCHEDULE`) reads `domains` and starts
+  one `CrawlDomainsWorkflow` on Temporal (fixed ID, so crawls never overlap);
+  `etl_ingestion_pipeline` waits for `ETL_BATCH_SIZE` (100) site events, then starts one
+  `EtlBatchWorkflow` on the `etl-task-queue`. `etl-worker` (`ETL/temporal/`) runs it as the
+  Spark driver against the standalone cluster (`spark-master`, `spark-worker`, all on the ETL
+  image, because executors need the driver's Python packages). Services that run the ETL image
+  as `AIRFLOW_UID` go through the image's `/entrypoint`, which gives that UID a passwd entry and
+  home (Airflow and Spark both fail without one). k8s still runs the old shape
+  (KubernetesExecutor, no Spark cluster or ETL worker).
+- **Scraper -> ETL hand-off is one Kafka event per crawled website**, never per page or file:
+  when a site's crawl finishes, the worker publishes a `site_crawl_completed` event to
+  `scraped_files_topic` (`scraper/internal/storage/site_events.go`) naming the site's documents
+  prefix `<s3-prefix>/<crawl_run_id>/<host>/`. The `etl_ingestion_pipeline` DAG runs the whole
+  PySpark pipeline (`ETL/spark/site_pipeline.py`: ClamAV scan, extraction, dedup, embedding,
+  output) once per site, and commits the Kafka offsets only after the whole batch succeeded.
 - **DAGs hardcode** `kafka:29092`, `/opt/airflow/spark_lib` and `/opt/airflow/data/...`. The
   compose bind mounts keep those paths; don't rename them. The intake scanner reaches ClamAV via
-  `CLAMD_HOST`/`CLAMD_PORT` and fails closed, so `clamav` must be running for the DAG.
-- **OpenSearch is pinned to 2.19:** the ETL index (`ETL/OpenSearch/opensearch/create_index.py`)
+  `CLAMD_HOST`/`CLAMD_PORT` and fails closed (an unreachable ClamAV fails the site's run, which
+  is retried), so `clamav` must be running for the DAG.
+- **OpenSearch is pinned to 2.19:** the ETL index (`ETL/open_search/opensearch/create_index.py`)
   uses the `nmslib` k-NN engine, which OpenSearch 3.x refuses for new indexes. Moving to 3.x
   means switching that mapping to `faiss` or `lucene` first.
 - **The search engine must run from its source layout** (`PYTHONPATH=/app/src`). It locates
@@ -132,12 +187,10 @@ kubectl kustomize k8/ | kubeconform -strict -kubernetes-version 1.30.0 -summary 
 
 ## Known breakages (as of 2026-10-03; not Docker issues)
 
-- `database/src/pgs_db/schemas/geography.py` and `schemas/crawl.py` have broken indentation
-  (`geography.py` also has stray Markdown code fences), so `import pgs_db` fails, and with it
-  `db-migrate` and every image that imports the package. Fix the indentation in those files.
-- `ui/` doesn't build. `src/lib/` (imported as `@/lib/...`) isn't in the repo, because the root
-  `.gitignore` rule `lib/` hides it. And `package.json` lacks `leaflet`, `react-leaflet`,
-  `recharts`, `lucide-react` and `clsx`, which are listed only in the stray `package copy.json`.
+- `ui/` keeps stray `* copy.*` files (`package copy.json`, `next.config copy.ts`, ...). The UI's
+  `src/lib/` was missing from this branch (the root `.gitignore` rule `lib/` hid it; there is now
+  a `!ui/src/lib/` exception) and was restored, with the dependencies it needs, from
+  `origin/ishantbranch`. `origin/ui-new-map` has a newer map UI (and `lib/geo.ts`) not merged here.
 - Root `requirements.txt` lists `clamav==1.0.2`; the scanner imports `clamd` (`clamd==1.0.2`).
 
 ## Checks
@@ -145,7 +198,7 @@ kubectl kustomize k8/ | kubeconform -strict -kubernetes-version 1.30.0 -summary 
 ```bash
 docker compose config --quiet                      # compose syntax and interpolation
 cd scraper && go vet ./... && go test ./...
-cd ETL/kafka && python -m unittest test_consumer
+cd ETL/spark && python -m unittest test_site_pipeline   # in the ETL image
 cd database && DATABASE_URL=postgresql+psycopg://pgs:pgs@localhost:5432/pgs python -m pytest
 ruff check . && pyright                            # Python lint/type check (root pyproject.toml)
 ```

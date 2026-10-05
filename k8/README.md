@@ -32,8 +32,8 @@ kubectl -n pgs-search-engine get pods -w
 ```
 
 Start-up order is enforced with init containers instead of compose's `depends_on`: the
-`db-bootstrap` Job migrates (Alembic), seeds and sets the service roles' passwords; the API,
-ETL consumer and search engine wait until they can log in as their role and see the seeded
+`db-bootstrap` Job migrates (Alembic), seeds and sets the service roles' passwords; the API and
+search engine wait until they can log in as their role and see the seeded
 data. Airflow's scheduler and webserver wait for `airflow-init` to migrate Airflow's own
 database. The bootstrap Jobs delete themselves 10 minutes after finishing, so re-running
 `kubectl apply -k k8/` (e.g. after rebuilding images with a new migration) runs them again.
@@ -54,12 +54,14 @@ There is no Celery worker or Redis here. At most 4 task pods run at once
 `docker compose build airflow-scheduler` and
 `kubectl -n pgs-search-engine rollout restart deploy/airflow-scheduler deploy/airflow-webserver`.
 
-Run the ETL pipeline:
+Run the ETL pipeline: with the `scraper` block enabled, each website whose crawl finishes
+publishes one event to `scraped_files_topic`; `etl_ingestion_pipeline` picks the new events
+up every 5 minutes and runs the PySpark pipeline (security scan, extraction, dedup,
+embedding) once per site.
 
 ```bash
-kubectl create -f k8/jobs/on-demand/ingestion-signal-publisher.yaml   # file-ready signal on Kafka
 kubectl -n pgs-search-engine port-forward svc/airflow-webserver 8080:8080
-# http://localhost:8080 (login from secrets/secrets.env): trigger etl_ingestion_pipeline
+# http://localhost:8080 (login from secrets/secrets.env): etl_ingestion_pipeline runs
 kubectl -n pgs-search-engine get pods -l app.kubernetes.io/name=airflow-task -w
 kubectl create -f k8/jobs/on-demand/opensearch-indexer.yaml           # index the JSONL output
 ```
@@ -75,11 +77,11 @@ whole block, then `kubectl apply -k k8/`.
 | `scraper` | Temporal (+ its PostgreSQL and UI), LocalStack S3 (+ browser), headless Chrome, crawler worker, documents API |
 | `scraper-sharded` | with `scraper`: three host-sharded workers (StatefulSet) instead of the worker Deployment; also uncomment the `patches:` block |
 | `scraper-schedule` | with `scraper`: CronJob starting a crawl every 15 minutes (edit its seeds first) |
-| `ui` | Next.js UI (its image doesn't build yet; see CLAUDE.md "Known breakages") |
+| `ui` | Next.js UI |
 | `tools` | OpenSearch Dashboards |
 
-One-off Jobs in `jobs/on-demand/` (`kubectl create -f`): `ingestion-signal-publisher.yaml`,
-`opensearch-indexer.yaml`, `etl-spark-test.yaml`, and a crawl:
+One-off Jobs in `jobs/on-demand/` (`kubectl create -f`): `opensearch-indexer.yaml`,
+`etl-spark-test.yaml`, and a crawl:
 `SEEDS=https://example.gov.np envsubst < k8/jobs/on-demand/scraper-crawl.yaml.tmpl | kubectl create -f -`
 (or `make k8s-crawl SEEDS=...` in `scraper/`).
 
@@ -120,7 +122,7 @@ k8/
 ├── rolebindings/             binds those roles to the service accounts
 ├── services/                 one ClusterIP Service per workload
 ├── statefulsets/             PostgreSQL, Kafka, OpenSearch, Airflow DB, Temporal DB, sharded crawler
-├── deployments/              API, ClamAV, ETL consumer, Airflow scheduler/webserver, search engine,
+├── deployments/              API, ClamAV, Airflow scheduler/webserver, search engine,
 │                             scraper, Temporal, S3, Chrome, UI, Dashboards
 ├── jobs/                     bootstrap Jobs applied with the stack (db-bootstrap, kafka-init, airflow-init)
 │   └── on-demand/            one-off Jobs, created with `kubectl create -f`
@@ -133,4 +135,4 @@ k8/
 - Shared volumes (`airflow-logs`, `etl-processed`, `etl-models`) rely on all pods being on
   one node; on a multi-node cluster use a ReadWriteMany storage class or remote task logs.
 - No Ingress, NetworkPolicies, autoscaling or backups. The PostgreSQL schema stays owned by
-  the `pgs-db` migrations; the scraper's own `scraper/migrations` are never applied.
+  the `pgs-db` migrations; the scraper has no migrations of its own.
