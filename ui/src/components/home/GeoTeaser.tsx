@@ -12,10 +12,10 @@ export function GeoTeaser() {
       </div>
       <div className="flex-1 text-left">
         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-          Explore the Geo Tagging map of Nepal
+          Explore the map of Nepal
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          75 districts · 766 local levels · tag and search any location
+          7 provinces · 77 districts · 753 local levels · click any district for local news
         </p>
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1" />
