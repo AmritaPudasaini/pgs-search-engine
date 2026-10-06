@@ -183,7 +183,9 @@ class TestRetriesAndIdempotency:
     def test_concurrent_domain_registration_is_safe(self, repo: BronzeRepository) -> None:
         # Two workers meeting the same host must not create two rows.
         assert repo.ensure_domain(HOST) == repo.ensure_domain(HOST.upper())
-        assert repo.session.scalar(select(func.count()).select_from(Domain)) == 1
+        # Counted for this host only: a migrated database also holds the seeded websites.
+        rows = select(func.count()).select_from(Domain).where(Domain.domain == HOST.lower())
+        assert repo.session.scalar(rows) == 1
 
 
 class TestConstraintsAndFailures:

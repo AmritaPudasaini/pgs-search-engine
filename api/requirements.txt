@@ -1,0 +1,32 @@
+# Runtime dependencies of the API service, pinned for reproducible images
+# (api/Dockerfile). Versions match the repo-root requirements.txt freeze, the
+# shared development venv. The shared pgs-db package is not listed: the Dockerfile
+# installs it from database/ with database/constraints.txt.
+
+# Direct dependencies
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+# api/grpc_client.py imports the search engine's generated stubs, which were
+# generated with grpcio-tools 1.84.0 / protobuf 7.35.1 and require at least those
+# runtime versions.
+grpcio==1.84.0
+protobuf==7.35.1
+
+# Transitive dependencies
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+click==8.5.0
+h11==0.16.0
+httptools==0.8.0
+idna==3.19
+pydantic==2.13.5
+pydantic-core==2.46.5
+python-dotenv==1.2.3
+pyyaml==6.0.3
+starlette==1.6.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==17.1

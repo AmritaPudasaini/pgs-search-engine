@@ -1,0 +1,1000 @@
+# PGS Search Engine -- the whole stack, from the repository root.
+#
+#   cp .env.example .env        # once; then adjust (AIRFLOW_UID, passwords, ports)
+#   docker compose up -d --build
+#
+# Startup order (enforced with health checks and depends_on conditions, no sleeps):
+#
+#   postgres ─► db-migrate (schema + reference data) ─► db-roles ─┬─► api, search-engine
+#                                                                 ├─► temporal ─► temporal-ui,
+#                                                                 │     etl-worker, scraper-*
+#                                                                 └─► airflow-scheduler ─►
+#                                                                       airflow-webserver
+#   kafka ─► airflow-scheduler, scraper-worker;  opensearch ─► api, search-engine
+#   spark-master ─► spark-worker (x2), etl-worker;  s3 ─► scraper-*
+#
+# One PostgreSQL server holds the application database plus Airflow's and Temporal's own
+# databases (`airflow`, `temporal`, `temporal_visibility`, each with its own role, created
+# by db-roles). Kafka creates its topic on first use (KAFKA_AUTO_CREATE_TOPICS_ENABLE).
+#
+# Airflow only schedules (LocalExecutor: no Celery, no Redis). Its DAGs hand the work to
+# Temporal: scraper_crawl_schedule starts the crawl of every website every 30 minutes
+# (the Go scraper-worker runs it), and etl_ingestion_pipeline sends each batch of 100
+# crawled sites to the ETL worker, which drives the Spark cluster.
+#
+# Optional services are grouped in profiles, enabled with --profile or COMPOSE_PROFILES:
+#   search           gRPC search engine + index init (~3 GB RAM, ~2.5 GB model download)
+#   scraper          Go crawler: LocalStack S3 (+browser), headless Chrome, worker,
+#                    documents API
+#   scraper-sharded  three host-sharded crawler workers (instead of scaling one)
+#   ui               Next.js UI (localhost:3000) behind nginx (localhost, port 80)
+#   tools            OpenSearch Dashboards, OpenSearch indexer
+#
+# Containers reach each other by service name (postgres:5432, kafka:29092,
+# opensearch:9200, ...). Ports published to the host are bound to 127.0.0.1 only.
+#
+# All persistent state is under ./data/<dir> on the host, through the volumes declared
+# at the end of this file (bind-type local volumes); data-dirs creates the directories
+# with the owner each container runs as. All services share one bridge network,
+# pgs-network.
+
+name: pgs-search-engine
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+# ---------------------------------------------------------------------------------
+# ETL image (ETL/Dockerfile): Airflow, the Temporal ETL worker, the Spark cluster and the
+# PySpark pipeline
+# ---------------------------------------------------------------------------------
+x-etl-build: &etl-build
+  build:
+    context: .
+    dockerfile: ETL/Dockerfile
+  image: pgs-search-engine/etl:local
+
+# Settings every ETL process shares: Airflow, the Temporal ETL worker (the Spark driver)
+# and the Spark workers (whose executors read S3 and call ClamAV).
+x-etl-env: &etl-env
+  KAFKA_BROKERS: kafka:29092
+  TEMPORAL_ADDRESS: temporal:7233
+  # spark/security_scanner.py streams every page to ClamAV and rejects it when the scan
+  # cannot run; spark/transform.py embeds text with this model.
+  CLAMD_HOST: clamav
+  CLAMD_PORT: "3310"
+  EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-sentence-transformers/LaBSE}
+  # The scraper's bucket (LocalStack, profile `scraper`): the site-crawled events name
+  # the bucket and prefix; spark/site_pipeline.py reads the pages from it.
+  S3_ENDPOINT: http://s3:4566
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+
+x-airflow-common: &airflow-common
+  <<: *etl-build
+  environment: &airflow-env
+    <<: *etl-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Airflow's metadata database lives in the shared `postgres` server (database and
+    # role `airflow`, created by db-roles).
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}@postgres:5432/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:?set AIRFLOW_SECRET_KEY in .env}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # Local-development sizing (Airflow default: 4 webserver workers).
+    AIRFLOW__WEBSERVER__WORKERS: ${AIRFLOW_WEBSERVER_WORKERS:-2}
+    # Leave newly added DAGs unpaused (as the ETL team runs them).
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    # scraper_crawl_schedule reads the websites (domains) as pgs_etl.
+    DATABASE_URL: postgresql+psycopg://pgs_etl:${PGS_ETL_DB_PASSWORD:?set PGS_ETL_DB_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-pgs}
+    DB_APPLICATION_NAME: pgs-airflow
+    # etl_ingestion_pipeline: run the ETL once this many site events have arrived, or
+    # once the oldest has waited this long.
+    ETL_BATCH_SIZE: ${ETL_BATCH_SIZE:-100}
+    ETL_BATCH_MAX_WAIT_MINUTES: ${ETL_BATCH_MAX_WAIT_MINUTES:-60}
+    ETL_SITE_CONCURRENCY: ${ETL_SITE_CONCURRENCY:-4}
+    # scraper_crawl_schedule: when and how the websites are crawled.
+    SCRAPER_CRAWL_SCHEDULE: ${SCRAPER_CRAWL_SCHEDULE:-*/30 * * * *}
+    SCRAPER_MAX_PAGES_PER_DOMAIN: ${SCRAPER_MAX_PAGES_PER_DOMAIN:-100}
+    SCRAPER_MAX_DEPTH: ${SCRAPER_MAX_DEPTH:-3}
+    SCRAPER_CONCURRENT_DOMAINS: ${SCRAPER_CONCURRENT_DOMAINS:-20}
+    SCRAPER_REVISIT_AFTER_HOURS: ${SCRAPER_REVISIT_AFTER_HOURS:-0}
+    # 3 with the scraper-sharded profile (its workers own three shard queues).
+    SCRAPER_TASK_QUEUE_SHARDS: ${SCRAPER_TASK_QUEUE_SHARDS:-1}
+  # Live-editable DAGs/code and the data directory (JSONL output), as in the former
+  # ETL/airflow/docker-compose.yaml (paths now relative to the repository root).
+  volumes:
+    - ./ETL/airflow/dags:/opt/airflow/dags
+    - {type: volume, source: data-airflow-logs, target: /opt/airflow/logs, volume: {nocopy: true}}
+    - ./ETL/airflow/plugins:/opt/airflow/plugins
+    - ./ETL/airflow/config:/opt/airflow/config
+    - ./ETL/airflow/data:/opt/airflow/data
+    - ./ETL/spark:/opt/airflow/spark_lib:ro
+    # Hugging Face cache, so the LaBSE model (~1.8 GB) downloads once.
+    - {type: volume, source: data-etl-models, target: /home/airflow/.cache/huggingface, volume: {nocopy: true}}
+  # Set AIRFLOW_UID to your WSL/Linux user id (`id -u`) so files written to the bind
+  # mounts above (logs) belong to you.
+  user: "${AIRFLOW_UID:-50000}:0"
+
+x-airflow-depends: &airflow-depends
+  airflow-scheduler:
+    condition: service_healthy
+
+services:
+  # data-dirs: One-shot, on every `up`: creates the ./data/<dir> directories behind the
+  # volumes (a bind-type volume fails when its directory is missing) and gives each the
+  # user its container runs as (OpenSearch and Kafka 1000, ClamAV 100:101, the ETL images
+  # AIRFLOW_UID, the search engine 10001), so non-root services can write. Only the top
+  # directory is chowned. Every service with a data volume waits for it.
+  data-dirs:
+    networks:
+      - pgs-network
+    image: busybox:1.37
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        own() { mkdir -p "/data/$$1" && chown "$$2" "/data/$$1"; }
+        # Created here because a bind-type volume needs its directory to exist; their
+        # images fix the ownership themselves (postgres) or run as root (localstack).
+        mkdir -p /data/postgres /data/localstack
+        own opensearch 1000:1000
+        own kafka 1000:1000
+        own clamav 100:101
+        own etl-models "$${AIRFLOW_UID}:0"
+        own search-models 10001:10001
+        own airflow-logs "$${AIRFLOW_UID}:0"
+    environment:
+      AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+    volumes:
+      - {type: volume, source: data-root, target: /data, volume: {nocopy: true}}
+    restart: "no"
+
+  # =================================================================================
+  # PostgreSQL 16 + PostGIS + pgvector (database/Dockerfile)
+  # =================================================================================
+  # postgres: The one PostgreSQL 16 server (+ PostGIS, pgvector): the application database
+  # `pgs`, plus Airflow's (`airflow`) and Temporal's (`temporal`, `temporal_visibility`)
+  # databases.
+  postgres:
+    networks:
+      - pgs-network
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: pgs-search-engine/postgres:local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pgs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pgs}
+    volumes:
+      - {type: volume, source: data-postgres, target: /var/lib/postgresql/data, volume: {nocopy: true}}
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+    # Published for host-side tooling (database tests, psql, GUI clients).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    shm_size: 256m
+    healthcheck:
+      # Over TCP: during first-time init the entrypoint's temporary server only
+      # listens on the Unix socket, so this does not report ready too early.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------------
+  # One-shot database tasks (exit 0 when done; re-run, idempotently, on every `up`)
+  # ---------------------------------------------------------------------------------
+  # db-migrate: One-shot, on every `up`: applies the Alembic migrations (schema,
+  # extensions, service roles) and seeds the reference data (provinces, districts, local
+  # bodies, boundaries) and the websites to crawl (domains).
+  db-migrate:
+    <<: *hardening
+    networks:
+      - pgs-network
+    build:
+      context: ./database
+      dockerfile: migrate.Dockerfile
+    image: pgs-search-engine/db-migrate:local
+    # The schema (python -m alembic upgrade head: tables, extensions, roles), then the
+    # reference data the services need: 7 provinces, 77 districts, 753 local bodies and
+    # their map boundaries, then the websites to crawl (database/data/domains.json, each
+    # local government's site linked to its local body). The seeds upsert, so re-running
+    # is safe; seed_domains never overrides what an admin changed. Runs as the schema
+    # owner; services never do.
+    command:
+      - sh
+      - -c
+      - python -m alembic upgrade head && python scripts/seed_geography.py && python scripts/seed_boundaries.py && python scripts/seed_domains.py
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pgs}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-db-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # db-roles: One-shot, after db-migrate: sets each service role's login password and
+  # creates Airflow's and Temporal's roles and databases in this server.
+  db-roles:
+    networks:
+      - pgs-network
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: pgs-search-engine/postgres:local
+    # Gives the service roles the migrations created a login password
+    # (database/sql/set-role-passwords.sql, baked into the image), and creates the roles
+    # and databases of Airflow (`airflow`) and Temporal (`temporal`, `temporal_visibility`)
+    # in this same server. Idempotent.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        psql --no-psqlrc --quiet --file=/opt/pgs/set-role-passwords.sql
+        psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 \
+          -v airflow_pw="$${AIRFLOW_DB_PASSWORD}" -v temporal_pw="$${TEMPORAL_DB_PASSWORD}" <<'SQL'
+        SELECT format('CREATE ROLE %I LOGIN', r) FROM unnest(ARRAY['airflow', 'temporal']) AS r
+          WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = r) \gexec
+        ALTER ROLE airflow PASSWORD :'airflow_pw';
+        ALTER ROLE temporal PASSWORD :'temporal_pw';
+        SELECT format('CREATE DATABASE %I OWNER %I', d, o)
+          FROM (VALUES ('airflow', 'airflow'), ('temporal', 'temporal'),
+                       ('temporal_visibility', 'temporal')) AS t(d, o)
+          WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = d) \gexec
+        SQL
+    user: postgres
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-pgs}
+      PGDATABASE: ${POSTGRES_DB:-pgs}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGS_API_DB_PASSWORD: ${PGS_API_DB_PASSWORD:?set PGS_API_DB_PASSWORD in .env}
+      PGS_ETL_DB_PASSWORD: ${PGS_ETL_DB_PASSWORD}
+      PGS_SEARCH_DB_PASSWORD: ${PGS_SEARCH_DB_PASSWORD:?set PGS_SEARCH_DB_PASSWORD in .env}
+      PGS_SCRAPER_DB_PASSWORD: ${PGS_SCRAPER_DB_PASSWORD:?set PGS_SCRAPER_DB_PASSWORD in .env}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # =================================================================================
+  # OpenSearch (security plugin disabled for local development; reachable only from the
+  # Docker network and 127.0.0.1). 2.19 is the newest line both indexes work on: the
+  # ETL index (ETL/open_search) uses the nmslib k-NN engine, which OpenSearch 3.x refuses
+  # for new indexes; the search engine's own index works on 2.x and 3.x alike.
+  # =================================================================================
+  # opensearch: Search index (OpenSearch 2.19): BM25 and k-NN vectors for the search
+  # engine and the ETL output.
+  opensearch:
+    networks:
+      - pgs-network
+    image: opensearchproject/opensearch:2.19.6
+    environment:
+      cluster.name: pgs-search
+      node.name: opensearch
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: ${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - {type: volume, source: data-opensearch, target: /usr/share/opensearch/data, volume: {nocopy: true}}
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${OPENSEARCH_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  # opensearch-dashboards: Optional (profile `tools`): web UI to inspect the OpenSearch
+  # indexes.
+  opensearch-dashboards:
+    networks:
+      - pgs-network
+    profiles: ["tools"]
+    image: opensearchproject/opensearch-dashboards:2.19.6
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports:
+      - "127.0.0.1:${OPENSEARCH_DASHBOARDS_PORT:-5601}:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # =================================================================================
+  # Kafka 3.8 in KRaft mode (one combined broker/controller, no ZooKeeper)
+  #   PLAINTEXT_INTERNAL kafka:29092    containers
+  #   PLAINTEXT          localhost:9092 host tools (ETL/kafka/tools scripts)
+  # =================================================================================
+  # kafka: Message broker (single-node KRaft). Carries `scraped_files_topic`: one event
+  # per website whose crawl finished, from the scraper to the ETL.
+  kafka:
+    networks:
+      - pgs-network
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092},PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Single broker: every internal topic has one replica.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Persist the log in the volume below (the image default is under /tmp), formatted
+      # with a fixed cluster id (the image's default value, pinned so the stored log
+      # stays valid across image upgrades).
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx512m}
+    volumes:
+      - {type: volume, source: data-kafka, target: /var/lib/kafka/data, volume: {nocopy: true}}
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${KAFKA_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx128m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 20s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # =================================================================================
+  # API gateway (api/Dockerfile)
+  # =================================================================================
+  # api: FastAPI gateway: the public HTTP API; reads PostgreSQL as pgs_api and calls the
+  # search engine over gRPC.
+  api:
+    <<: *hardening
+    networks:
+      - pgs-network
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: pgs-search-engine/api:local
+    environment:
+      DATABASE_URL: postgresql+psycopg://pgs_api:${PGS_API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-api
+      SEARCH_GRPC_HOST: search-engine
+      SEARCH_GRPC_PORT: "50051"
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+      # Only with the `search` profile; the gRPC channel connects lazily.
+      search-engine:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+
+  # =================================================================================
+  # UI (ui/Dockerfile) -- profile `ui`
+  # =================================================================================
+  # ui: Optional (profile `ui`): Next.js web front end that talks to the API.
+  ui:
+    <<: *hardening
+    networks:
+      - pgs-network
+    profiles: ["ui"]
+    build:
+      context: ./ui
+      args:
+        # Build-time: inlined into the browser bundle; a host URL, not a service name.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    image: pgs-search-engine/ui:local
+    # Directly on http://localhost:3000 (UI_PORT) as well as through nginx on port 80;
+    # nginx reaches it as ui:3000 on the network.
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  # nginx: Reverse proxy in front of the UI (profile `ui`), the stack's web entry point:
+  # http://localhost, or any domain whose DNS points at this machine (it answers for
+  # every host name; config in nginx/default.conf). Published on all interfaces by
+  # default, unlike the other services, so a domain can reach it; set
+  # HTTP_BIND_ADDRESS=127.0.0.1 in .env to keep it local.
+  nginx:
+    <<: *hardening
+    networks:
+      - pgs-network
+    profiles: ["ui"]
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    # Port 80 inside the container too (http://nginx on the network). nginx runs as a
+    # non-root user with every capability dropped; this per-container setting lets it
+    # bind a port below 1024 without root or NET_BIND_SERVICE.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${HTTP_BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      ui:
+        condition: service_started
+    restart: unless-stopped
+
+  # =================================================================================
+  # ETL: ClamAV, Airflow (LocalExecutor; the work runs on Temporal + Spark), tools
+  # clamav is the scan engine the PySpark pipeline (spark/site_pipeline.py) calls for
+  # every page; it is a daemon, not a pipeline step of its own.
+  # =================================================================================
+  # clamav: Antivirus daemon: the Spark executors stream every crawled page to it
+  # (security scan step of the ETL pipeline).
+  clamav:
+    networks:
+      - pgs-network
+    image: clamav/clamav:1.4
+    # The image's own healthcheck (clamdcheck.sh) allows 6 minutes for the first
+    # signature download; the volume keeps the signatures across restarts.
+    volumes:
+      - {type: volume, source: data-clamav, target: /var/lib/clamav, volume: {nocopy: true}}
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+    # Published for running spark/test_security_scanner.py on the host (CLAMD_HOST=localhost).
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
+    restart: unless-stopped
+
+  # opensearch-indexer: Optional one-shot tool (profile `tools`): bulk-loads the ETL's
+  # JSONL output into the OpenSearch index.
+  opensearch-indexer:
+    <<: [*etl-build, *hardening]
+    networks:
+      - pgs-network
+    profiles: ["tools"]
+    # Bulk-indexes the DAG's JSONL output (ETL/airflow/data/processed/) into OpenSearch:
+    # `docker compose run --rm opensearch-indexer`.
+    entrypoint: ["/usr/bin/dumb-init", "--"]
+    command: ["/opt/etl-venv/bin/python", "-m", "opensearch.index_documents"]
+    working_dir: /opt/etl/open_search
+    environment:
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_INDEX: ${ETL_OPENSEARCH_INDEX:-pgs_documents}
+      JSONL_PATH: /data/processed/transformed_documents.jsonl
+    volumes:
+      - ./ETL/airflow/data:/data:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: "no"
+
+  # airflow-webserver: Airflow web UI: DAG runs, task logs, manual triggers.
+  airflow-webserver:
+    <<: *airflow-common
+    networks:
+      - pgs-network
+    command: webserver
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on: *airflow-depends
+    restart: unless-stopped
+
+  # airflow-scheduler: Airflow scheduler (LocalExecutor: it runs the lightweight task
+  # processes itself; no Celery or Redis). Runs scraper_crawl_schedule (starts the crawl
+  # of every website every 30 min on Temporal) and etl_ingestion_pipeline (hands each
+  # batch of 100 crawled sites to Temporal). On every start the image's entrypoint first
+  # migrates Airflow's database and creates the admin login (both idempotent), so there is
+  # no separate init container.
+  airflow-scheduler:
+    <<: *airflow-common
+    networks:
+      - pgs-network
+    command: scheduler
+    environment:
+      <<: *airflow-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?set AIRFLOW_ADMIN_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+      db-roles:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # =================================================================================
+  # Spark standalone cluster + the Temporal ETL worker (the Spark driver)
+  #
+  # All three run the ETL image: executors need the same Python and packages as the
+  # driver. Scale the workers with SPARK_WORKERS (or --scale spark-worker=N).
+  # =================================================================================
+  # spark-master: Spark standalone master: accepts the ETL worker's Spark application and
+  # schedules its tasks onto the workers.
+  spark-master:
+    <<: [*etl-build, *hardening]
+    networks:
+      - pgs-network
+    entrypoint: ["/usr/bin/dumb-init", "--"]
+    command: ["spark-class", "org.apache.spark.deploy.master.Master",
+              "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
+    # Spark master UI (Airflow owns 8080 on the host).
+    ports:
+      - "127.0.0.1:${SPARK_MASTER_UI_PORT:-8090}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # spark-worker: Spark standalone worker(s), SPARK_WORKERS of them: run the executors
+  # that do the per-page ETL work (read the page from S3, ClamAV scan, text extraction).
+  spark-worker:
+    <<: [*etl-build, *hardening]
+    networks:
+      - pgs-network
+    entrypoint: ["/usr/bin/dumb-init", "--"]
+    command: ["spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077",
+              "--cores", "${SPARK_WORKER_CORES:-2}", "--memory", "${SPARK_WORKER_MEMORY:-2g}",
+              "--work-dir", "/tmp/spark-work"]
+    environment: *etl-env
+    deploy:
+      replicas: ${SPARK_WORKERS:-2}
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # etl-worker: Temporal worker for EtlBatchWorkflow (ETL/temporal) on the etl-task-queue,
+  # and the Spark driver: one long-lived Spark application on the cluster, one site job
+  # per activity. It dedups, embeds (LaBSE) and writes the JSONL output, so it runs as one
+  # replica.
+  etl-worker:
+    <<: [*etl-build, *hardening]
+    networks:
+      - pgs-network
+    # /entrypoint gives AIRFLOW_UID a passwd entry and home, which Spark's launcher needs.
+    entrypoint: ["/usr/bin/dumb-init", "--", "/entrypoint"]
+    command: ["python", "worker.py"]
+    working_dir: /opt/etl/temporal
+    environment:
+      <<: *etl-env
+      SPARK_MASTER: spark://spark-master:7077
+      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-1g}
+      SPARK_EXECUTOR_CORES: "1"
+      ETL_SITE_CONCURRENCY: ${ETL_SITE_CONCURRENCY:-4}
+    volumes:
+      - ./ETL/temporal:/opt/etl/temporal:ro
+      - ./ETL/spark:/opt/airflow/spark_lib:ro
+      - ./ETL/airflow/data:/opt/airflow/data
+      - {type: volume, source: data-etl-models, target: /home/airflow/.cache/huggingface, volume: {nocopy: true}}
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+      clamav:
+        condition: service_started
+    restart: unless-stopped
+
+  # =================================================================================
+  # Search engine core (search-engine/Dockerfile) -- profile `search`
+  # =================================================================================
+  # search-engine: Optional (profile `search`): gRPC SearchService (BM25 + pgvector +
+  # translation + rerank). Creates its OpenSearch index on start, then serves on :50051.
+  search-engine:
+    <<: *hardening
+    networks:
+      - pgs-network
+    profiles: ["search"]
+    build:
+      context: .
+      dockerfile: search-engine/Dockerfile
+    image: pgs-search-engine/search-engine:local
+    # Creates the OpenSearch index with its mapping (a no-op when it exists), then serves.
+    command: ["sh", "-c", "python scripts/create_index.py && exec python -m pgs_search.grpc.server"]
+    environment:
+      SEARCH_GRPC_HOST: 0.0.0.0
+      SEARCH_GRPC_PORT: "50051"
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: "9200"
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-np_web_pages}
+      # vector_search/config.py (psycopg2) and pgs_db (DATABASE_URL), both as pgs_search
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-pgs}
+      POSTGRES_USER: pgs_search
+      POSTGRES_PASSWORD: ${PGS_SEARCH_DB_PASSWORD}
+      DATABASE_URL: postgresql+psycopg://pgs_search:${PGS_SEARCH_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-pgs}
+      DB_APPLICATION_NAME: pgs-search
+    volumes:
+      # Hugging Face model cache, so the models download once, not on every start.
+      - {type: volume, source: data-search-models, target: /home/app/.cache/huggingface, volume: {nocopy: true}}
+    # Published for search-engine/scripts/test_grpc_client.py (localhost:50051).
+    ports:
+      - "127.0.0.1:${SEARCH_GRPC_PORT:-50051}:50051"
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+      db-roles:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # =================================================================================
+  # Scraper (scraper/Dockerfile, one target per binary) -- profile `scraper`
+  #
+  # The worker uploads each crawled page (complete HTML + metadata) to S3 -- LocalStack
+  # here -- and, with KAFKA_BROKERS set, publishes one event per website whose crawl
+  # finished to `scraped_files_topic`, which starts the ETL DAG for that site. It never
+  # writes PostgreSQL: the pgs-db migrations own the schema (the scraper has none).
+  # =================================================================================
+  # temporal: Temporal server: durable workflow engine. Runs the crawl workflows (scraper-
+  # worker) and the ETL batch workflows (etl-worker); stores its state in the shared
+  # postgres.
+  temporal:
+    networks:
+      - pgs-network
+    image: temporalio/auto-setup:1.24.2
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      # Its databases (temporal, temporal_visibility) are in the shared `postgres`
+      # server, created by db-roles; auto-setup creates their schemas.
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD}
+      POSTGRES_SEEDS: postgres
+      SKIP_DB_CREATE: "true"
+    # Published for running cmd/scraper or cmd/worker on the host.
+    ports:
+      - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
+    healthcheck:
+      # Healthy once the `default` namespace the worker and client use exists (the
+      # image's setup creates it after the server is up). The frontend binds to the
+      # container's IP, not localhost.
+      test: ["CMD-SHELL", "temporal operator namespace describe --namespace default --address $$(hostname -i):7233 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # temporal-ui: Temporal web UI: inspect crawl and ETL workflows, their activities and
+  # retries.
+  temporal-ui:
+    networks:
+      - pgs-network
+    image: temporalio/ui:2.31.2
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:${TEMPORAL_UI_PORT:-8233}
+    ports:
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8080"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # s3: Object storage (LocalStack S3, profile `scraper`): the `crawled-pages` bucket the
+  # scraper writes every page's HTML and metadata to, and the ETL reads from.
+  s3:
+    networks:
+      - pgs-network
+    profiles: ["scraper", "scraper-sharded"]
+    image: localstack/localstack:3.8
+    # S3 only; the s3-create-bucket config (end of this file) creates the `crawled-pages`
+    # bucket once S3 is ready.
+    # data-localstack keeps LocalStack's cache, logs and state files; the S3 objects
+    # themselves do not survive a restart (persistence is a LocalStack Pro feature). For
+    # real S3, drop S3_ENDPOINT and the test credentials from the scraper services.
+    environment:
+      SERVICES: s3
+    depends_on:
+      data-dirs:
+        condition: service_completed_successfully
+    volumes:
+      - {type: volume, source: data-localstack, target: /var/lib/localstack, volume: {nocopy: true}}
+    configs:
+      - source: s3-create-bucket
+        target: /etc/localstack/init/ready.d/create-bucket.sh
+        mode: 0755
+    # Published for host tools (aws --endpoint-url http://localhost:4566 ..., pgs_db.ingest).
+    ports:
+      - "127.0.0.1:${S3_PORT:-4566}:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3 ls s3://crawled-pages"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # s3-browser: Optional (profile `scraper`): web UI to browse the S3 bucket.
+  s3-browser:
+    networks:
+      - pgs-network
+    profiles: ["scraper", "scraper-sharded"]
+    image: cloudlena/s3manager:v0.11.0
+    # Browse the bucket: open crawled-pages, then html/<host>/.
+    environment:
+      ENDPOINT: s3:4566
+      REGION: us-east-1
+      ACCESS_KEY_ID: test
+      SECRET_ACCESS_KEY: test
+      USE_SSL: "false"
+    ports:
+      - "127.0.0.1:${S3_BROWSER_PORT:-8081}:8080"
+    depends_on:
+      s3:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # chrome: Headless Chrome (profile `scraper`): renders JavaScript-built pages for the
+  # scraper worker.
+  chrome:
+    networks:
+      - pgs-network
+    profiles: ["scraper", "scraper-sharded"]
+    image: chromedp/headless-shell:151.0.7922.109
+    # Renders JavaScript-built pages for the workers (--render=auto); internal only.
+    shm_size: 1gb
+    restart: unless-stopped
+
+  # scraper-worker: Go crawler worker (profile `scraper`): executes the crawl workflows on
+  # Temporal (fetch, robots.txt, render, parse), writes pages to S3, and publishes one
+  # Kafka event per finished website.
+  scraper-worker: &scraper-worker
+    <<: *hardening
+    networks:
+      - pgs-network
+    profiles: ["scraper"]
+    build:
+      context: ./scraper
+      target: worker
+    image: pgs-search-engine/scraper-worker:local
+    # The worker's flags, as environment variables of the same name. Scale with
+    # `docker compose up -d --scale scraper-worker=N`: replicas share the Temporal task
+    # queue and load-balance automatically. MAX_CONCURRENT_ACTIVITIES is left to the
+    # binary's default (NumCPU * 100, honouring the container's CPU limit).
+    environment: &scraper-worker-env
+      TEMPORAL_ADDRESS: temporal:7233
+      STORAGE: ${SCRAPER_STORAGE:-s3}
+      RENDER: ${SCRAPER_RENDER:-auto}
+      CHROME_URL: ws://chrome:9222
+      S3_BUCKET: crawled-pages
+      S3_ENDPOINT: http://s3:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # Publish the site-crawled event for the ETL DAG; set SCRAPER_KAFKA_BROKERS=
+      # (empty) in .env to write S3 only.
+      KAFKA_BROKERS: ${SCRAPER_KAFKA_BROKERS-kafka:29092}
+      KAFKA_TOPIC: scraped_files_topic
+    depends_on: &scraper-worker-depends
+      temporal:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+      chrome:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # scraper-worker-shard-0: Host-sharded crawler workers (profile `scraper-sharded`,
+  # instead of scraper-worker): each host's fetches are routed to one of three shard
+  # queues and each worker owns one shard, so a host is only ever fetched (rate-limited,
+  # robots-checked, DNS-cached) by one container. Set SCRAPER_TASK_QUEUE_SHARDS=3. This
+  # one owns shard 0.
+  scraper-worker-shard-0:
+    <<: *scraper-worker
+    networks:
+      - pgs-network
+    profiles: ["scraper-sharded"]
+    environment:
+      <<: *scraper-worker-env
+      TASK_QUEUE_SHARDS: "3"
+      SHARD_INDEX: "0"
+      METRICS_ADDRESS: ""
+
+  # scraper-worker-shard-1: Host-sharded crawler worker for shard 1 (see scraper-worker-
+  # shard-0).
+  scraper-worker-shard-1:
+    <<: *scraper-worker
+    networks:
+      - pgs-network
+    profiles: ["scraper-sharded"]
+    environment:
+      <<: *scraper-worker-env
+      TASK_QUEUE_SHARDS: "3"
+      SHARD_INDEX: "1"
+      METRICS_ADDRESS: ""
+
+  # scraper-worker-shard-2: Host-sharded crawler worker for shard 2 (see scraper-worker-
+  # shard-0).
+  scraper-worker-shard-2:
+    <<: *scraper-worker
+    networks:
+      - pgs-network
+    profiles: ["scraper-sharded"]
+    environment:
+      <<: *scraper-worker-env
+      TASK_QUEUE_SHARDS: "3"
+      SHARD_INDEX: "2"
+      METRICS_ADDRESS: ""
+
+  # scraper-api: Read-only documents API + Swagger UI over the S3 bucket (profile
+  # `scraper`): browse crawl runs and crawled pages.
+  scraper-api:
+    <<: *hardening
+    networks:
+      - pgs-network
+    profiles: ["scraper", "scraper-sharded"]
+    build:
+      context: ./scraper
+      target: api
+    image: pgs-search-engine/scraper-api:local
+    # Read-only documents API + Swagger UI (http://localhost:8082/docs) over the bucket.
+    environment:
+      S3_BUCKET: crawled-pages
+      S3_ENDPOINT: http://s3:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    ports:
+      - "127.0.0.1:${SCRAPER_API_PORT:-8082}:8080"
+    depends_on:
+      s3:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ---------------------------------------------------------------------------------
+# Volumes: every one is a bind-type local volume on a directory under ./data (created
+# by data-dirs), so all state lives on the host, in one place. `docker compose down -v`
+# removes the volume objects only, never the files; delete ./data/<dir> to reset one.
+# Services mount them with `nocopy: true`: nothing from the image is copied in, and the
+# directory is only mounted when the container starts, after data-dirs has created it.
+# ---------------------------------------------------------------------------------
+volumes:
+  # parent of all the directories below (for data-dirs)
+  data-root:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  # PostgreSQL: pgs, airflow, temporal, temporal_visibility
+  data-postgres:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+  # OpenSearch indexes
+  data-opensearch:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/opensearch
+  # Kafka log (scraped_files_topic, consumer offsets)
+  data-kafka:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/kafka
+  # ClamAV signatures
+  data-clamav:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/clamav
+  # LocalStack cache/logs/state
+  data-localstack:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/localstack
+  # Hugging Face cache: LaBSE (~1.8 GB) for Airflow and etl-worker
+  data-etl-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/etl-models
+  # Hugging Face cache of the search engine (~2.5 GB)
+  data-search-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/search-models
+  # Airflow task logs
+  data-airflow-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/airflow-logs
+
+# Files given to containers. s3-create-bucket is a LocalStack ready.d hook: LocalStack
+# runs it once S3 is up.
+configs:
+  s3-create-bucket:
+    content: |
+      #!/bin/sh
+      awslocal s3 mb s3://crawled-pages
+
+# One bridge network for the whole stack; every service is attached to it and reaches
+# the others by service name.
+networks:
+  pgs-network:
+    driver: bridge

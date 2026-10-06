@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"search-engine-scraper/internal/model"
+	"search-engine-scraper/internal/normalize"
 )
 
 // s3PutObjectAPI is the subset of the S3 client S3Writer needs, so tests
@@ -128,11 +129,22 @@ func s3URLHash(normalizedURL string) string {
 }
 
 // S3ObjectKey derives the content-addressed, run-scoped key a Document
-// with the given crawl run ID and normalized URL is written to. Exported
-// so the read API (internal/api) can key its own lookups the same way
-// without duplicating the hash scheme.
+// with the given crawl run ID and normalized URL is written to:
+// "<crawl_run_id>/<host>/<url_hash>.json". Exported so the read API
+// (internal/api) can key its own lookups the same way without duplicating
+// the hash scheme. The host segment groups one site's documents of a run
+// under S3SiteDocumentsPrefix, which the site-crawled event hands to ETL.
 func S3ObjectKey(crawlRunID int64, normalizedURL string) string {
-	return fmt.Sprintf("%d/%s.json", crawlRunID, s3URLHash(normalizedURL))
+	return S3SiteDocumentsPrefix(crawlRunID, normalize.Hostname(normalizedURL)) + s3URLHash(normalizedURL) + ".json"
+}
+
+// S3SiteDocumentsPrefix is the key prefix (without the optional
+// environment prefix) holding every Document of host written in a run.
+func S3SiteDocumentsPrefix(crawlRunID int64, host string) string {
+	if host == "" {
+		host = "unknown-host"
+	}
+	return fmt.Sprintf("%d/%s/", crawlRunID, strings.ToLower(host))
 }
 
 // S3LatestObjectKey derives the content-addressed, run-independent key

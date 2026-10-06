@@ -6,10 +6,10 @@ reasoning) defines what `cmd/worker` serves on `--metrics-address`
 metric definitions themselves point at -- Person 5 checklist item 7.
 
 Every query below assumes Prometheus is scraping each worker replica
-(`docker-compose.yml`'s worker service, or each pod in the Kubernetes
-Deployment) on that port -- see `k8s/`'s manifests for the scrape config,
+(the root `docker-compose.yml`'s `scraper-worker` service, or each pod in the Kubernetes
+Deployment) on that port -- see the repository's `k8/` manifests (`scraper-worker-metrics` Service),
 or point a local Prometheus at `http://localhost:9090/metrics` directly
-for a single `make run` worker.
+for a single worker started by the root `docker compose --profile scraper up`.
 
 ## Pages/sec
 

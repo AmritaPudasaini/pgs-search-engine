@@ -13,27 +13,24 @@ import (
 	"search-engine-scraper/internal/model"
 )
 
-// PostgresWriter persists documents to Postgres via sqlc-generated queries.
-// Unlike NDJSONWriter's in-memory content-hash dedupe (which only protects
-// against duplicate writes within one worker process's lifetime), this is
-// fully idempotent across restarts and across every worker in the fleet: a
-// retried WriteDocument activity lands on the same row via the
-// normalized_url UNIQUE constraint (see
-// migrations/0009_fix_unique_constraint_and_revisit.up.sql -- originally
-// (normalized_url, content_hash), fixed since a revisit whose content
-// changed needs to update the existing row, not insert a new one),
-// enforced by Postgres itself rather than by worker-local state. This is
-// the right choice for a multi-replica Kubernetes deployment where several
-// worker pods write concurrently -- there is no single process whose
-// in-memory map could dedupe across all of them.
+// PostgresWriter writes crawled documents and crawl runs to the shared Bronze
+// tables (crawled_documents, crawl_runs) as the pgs_scraper role, with the
+// statements of database/docs/scraper-db-contract.md. The schema belongs to
+// database/'s models and Alembic migrations; sqlc generates internal/db from
+// database/sql/scraper_schema.sql, which is exported from those models.
+//
+// Idempotent across restarts and across every worker in the fleet: a retried
+// WriteDocument activity lands on the same row through the
+// (normalized_url, content_hash) unique key, enforced by Postgres itself rather
+// than by worker-local state.
 type PostgresWriter struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
-// NewPostgresWriter connects to databaseURL and returns a Writer backed by
-// it. The `documents` table must already exist -- run the migrations in
-// migrations/ first (see Makefile's `migrate-up` target).
+// NewPostgresWriter connects to databaseURL (the pgs_scraper role) and returns a
+// Writer backed by it. The tables must already exist: the database/ migrations
+// (db-migrate) create them.
 func NewPostgresWriter(ctx context.Context, databaseURL string) (*PostgresWriter, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -46,75 +43,86 @@ func NewPostgresWriter(ctx context.Context, databaseURL string) (*PostgresWriter
 	return &PostgresWriter{pool: pool, queries: db.New(pool)}, nil
 }
 
-// Write upserts one document. Safe for concurrent use: pgxpool.Pool itself
-// is a connection pool safe for concurrent queries, so no additional
-// locking is needed here (unlike NDJSONWriter, which serializes access to
-// a single file handle).
+// Write upserts one document. Safe for concurrent use: pgxpool.Pool is.
 func (w *PostgresWriter) Write(doc *model.Document) error {
-	var geoLat, geoLng pgtype.Float8
-	if doc.Geo != nil {
-		geoLat = pgtype.Float8{Float64: doc.Geo.Lat, Valid: true}
-		geoLng = pgtype.Float8{Float64: doc.Geo.Lng, Valid: true}
-	}
-	var crawlRunID pgtype.Int8
-	if doc.CrawlRunID != 0 {
-		crawlRunID = pgtype.Int8{Int64: doc.CrawlRunID, Valid: true}
-	}
-
-	// headings is stored as JSONB; a nil/empty slice must still marshal to
-	// "[]" (not fail, not write SQL NULL into a NOT NULL column).
-	headings, err := json.Marshal(doc.Headings)
+	params, err := crawledDocumentParams(doc)
 	if err != nil {
-		return fmt.Errorf("marshal headings for %s: %w", doc.URL, err)
+		return err
 	}
-
-	_, err = w.queries.UpsertDocument(context.Background(), db.UpsertDocumentParams{
-		Url:             doc.URL,
-		NormalizedUrl:   doc.NormalizedURL,
-		Category:        doc.Category,
-		Title:           doc.Title,
-		BodyText:        doc.Text,
-		Links:           nonNilStrings(doc.Links),
-		Depth:           int32(doc.Depth),
-		StatusCode:      int32(doc.StatusCode),
-		ContentType:     doc.ContentType,
-		ContentHash:     doc.ContentHash,
-		FetchDurationMs: doc.FetchDurMs,
-		FetchError:      doc.Error,
-		FetchedAt:       pgtype.Timestamptz{Time: doc.FetchedAt, Valid: true},
-		JsonLd:          nonNilStrings(doc.JSONLD),
-		GeoLat:          geoLat,
-		GeoLng:          geoLng,
-		AnchorTexts:     nonNilStrings(doc.AnchorTexts),
-		CrawlRunID:      crawlRunID,
-		CanonicalUrl:    doc.CanonicalURL,
-		FinalUrl:        doc.FinalURL,
-		SimHash:         int64(doc.SimHash),
-		MetaDescription: doc.MetaDescription,
-		Headings:        headings,
-		Host:            doc.Host,
-		Country:         doc.Country,
-	})
-	if err != nil {
-		return fmt.Errorf("upsert document %s: %w", doc.URL, err)
+	if _, err := w.queries.UpsertCrawledDocument(context.Background(), params); err != nil {
+		return fmt.Errorf("upsert crawled document %s: %w", doc.URL, err)
 	}
 	return nil
 }
 
-// nonNilStrings coalesces a nil slice to an empty one. pgx sends a nil Go
-// slice as SQL NULL for a TEXT[] parameter -- fine for a nullable column,
-// but every one of documents' array columns (links, json_ld, anchor_texts)
-// is NOT NULL DEFAULT '{}', and that default only applies when a column is
-// omitted from the INSERT entirely, not when it's explicitly given NULL.
-// Without this, any page with no links (or no JSON-LD, or no anchor text --
-// a nil slice is normal and common, not an edge case) fails the NOT NULL
-// constraint on write. Caught by actually running a live crawl against
-// Postgres, not by unit tests, which all built params with non-nil slices.
-func nonNilStrings(s []string) []string {
-	if s == nil {
-		return []string{}
+// crawledDocumentParams applies the contract's conversions (§1): an empty string
+// or a zero crawl run ID is NULL, not a value; SimHash is stored bit-for-bit as
+// int64; Geo and ContactInfo are flattened into their columns.
+func crawledDocumentParams(doc *model.Document) (db.UpsertCrawledDocumentParams, error) {
+	headings, err := jsonOrNull(doc.Headings, len(doc.Headings) > 0)
+	if err != nil {
+		return db.UpsertCrawledDocumentParams{}, fmt.Errorf("marshal headings for %s: %w", doc.URL, err)
 	}
-	return s
+	openGraph, err := jsonOrNull(doc.OpenGraph, len(doc.OpenGraph) > 0)
+	if err != nil {
+		return db.UpsertCrawledDocumentParams{}, fmt.Errorf("marshal open graph for %s: %w", doc.URL, err)
+	}
+	p := db.UpsertCrawledDocumentParams{
+		Host:            text(doc.Host),
+		Url:             doc.URL,
+		NormalizedUrl:   doc.NormalizedURL,
+		FinalUrl:        text(doc.FinalURL),
+		CanonicalUrl:    text(doc.CanonicalURL),
+		Category:        text(doc.Category),
+		Title:           text(doc.Title),
+		MetaDescription: text(doc.MetaDescription),
+		MetaKeywords:    doc.MetaKeywords,
+		OpenGraph:       openGraph,
+		Text:            text(doc.Text),
+		Headings:        headings,
+		JsonLd:          doc.JSONLD,
+		Emails:          doc.ContactInfo.Emails,
+		Phones:          doc.ContactInfo.Phones,
+		Address:         text(doc.ContactInfo.Address),
+		SocialLinks:     doc.SocialLinks,
+		Links:           doc.Links,
+		AnchorTexts:     doc.AnchorTexts,
+		InternalLinks:   doc.InternalLinks,
+		ExternalLinks:   doc.ExternalLinks,
+		ImageLinks:      doc.ImageLinks,
+		VideoLinks:      doc.VideoLinks,
+		Country:         text(doc.Country),
+		SimHash:         pgtype.Int8{Int64: int64(doc.SimHash), Valid: doc.SimHash != 0},
+		Depth:           int32(doc.Depth),
+		StatusCode:      pgtype.Int4{Int32: int32(doc.StatusCode), Valid: doc.StatusCode != 0},
+		ContentType:     text(doc.ContentType),
+		ContentHash:     doc.ContentHash,
+		FetchedAt:       pgtype.Timestamptz{Time: doc.FetchedAt, Valid: true},
+		FetchDurationMs: pgtype.Int8{Int64: doc.FetchDurMs, Valid: true},
+		Error:           text(doc.Error),
+	}
+	if doc.CrawlRunID != 0 {
+		p.CrawlRunID = pgtype.Int8{Int64: doc.CrawlRunID, Valid: true}
+	}
+	if doc.Geo != nil {
+		p.GeoLat = pgtype.Float8{Float64: doc.Geo.Lat, Valid: true}
+		p.GeoLng = pgtype.Float8{Float64: doc.Geo.Lng, Valid: true}
+	}
+	return p, nil
+}
+
+// text is SQL NULL for "" (an omitted value), else the string.
+func text(s string) pgtype.Text {
+	return pgtype.Text{String: s, Valid: s != ""}
+}
+
+// jsonOrNull marshals v for a JSONB column, or returns nil (SQL NULL) when
+// present is false.
+func jsonOrNull(v any, present bool) ([]byte, error) {
+	if !present {
+		return nil, nil
+	}
+	return json.Marshal(v)
 }
 
 // Close releases the connection pool.
@@ -130,9 +138,9 @@ func (w *PostgresWriter) Close() error {
 
 func (w *PostgresWriter) StartRun(ctx context.Context, in StartRunInput) (int64, error) {
 	id, err := w.queries.CreateCrawlRun(ctx, db.CreateCrawlRunParams{
-		SeedCount: int32(in.SeedCount),
-		MaxDepth:  int32(in.MaxDepth),
-		MaxPages:  int32(in.MaxPages),
+		SeedCount: pgtype.Int4{Int32: int32(in.SeedCount), Valid: true},
+		MaxDepth:  pgtype.Int4{Int32: int32(in.MaxDepth), Valid: true},
+		MaxPages:  pgtype.Int4{Int32: int32(in.MaxPages), Valid: true},
 	})
 	if err != nil {
 		return 0, fmt.Errorf("create crawl run: %w", err)
@@ -142,12 +150,12 @@ func (w *PostgresWriter) StartRun(ctx context.Context, in StartRunInput) (int64,
 
 func (w *PostgresWriter) UpdateRunStats(ctx context.Context, runID int64, stats RunStats) error {
 	err := w.queries.UpdateCrawlRunStats(ctx, db.UpdateCrawlRunStatsParams{
-		ID:           runID,
-		Fetched:      int32(stats.Fetched),
-		Succeeded:    int32(stats.Succeeded),
-		Failed:       int32(stats.Failed),
-		Skipped:      int32(stats.Skipped),
-		DomainCapped: int32(stats.DomainCapped),
+		ID:                runID,
+		FetchedCount:      int32(stats.Fetched),
+		SucceededCount:    int32(stats.Succeeded),
+		FailedCount:       int32(stats.Failed),
+		SkippedCount:      int32(stats.Skipped),
+		DomainCappedCount: int32(stats.DomainCapped),
 	})
 	if err != nil {
 		return fmt.Errorf("update crawl run %d stats: %w", runID, err)
@@ -156,7 +164,7 @@ func (w *PostgresWriter) UpdateRunStats(ctx context.Context, runID int64, stats 
 }
 
 // FreshURLs implements FreshnessChecker on top of the same pool/queries
-// PostgresWriter already holds for documents.
+// PostgresWriter already holds for documents (any version of the URL counts).
 func (w *PostgresWriter) FreshURLs(ctx context.Context, normalizedURLs []string, since time.Time) (map[string]bool, error) {
 	if len(normalizedURLs) == 0 {
 		return nil, nil
@@ -177,14 +185,14 @@ func (w *PostgresWriter) FreshURLs(ctx context.Context, normalizedURLs []string,
 
 func (w *PostgresWriter) FinishRun(ctx context.Context, runID int64, status string, stats RunStats, errMsg string) error {
 	err := w.queries.FinishCrawlRun(ctx, db.FinishCrawlRunParams{
-		ID:           runID,
-		Status:       status,
-		Fetched:      int32(stats.Fetched),
-		Succeeded:    int32(stats.Succeeded),
-		Failed:       int32(stats.Failed),
-		Skipped:      int32(stats.Skipped),
-		DomainCapped: int32(stats.DomainCapped),
-		Error:        errMsg,
+		ID:                runID,
+		Status:            status,
+		FetchedCount:      int32(stats.Fetched),
+		SucceededCount:    int32(stats.Succeeded),
+		FailedCount:       int32(stats.Failed),
+		SkippedCount:      int32(stats.Skipped),
+		DomainCappedCount: int32(stats.DomainCapped),
+		Error:             text(errMsg),
 	})
 	if err != nil {
 		return fmt.Errorf("finish crawl run %d: %w", runID, err)

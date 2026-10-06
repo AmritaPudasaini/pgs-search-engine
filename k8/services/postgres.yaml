@@ -1,0 +1,16 @@
+# PostgreSQL 16 + PostGIS + pgvector (image: database/Dockerfile). Single replica.
+# The schema is owned by the pgs-db Alembic migrations (db-bootstrap Job), not by this
+# StatefulSet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

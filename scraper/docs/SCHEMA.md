@@ -18,23 +18,27 @@ Every key below may be prefixed with a fixed string (`WithS3KeyPrefix` /
 `WithS3FreshnessKeyPrefix` / `WithS3RunRecorderKeyPrefix`, all three must
 be set to the *same* prefix against one bucket, or documents/freshness
 lookups/manifests silently stop seeing each other) -- e.g. to share one
-bucket across environments: `staging/42/<hash>.json` instead of
-`42/<hash>.json`.
+bucket across environments: `staging/42/<host>/<hash>.json` instead of
+`42/<host>/<hash>.json`.
 
 ```
 <prefix?>/
 ├── <crawl_run_id>/
 │   ├── _run.json                  # this run's manifest (see below)
-│   └── <sha256(normalized_url)>.json   # one Document, written under this run
+│   └── <host>/
+│       └── <sha256(normalized_url)>.json   # one Document, written under this run
 ├── <crawl_run_id>/...             # every other run's own prefix
 └── latest/
     └── <sha256(normalized_url)>.json   # this URL's most recent Document, any run
 ```
 
-### Document objects: `<crawl_run_id>/<sha256(normalized_url)>.json`
+### Document objects: `<crawl_run_id>/<host>/<sha256(normalized_url)>.json`
 
 - Content-addressed by `(crawl_run_id, normalized_url)` -- see
-  `S3ObjectKey`. Concurrent worker replicas writing the same document
+  `S3ObjectKey`; `<host>` is the URL's lower-cased hostname. Grouping by host
+  gives each website of a run its own prefix (`S3SiteDocumentsPrefix`), which
+  is what the `site_crawl_completed` Kafka event hands to ETL when that
+  site's crawl finishes. Concurrent worker replicas writing the same document
   within the same run overwrite the same key with identical bytes: this is
   what makes S3 storage replica-safe without a central DB doing dedupe.
 - Body is exactly `model.Document` marshalled to JSON (`ContentType:
@@ -57,7 +61,7 @@ bucket across environments: `staging/42/<hash>.json` instead of
 - Always overwritten with the most recently fetched version of that URL,
   regardless of which run fetched it.
 - **Why this exists**: a run-scoped-only key scheme
-  (`<crawl_run_id>/<hash>.json`) has no single stable address to
+  (`<crawl_run_id>/<host>/<hash>.json`) has no single stable address to
   `HeadObject` for "was this URL fetched recently" -- a URL's
   `crawl_run_id` isn't known until it's actually been fetched. Without this
   second index, `S3FreshnessChecker` (item 3) would be impossible to

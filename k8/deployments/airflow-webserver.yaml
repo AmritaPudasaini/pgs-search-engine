@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  labels:
+    app.kubernetes.io/name: airflow-webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: airflow-webserver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: airflow-webserver
+    spec:
+      serviceAccountName: airflow-webserver
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 50000
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-migrations
+          image: pgs-search-engine/etl
+          imagePullPolicy: IfNotPresent
+          args: ["airflow", "db", "check-migrations", "--migration-wait-timeout=300"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          env:
+            - name: AIRFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_DB_PASSWORD }
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflow:$(AIRFLOW_DB_PASSWORD)@airflow-db/airflow
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 768Mi }
+      containers:
+        - name: webserver
+          image: pgs-search-engine/etl
+          imagePullPolicy: IfNotPresent
+          args: ["webserver"]
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          env:
+            - name: AIRFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_DB_PASSWORD }
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflow:$(AIRFLOW_DB_PASSWORD)@airflow-db/airflow
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_FERNET_KEY }
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_SECRET_KEY }
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/airflow/logs
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 200m, memory: 768Mi }
+            limits: { memory: 1536Mi }
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: airflow-logs

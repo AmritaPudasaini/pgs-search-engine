@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-pod-template
+  labels:
+    app.kubernetes.io/name: airflow
+data:
+  # The executor fills in the command (`airflow tasks run ...`), name and labels; the
+  # container must be called `base`. The image is not rewritten by Customize's `images:`
+  # (this is a string inside a ConfigMap): change it here when using a registry.
+  pod_template.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: airflow-task
+      labels:
+        app.kubernetes.io/name: airflow-task
+        app.kubernetes.io/part-of: pgs-search-engine
+    spec:
+      serviceAccountName: airflow-task
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 50000
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: base
+          image: pgs-search-engine/etl:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: pgs-config
+          env:
+            # A task pod runs exactly one task itself.
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_DB_PASSWORD }
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflow:$(AIRFLOW_DB_PASSWORD)@airflow-db/airflow
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_FERNET_KEY }
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: AIRFLOW_SECRET_KEY }
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "false"
+            # For DAG code (the DAGs themselves use kafka:29092 directly). pgs_db needs
+            # the separate interpreter /opt/etl-venv/bin/python (see ETL/Dockerfile).
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: POSTGRES_DB }
+            - name: PGS_ETL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: PGS_ETL_DB_PASSWORD }
+            - name: DATABASE_URL
+              value: postgresql+psycopg://pgs_etl:$(PGS_ETL_DB_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+            - name: DB_APPLICATION_NAME
+              value: pgs-airflow-task
+            - name: EMBEDDING_MODEL_NAME
+              value: sentence-transformers/LaBSE
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: processed
+              mountPath: /opt/airflow/data/processed
+            - name: models
+              mountPath: /home/airflow/.cache/huggingface
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          # LaBSE embeddings (~1.8 GB model) run inside the transform task.
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 3Gi }
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: airflow-logs
+        - name: processed
+          persistentVolumeClaim:
+            claimName: etl-processed
+        - name: models
+          persistentVolumeClaim:
+            claimName: etl-models

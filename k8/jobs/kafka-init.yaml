@@ -1,0 +1,46 @@
+# Creates the scraper -> ETL topic (idempotent): scraped_files_topic, one event per
+# website whose crawl finished, read by the etl_ingestion_pipeline DAG. Deletes itself 10 minutes after finishing, so each `kubectl apply` re-runs it.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  labels:
+    app.kubernetes.io/name: kafka-init
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-init
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: create-topics
+          image: apache/kafka:3.8.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 > /dev/null 2>&1; do
+                echo "waiting for kafka"; sleep 3
+              done
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
+                --create --if-not-exists --topic scraped_files_topic \
+                --partitions 1 --replication-factor 1
+          env:
+            - { name: KAFKA_HEAP_OPTS, value: "-Xmx128m" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 384Mi }

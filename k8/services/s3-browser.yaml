@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3-browser
+  labels:
+    app.kubernetes.io/name: s3-browser
+spec:
+  selector:
+    app.kubernetes.io/name: s3-browser
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

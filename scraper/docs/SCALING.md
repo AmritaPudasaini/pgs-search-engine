@@ -2,7 +2,8 @@
 
 ## Default: identical replicas
 
-`make scale SCALE=N` runs N identical workers on one task queue
+`docker compose --profile scraper up -d --scale scraper-worker=N` (from the repository
+root) runs N identical workers on one task queue
 (`scraper-task-queue`). Temporal gives each fetch to whichever worker is
 free. Simple and fast to scale, but a host's fetches spread over all
 replicas, so per-host politeness (rate limit, `Crawl-delay`, robots cache,
@@ -25,8 +26,9 @@ Worker flags:
 | `--shard-index` | shard this worker polls; `-1` = all shards |
 | `--shard-from-hostname` | take the shard from the hostname's trailing ordinal (`worker-sharded-3` -> 3) |
 
-Local: `docker compose --profile sharded up -d` starts three shard workers,
-then crawl with `--task-queue-shards=3`. Kubernetes: `k8s/06-worker-sharded.yaml`
+Local (from the repository root): `docker compose --profile scraper-sharded up -d`
+starts three shard workers (`scraper-worker-shard-{0,1,2}`),
+then crawl with `--task-queue-shards=3`. Kubernetes: the `scraper-sharded` component in the repository's `k8/`
 (StatefulSet, one pod per shard).
 
 Notes:

@@ -47,14 +47,14 @@ func main() {
 	var (
 		hostPort       = envflag.String("temporal-address", "localhost:7233", "Temporal frontend address")
 		namespace      = envflag.String("namespace", "default", "Temporal namespace")
-		storageKind    = envflag.String("storage", "s3", "where to write crawled data: s3 (complete HTML + metadata objects, no database), ndjson (local dev), or kafka")
+		storageKind    = envflag.String("storage", "s3", "where to write crawled data: s3 (complete HTML + metadata objects, no database) or ndjson (local dev)")
 		output         = envflag.String("output", "data/output/documents.ndjson", "NDJSON output path (used when --storage=ndjson)")
 		s3Bucket       = envflag.String("s3-bucket", "", "S3 bucket crawled pages are uploaded to (required when --storage=s3)")
 		s3Prefix       = envflag.String("s3-prefix", "", "optional key prefix inside the bucket, e.g. an environment name")
 		s3Endpoint     = envflag.String("s3-endpoint", "", "S3-compatible endpoint URL for LocalStack/MinIO (empty = real AWS S3)")
 		awsRegion      = envflag.String("aws-region", "", "AWS region (empty = resolve from AWS_REGION / shared config)")
-		kafkaBrokers   = envflag.String("kafka-brokers", "", "comma-separated Kafka broker addresses, e.g. kafka-1:9092,kafka-2:9092 (used when --storage=kafka)")
-		kafkaTopic     = envflag.String("kafka-topic", "crawled-documents", "Kafka topic to publish crawled documents to (used when --storage=kafka) -- the hand-off point to the ETL pipeline")
+		kafkaBrokers   = envflag.String("kafka-brokers", "", "comma-separated Kafka broker addresses, e.g. kafka-1:9092,kafka-2:9092; when set, one event per website whose crawl finished is published to --kafka-topic (requires --storage=s3)")
+		kafkaTopic     = envflag.String("kafka-topic", "scraped_files_topic", "Kafka topic for the site-crawled events -- the hand-off point to the ETL pipeline")
 		taskShards     = envflag.Int("task-queue-shards", 1, "total number of host-shard task queues the crawl uses (1 = off); must match the scraper client's --task-queue-shards")
 		shardIndex     = envflag.Int("shard-index", -1, "which shard's fetch queue this worker polls (0..task-queue-shards-1); -1 = poll every shard queue")
 		shardFromHost  = envflag.Bool("shard-from-hostname", false, "derive --shard-index from the trailing ordinal of the hostname (e.g. worker-2 -> 2, a Kubernetes StatefulSet pod), modulo --task-queue-shards")
@@ -100,24 +100,29 @@ func main() {
 		}
 		primary, runs, freshness, htmlStore, records = s3b.writer, s3b.runs, s3b.freshness, s3b.html, s3b.records
 	} else {
-		primary, err = buildWriter(*storageKind, *output, *kafkaBrokers, *kafkaTopic)
+		primary, err = buildWriter(*storageKind, *output)
 		if err != nil {
 			log.Fatalf("open storage writer: %v", err)
 		}
 	}
-
 	writer := primary
-	if *storageKind != "kafka" && *kafkaBrokers != "" {
-		// Fan out to Kafka in addition to the primary backend, so the ETL
-		// team gets a live document stream even when the primary store
-		// (S3/NDJSON) is what the crawler's own API/tooling reads.
-		kw, err := storage.NewKafkaWriter(storage.ParseBrokers(*kafkaBrokers), *kafkaTopic)
-		if err != nil {
-			log.Fatalf("open kafka writer: %v", err)
-		}
-		writer = storage.NewMultiWriter(primary, kw)
-	}
 	defer writer.Close()
+
+	// The ETL hand-off: one Kafka event per website whose crawl finished,
+	// pointing at that site's documents in the bucket. Nothing is published
+	// per page or per file.
+	var sites storage.SiteEventEmitter = storage.NoopSiteEventEmitter{}
+	if *kafkaBrokers != "" {
+		if *storageKind != "s3" {
+			log.Fatal("--kafka-brokers requires --storage=s3: the site-crawled event points ETL at the site's objects in the bucket")
+		}
+		emitter, err := storage.NewKafkaSiteEventEmitter(storage.ParseBrokers(*kafkaBrokers), *kafkaTopic, *s3Bucket, *s3Prefix)
+		if err != nil {
+			log.Fatalf("open kafka site-event emitter: %v", err)
+		}
+		defer emitter.Close()
+		sites = emitter
+	}
 
 	c, err := client.Dial(client.Options{HostPort: *hostPort, Namespace: *namespace})
 	if err != nil {
@@ -134,6 +139,7 @@ func main() {
 	act := activities.New(f, guard, writer, runs, freshness)
 	act.HTML = htmlStore
 	act.Records = records
+	act.Sites = sites
 
 	mode, merr := render.ParseMode(*renderFlag)
 	if merr != nil {
@@ -168,6 +174,7 @@ func main() {
 	w.RegisterActivity(act.StartCrawlRun)
 	w.RegisterActivity(act.UpdateCrawlRunStats)
 	w.RegisterActivity(act.FinishCrawlRun)
+	w.RegisterActivity(act.PublishSiteCrawled)
 
 	// Host-sharded fetching: besides the shared queue (workflow tasks and
 	// storage/run activities), poll the shard queue(s) this worker owns for
@@ -286,17 +293,12 @@ func buildS3Backend(bucket, prefix, endpoint, region string) (*s3Backend, error)
 	return &s3Backend{writer: w, runs: r, freshness: fr, html: h, records: rw}, nil
 }
 
-func buildWriter(kind, output, kafkaBrokers, kafkaTopic string) (storage.Writer, error) {
+func buildWriter(kind, output string) (storage.Writer, error) {
 	switch kind {
 	case "ndjson":
 		return storage.NewNDJSONWriter(output)
-	case "kafka":
-		if kafkaBrokers == "" {
-			log.Fatal("--kafka-brokers (or KAFKA_BROKERS) is required when --storage=kafka")
-		}
-		return storage.NewKafkaWriter(storage.ParseBrokers(kafkaBrokers), kafkaTopic)
 	default:
-		log.Fatalf("unknown --storage %q: must be s3, ndjson, or kafka", kind)
+		log.Fatalf("unknown --storage %q: must be s3 or ndjson", kind)
 		return nil, nil
 	}
 }

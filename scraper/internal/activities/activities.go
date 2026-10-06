@@ -61,6 +61,9 @@ type Activities struct {
 	// Records saves each page's complete structured capture
 	// (model.PageRecord). Defaults to a no-op.
 	Records storage.RecordWriter
+	// Sites publishes the "website crawl completed" event ETL starts from.
+	// Defaults to a no-op (no Kafka brokers configured).
+	Sites storage.SiteEventEmitter
 	// Renderer loads pages in a headless browser so JavaScript-rendered
 	// content is captured; RenderMode decides which pages it is used for.
 	// Both default to off.
@@ -83,6 +86,7 @@ func New(f *fetcher.Fetcher, r *robots.Guard, w storage.Writer, runs storage.Run
 		Freshness:   freshness,
 		HTML:        storage.NoopHTMLWriter{},
 		Records:     storage.NoopRecordWriter{},
+		Sites:       storage.NoopSiteEventEmitter{},
 		RenderMode:  render.ModeOff,
 		writtenHash: make(map[string]bool),
 	}
@@ -581,6 +585,23 @@ func (a *Activities) FinishCrawlRun(ctx context.Context, in FinishCrawlRunInput)
 		Skipped:      in.Skipped,
 		DomainCapped: in.DomainCapped,
 	}, in.Error)
+}
+
+// PublishSiteCrawledInput is the argument to PublishSiteCrawled.
+type PublishSiteCrawledInput struct {
+	RunID        int64
+	WorkflowID   string
+	Host         string
+	Status       string // "completed" or "failed"
+	Error        string
+	PagesFetched int
+	CompletedAt  time.Time
+}
+
+// PublishSiteCrawled tells ETL that one website's crawl has finished and
+// every page of it is stored, so the site can be processed as a whole.
+func (a *Activities) PublishSiteCrawled(ctx context.Context, in PublishSiteCrawledInput) error {
+	return a.Sites.EmitSiteCrawled(ctx, in.RunID, in.WorkflowID, in.Host, in.Status, in.Error, in.PagesFetched, in.CompletedAt)
 }
 
 // parseRetryAfter interprets a Retry-After header, which per RFC 9110 is

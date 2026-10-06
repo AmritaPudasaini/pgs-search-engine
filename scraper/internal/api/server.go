@@ -134,7 +134,7 @@ func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if docs == nil {
-		docs = []db.Document{}
+		docs = []db.CrawledDocument{}
 	}
 
 	resp := map[string]any{

@@ -53,7 +53,8 @@ class CrawlRunUpdate(SchemaBase):
 class CrawlRunRead(CrawlRunBase, ReadSchema):
     """Crawl-run data returned by the application."""
 
-    class CrawledDocumentBase(SchemaBase):
+
+class CrawledDocumentBase(SchemaBase):
     """Fields shared by all crawled-document schemas."""
 
     crawl_run_id: int | None = Field(default=None, gt=0)

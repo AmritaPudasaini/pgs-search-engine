@@ -65,6 +65,18 @@ func TestCrawlDomainsWorkflow_CrawlsEveryPageOfEveryDomain(t *testing.T) {
 	env.OnActivity(act.WriteDocument, mock.Anything, mock.Anything).Return(nil)
 	env.OnActivity(act.StartCrawlRun, mock.Anything, mock.Anything).Return(int64(7), nil)
 	env.OnActivity(act.FinishCrawlRun, mock.Anything, mock.Anything).Return(nil)
+	siteEvents := map[string]activities.PublishSiteCrawledInput{}
+	env.OnActivity(act.PublishSiteCrawled, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, in activities.PublishSiteCrawledInput) error {
+			mu.Lock()
+			defer mu.Unlock()
+			if _, dup := siteEvents[in.Host]; dup {
+				t.Errorf("second site-crawled event for %s", in.Host)
+			}
+			siteEvents[in.Host] = in
+			return nil
+		},
+	)
 
 	var seeds []Seed
 	for _, h := range hosts {
@@ -104,5 +116,19 @@ func TestCrawlDomainsWorkflow_CrawlsEveryPageOfEveryDomain(t *testing.T) {
 	}
 	if res.RunID != 7 {
 		t.Errorf("run id = %d, want the parent's run 7", res.RunID)
+	}
+	// One "site crawled" event per website, after its whole crawl -- not per page.
+	if len(siteEvents) != len(hosts) {
+		t.Errorf("site events = %d, want one per host (%d)", len(siteEvents), len(hosts))
+	}
+	for _, h := range hosts {
+		ev, ok := siteEvents[h]
+		if !ok {
+			t.Errorf("no site-crawled event for %s", h)
+			continue
+		}
+		if ev.RunID != 7 || ev.Status != "completed" || ev.PagesFetched != 1+len(subPages) {
+			t.Errorf("event for %s = %+v, want run 7, completed, %d pages", h, ev, 1+len(subPages))
+		}
 	}
 }

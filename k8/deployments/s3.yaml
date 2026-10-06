@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3
+  labels:
+    app.kubernetes.io/name: s3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s3
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: localstack
+          image: localstack/localstack:3.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: s3
+              containerPort: 4566
+          env:
+            - { name: SERVICES, value: s3 }
+          volumeMounts:
+            - name: init
+              mountPath: /etc/localstack/init/ready.d
+          # Ready once the bucket exists, i.e. the init hook ran.
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "awslocal s3 ls s3://crawled-pages > /dev/null"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: init
+          configMap:
+            name: s3-init
+            defaultMode: 0755

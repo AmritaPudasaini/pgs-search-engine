@@ -67,7 +67,9 @@ VALUES ($1, $2, 'RUNNING', $3, $4, $5, $6, 0, 0, 0, 0, 0)
 RETURNING id;
 ```
 
-These replace the scraper's own `crawl_runs` (migration 0004): `fetched` → `fetched_count`,
+These replace the scraper's former own `crawl_runs` (its migrations are gone; the Go side now
+generates its models from `database/sql/scraper_schema.sql`, exported from the pgs_db models, and writes them with the statements of
+this contract, `scraper/internal/db/queries.sql`): `fetched` → `fetched_count`,
 `domain_capped` → `domain_capped_count`, `error` → `error`; its other columns map one to one.
 
 ### 3.2 Resolve the domain

@@ -28,18 +28,24 @@ Mocked storage cannot catch bugs that only appear on a real write -- see
 `docs/CRAWLER_ROADMAP.md` item 18, where a nil slice broke the first real
 Postgres insert although every mocked test passed.
 
+From the repository root:
+
 ```bash
-make run                                   # bring up the Docker stack
-make crawl SEEDS=https://example.com       # run a real crawl
-make logs                                  # confirm no write errors
-make down                                  # tear down
+docker compose --profile scraper up -d --build                                  # bring up the stack
+docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule  # run a real crawl
+docker compose logs -f scraper-worker                                           # confirm no write errors
+docker compose --profile scraper down                                           # tear down
 ```
 
 Required: before calling any change to `internal/storage/`, `internal/db/`,
-`migrations/`, or the write path in `internal/activities/` done.
+or the write path in `internal/activities/` done.
 
-For `go test` against a standalone Postgres, `make devdb-up` starts one on
-port 5433 and `make devdb-down` removes it.
+The scraper has no migrations of its own: `database/` (Alembic) owns the
+schema; sqlc generates the Go models from `../database/sql/scraper_schema.sql`,
+which is exported from the pgs_db models (`make sqlc`). With the root stack's `postgres` up and migrated
+(`docker compose up -d db-migrate db-roles` from the repository root),
+`make test-db` runs the Postgres writer against the real schema as the
+`pgs_scraper` role.
 
 ## Known coverage gaps
 

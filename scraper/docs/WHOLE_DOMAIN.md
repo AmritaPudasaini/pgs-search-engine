@@ -3,11 +3,17 @@
 ## Crawl every page of each domain
 
 ```bash
-docker compose --profile sharded up -d --build        # stack + Chrome + shard workers
-docker compose run --rm scraper --seeds-file=/configs/seeds.example.txt \
-  --whole-domain --max-depth=8 --max-pages=2000 --max-concurrent-domains=20 \
-  --task-queue-shards=3
+# from the repository root
+docker compose --profile scraper-sharded up -d --build   # stack + Chrome + shard workers
 ```
+
+Airflow's `scraper_crawl_schedule` DAG starts this crawl every 30 minutes for every
+website in the `domains` table (limits: `SCRAPER_MAX_DEPTH`,
+`SCRAPER_MAX_PAGES_PER_DOMAIN`, `SCRAPER_CONCURRENT_DOMAINS` in `.env`; set
+`SCRAPER_TASK_QUEUE_SHARDS=3` for the sharded workers). By hand,
+from the host: `go run ./cmd/scraper --seeds-file=configs/seeds.example.txt
+--whole-domain --max-depth=8 --max-pages=2000 --max-concurrent-domains=20
+--task-queue-shards=3`.
 
 `--whole-domain` starts a `CrawlDomainsWorkflow` that runs one child
 `CrawlWorkflow` per host. Each child follows links and the sitemap across its
@@ -35,8 +41,13 @@ Chrome fails, the static HTML is used and the error is recorded.
 | `html/<host>/<hash>.html` | raw HTML exactly as served |
 | `html/<host>/rendered-<hash>.html` | DOM after JavaScript ran (rendered pages only) |
 | `pages/<host>/<hash>.json` | full structured record (`model.PageRecord`) |
-| `<run_id>/<url-hash>.json`, `latest/...` | slim document used by the API |
+| `<run_id>/<host>/<url-hash>.json`, `latest/...` | slim document used by the API and, per site, by ETL |
 | `<run_id>/_run.json` | run manifest |
+
+When a domain's crawl finishes, the worker publishes one `site_crawl_completed`
+event to the Kafka topic `scraped_files_topic` (`--kafka-brokers`,
+`--kafka-topic`), keyed by the host and naming `<run_id>/<host>/` as the site's
+documents prefix. That event, not individual pages, is what starts the ETL.
 
 A `PageRecord` holds: title, description, lang, charset, viewport, doctype; every
 `<meta>` and `<link>` tag; Open Graph and Twitter card; JSON-LD; the heading

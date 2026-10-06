@@ -1,0 +1,15 @@
+# Pod ordinal -> shard: scraper-worker-sharded-2 polls shard 2 (SHARD_FROM_HOSTNAME).
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraper-worker-sharded
+  labels:
+    app.kubernetes.io/name: scraper-worker-sharded
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: scraper-worker-sharded
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics

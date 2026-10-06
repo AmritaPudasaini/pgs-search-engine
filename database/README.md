@@ -158,20 +158,38 @@ an advisory lock (an overlapping run skips), prints one JSON line, and exits non
 
 Needs **Docker Desktop** (running) and **Python 3.11+**.
 
+PostgreSQL runs in the repository-root `docker-compose.yml` (image: `./Dockerfile`, PostgreSQL 16 +
+PostGIS + pgvector). Starting the stack also migrates and seeds the database: the one-shot
+`db-migrate` service (`./migrate.Dockerfile`) runs `alembic upgrade head` and the seed scripts,
+then `db-roles` sets the service roles' passwords from `.env` (and creates Airflow's and
+Temporal's databases in the same server); the services start only after those succeed.
+
 ```bash
+cp .env.example .env                  # in the repository root (Windows: copy)
+docker compose up -d --build postgres db-migrate db-roles   # or the whole stack
 cd database
-cp .env.example .env                  # Windows: copy .env.example .env
-docker compose up -d --build          # PostgreSQL 16 + PostGIS + pgvector (./Dockerfile)
 pip install -e ".[postgres,dev]"
 
 export DATABASE_URL=postgresql+psycopg://pgs:pgs@localhost:5432/pgs
 # Windows PowerShell: $env:DATABASE_URL="postgresql+psycopg://pgs:pgs@localhost:5432/pgs"
 
-python -m alembic upgrade head        # all tables, views, triggers and roles
-python scripts/seed_geography.py      # 7 provinces, 77 districts, 753 local bodies
-python scripts/seed_boundaries.py     # their shapes
-python -m pytest                      # 328 tests should pass
+python -m alembic upgrade head        # all tables, views, triggers and roles (done by db-migrate)
+python scripts/seed_geography.py      # 7 provinces, 77 districts, 753 local bodies (db-migrate)
+python scripts/seed_boundaries.py     # their shapes (db-migrate)
+python scripts/seed_domains.py        # the websites to crawl (db-migrate)
+python -m pytest                      # 337 tests should pass
 ```
+
+**The websites to crawl** are seeded from `data/domains.json` (9,761 rows of `domains`), which
+`scripts/build_domains.py` builds from the scraper's seed list
+(`scraper/configs/seeds.example.txt`) and the 753 local bodies' websites in
+`data/nepal_geography.json`. One row per website (host without `www.`); categories and priorities
+come from the seed list's sections. Each local government's site, and any subdomain of it, carries
+its `local_body_code`, which the seed resolves to `domains.local_body_id`: the website's
+geolocation (local body, and through it district and province), used to geo-tag its pages. The
+seed only inserts new websites and fills empty `local_body_id` / `website_name`; status, priority
+and anything else an admin changed are kept. After editing the seed list, re-run
+`python scripts/build_domains.py` (`tests/test_domains_seed.py` checks the file is current).
 
 The tests need a live, seeded database: they read `DATABASE_URL`, and each test runs in a
 transaction that is rolled back. Without `DATABASE_URL` the suite skips rather than fails, so check
@@ -211,18 +229,24 @@ review it). A migration that adds a table must also: add the `updated_at` trigge
 `pgs_db/grants.py` and call `grants.apply(op.execute)`, and bump `pgs_db.health.EXPECTED_REVISION`.
 `tests/test_hardening.py` fails until all three are done.
 
+A change to `crawl_runs`, `crawled_documents`, `stored_files` or `domains` must also re-export
+`sql/scraper_schema.sql` (`python scripts/export_scraper_schema.py`), the DDL the Go scraper's
+sqlc generates its models from, then `make sqlc` in `scraper/`. The scraper has no schema or
+migrations of its own. `tests/test_scraper_schema_sync.py` fails while the file is stale or a
+model disagrees with the migrated table.
+
 **Common problems**
 
 - **`alembic` / `pytest` not recognized:** use `python -m alembic` and `python -m pytest`.
 - **`password authentication failed for user "pgs"`:** another PostgreSQL owns port 5432. Set
-  `POSTGRES_PORT=5433` in `.env`, `docker compose down && docker compose up -d`, and use 5433 in
+  `POSTGRES_PORT=5433` in the root `.env`, `docker compose up -d postgres`, and use 5433 in
   `DATABASE_URL`.
 - **`extension "vector" is not available`:** the container is on the old PostGIS-only image. Run
-  `docker compose up -d --build`.
+  `docker compose up -d --build postgres` (repository root).
 - **`column ... does not exist` although `alembic current` says head:** your database was built
   from an earlier draft of a migration. Recreate it (this deletes its data):
-  `docker exec pgs-postgres psql -U pgs -d postgres -c "DROP DATABASE pgs WITH (FORCE)" -c "CREATE DATABASE pgs"`,
-  then migrate and seed again.
+  `docker compose exec postgres psql -U pgs -d postgres -c "DROP DATABASE pgs WITH (FORCE)" -c "CREATE DATABASE pgs"`,
+  then migrate and seed again (`docker compose up db-migrate db-roles`).
 - **Boundary tests skipped:** run `python scripts/seed_boundaries.py`.
 
 **Connection URLs**
@@ -231,7 +255,7 @@ review it). A migration that adds a table must also: add the `updated_at` trigge
 |---|---|
 | Python (SQLAlchemy, Alembic) | `postgresql+psycopg://<role>:<password>@<host>:5432/pgs` |
 | Go scraper (`--storage=postgres`) | `postgres://pgs_scraper:<password>@<host>:5432/pgs` |
-| Other containers in the same compose | host `postgres` instead of `localhost` |
+| Other containers in the root compose | host `postgres` instead of `localhost` |
 
 ## 8. Connecting the other teams
 
@@ -241,14 +265,14 @@ is on each team's side:
 
 - **Scraper** (`oxfordoli/api-s3-rework`, `moni/s3-storage-data-integrity`): it is moving to
   S3-only storage, and that already works with us: the `ingest` job reads its bucket layout
-  (`<run>/_run.json`, `<run>/<sha256(url)>.json`) into Bronze, run manifests included. All it has
+  (`<run>/_run.json`, `<run>/<host>/<sha256(url)>.json`) into Bronze, run manifests included. All it has
   to give us is the bucket name, prefix and read-only credentials. Optional, for features that
   need it: put PDFs/images and contacts back in `Document` (PDF search, municipality contacts),
   and read `domains.status` so the admin's PAUSE / RESUME reach the crawler.
 - **ETL** (`etl/workflow_saurav`): replace the JSONL / SQLite sink with one call per record,
-  `pgs_db.etl.save_transformed(Session, record, geo_confidence=...)`, as `pgs_etl`. When the
-  record came off Kafka (`--storage=kafka`, where nothing else writes Bronze), also pass the
-  message: `bronze_document=message` saves it to Bronze in the same transaction. Its
+  `pgs_db.etl.save_transformed(Session, record, geo_confidence=...)`, as `pgs_etl`. Pass the
+  page's Document JSON from S3 as `bronze_document=...` to save it to Bronze in the same
+  transaction. Its
   `transform.py` output is accepted unchanged: top-level title, hex simhash, place-name geo
   (resolved through the gazetteer) and the 768-d LaBSE embedding. Its rule-based
   `resolve_geo` can later give way to `ReferenceRepository.gazetteer` (names) and `locate`
@@ -276,9 +300,9 @@ is on each team's side:
   under the property names the map already reads, plus our codes; show the attribution. Later,
   log in through the API (email works) and colour the map from `geo_content`. Its `src/lib` folder
   is missing from the branch: the root `.gitignore`'s Python `lib/` rule hides it.
-- **DevOps** (`devops*`): no compose file includes the database yet. Add `database/`'s image,
-  run `alembic upgrade head` and both seed scripts on deploy, and give each service its role's
-  password (§7).
+- **DevOps**: done in the repository-root `docker-compose.yml`: `database/`'s image, `alembic
+  upgrade head` and both seed scripts (`db-migrate`) and a password per service role
+  (`db-roles`) on every start; each service connects as its own role.
 
 ## 9. Rules everyone should follow
 
