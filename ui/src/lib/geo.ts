@@ -43,9 +43,12 @@ export function getProvinceColor(provinceName: string | undefined): string {
   return PROVINCE_COLORS[provinceName] ?? DEFAULT_PROVINCE_COLOR;
 }
 
-// The district layer predates the 2017 province split, so Nawalparasi and Rukum
-// are each still one district even though their post-split halves sit in different
-// provinces today. They're bucketed under their historically dominant province.
+// All 77 districts, in their common English spellings (as on Wikipedia's list
+// of districts). The boundary data from Open Knowledge Nepal uses government
+// spellings for six of them (Chitawan, Kabhrepalanchok, Makawanpur, Tanahu,
+// Kapilbastu, Terhathum); public/data was renamed to match this list, and the
+// government spellings stay searchable via DISTRICT_ALIASES. Nawalparasi and Rukum were each
+// split in 2017, and their halves sit in different provinces.
 export const DISTRICT_TO_PROVINCE: Record<string, string> = {
   TAPLEJUNG: "Koshi Province", PANCHTHAR: "Koshi Province", ILAM: "Koshi Province",
   JHAPA: "Koshi Province", MORANG: "Koshi Province", SUNSARI: "Koshi Province",
@@ -53,27 +56,27 @@ export const DISTRICT_TO_PROVINCE: Record<string, string> = {
   BHOJPUR: "Koshi Province", SOLUKHUMBU: "Koshi Province", OKHALDHUNGA: "Koshi Province",
   KHOTANG: "Koshi Province", UDAYAPUR: "Koshi Province",
 
-  SAPTARI: "Madhesh Province", SIRAHA: "Madhesh Province", DHANUSA: "Madhesh Province",
+  SAPTARI: "Madhesh Province", SIRAHA: "Madhesh Province", DHANUSHA: "Madhesh Province",
   MAHOTTARI: "Madhesh Province", SARLAHI: "Madhesh Province", BARA: "Madhesh Province",
   PARSA: "Madhesh Province", RAUTAHAT: "Madhesh Province",
 
   SINDHULI: "Bagmati Province", RAMECHHAP: "Bagmati Province", DOLAKHA: "Bagmati Province",
   BHAKTAPUR: "Bagmati Province", DHADING: "Bagmati Province", KATHMANDU: "Bagmati Province",
-  KAVRE: "Bagmati Province", LALITPUR: "Bagmati Province", NUWAKOT: "Bagmati Province",
+  KAVREPALANCHOK: "Bagmati Province", LALITPUR: "Bagmati Province", NUWAKOT: "Bagmati Province",
   RASUWA: "Bagmati Province", SINDHUPALCHOK: "Bagmati Province", CHITWAN: "Bagmati Province",
   MAKWANPUR: "Bagmati Province",
 
   BAGLUNG: "Gandaki Province", GORKHA: "Gandaki Province", KASKI: "Gandaki Province",
   LAMJUNG: "Gandaki Province", MANANG: "Gandaki Province", MUSTANG: "Gandaki Province",
-  MYAGDI: "Gandaki Province", NAWALPARASI: "Gandaki Province", PARBAT: "Gandaki Province",
-  SYANGJA: "Gandaki Province", TANAHU: "Gandaki Province",
+  MYAGDI: "Gandaki Province", "NAWALPARASI EAST": "Gandaki Province", PARBAT: "Gandaki Province",
+  SYANGJA: "Gandaki Province", TANAHUN: "Gandaki Province",
 
-  RUPANDEHI: "Lumbini Province", KAPILBASTU: "Lumbini Province", ARGHAKHANCHI: "Lumbini Province",
+  RUPANDEHI: "Lumbini Province", KAPILVASTU: "Lumbini Province", ARGHAKHANCHI: "Lumbini Province",
   GULMI: "Lumbini Province", PALPA: "Lumbini Province", DANG: "Lumbini Province",
   PYUTHAN: "Lumbini Province", ROLPA: "Lumbini Province", BANKE: "Lumbini Province",
-  BARDIYA: "Lumbini Province",
+  BARDIYA: "Lumbini Province", "NAWALPARASI WEST": "Lumbini Province", "RUKUM EAST": "Lumbini Province",
 
-  RUKUM: "Karnali Province", SALYAN: "Karnali Province", DOLPA: "Karnali Province",
+  "RUKUM WEST": "Karnali Province", SALYAN: "Karnali Province", DOLPA: "Karnali Province",
   HUMLA: "Karnali Province", JUMLA: "Karnali Province", KALIKOT: "Karnali Province",
   MUGU: "Karnali Province", SURKHET: "Karnali Province", DAILEKH: "Karnali Province",
   JAJARKOT: "Karnali Province",
@@ -81,6 +84,21 @@ export const DISTRICT_TO_PROVINCE: Record<string, string> = {
   KAILALI: "Sudurpashchim Province", ACHHAM: "Sudurpashchim Province", DOTI: "Sudurpashchim Province",
   BAJURA: "Sudurpashchim Province", BAJHANG: "Sudurpashchim Province", KANCHANPUR: "Sudurpashchim Province",
   DADELDHURA: "Sudurpashchim Province", BAITADI: "Sudurpashchim Province", DARCHULA: "Sudurpashchim Province",
+};
+
+// Other names people type for a district: everyday short forms, government
+// spellings, and older spellings. Search matches these as well as the name.
+export const DISTRICT_ALIASES: Record<string, string[]> = {
+  KATHMANDU: ["Ktm"],
+  LALITPUR: ["Lal"],
+  BHAKTAPUR: ["Bkt"],
+  KAVREPALANCHOK: ["Kavre", "Kabhre", "Kabhrepalanchok"],
+  CHITWAN: ["Chitawan"],
+  MAKWANPUR: ["Makawanpur"],
+  TANAHUN: ["Tanahu"],
+  KAPILVASTU: ["Kapilbastu"],
+  TEHRATHUM: ["Terhathum"],
+  DHANUSHA: ["Dhanusa"],
 };
 
 export function getDistrictProvince(districtName: string): string | undefined {
@@ -99,6 +117,8 @@ const LEVEL_LABELS: Record<string, string> = {
   gaupaika: "Rural municipality",
   nationalpark: "National park",
   wildlifereserve: "Wildlife reserve",
+  watershedandwildlifereserve: "Watershed and wildlife reserve",
+  developmentarea: "Development area",
   huntingreserve: "Hunting reserve",
   hungintreserve: "Hunting reserve",
 };
@@ -119,13 +139,30 @@ export function titleCase(value: string): string {
 
 export const GEO_TAGS_STORAGE_KEY = "pgs_geo_tags";
 
+// Maps an old or alternative spelling ("CHITAWAN", "Kavre") to the current
+// district name, so data saved before a rename still matches the map.
+const ALIAS_TO_DISTRICT: Record<string, string> = Object.fromEntries(
+  Object.entries(DISTRICT_ALIASES).flatMap(([district, aliases]) =>
+    aliases.map((alias) => [alias.toUpperCase(), district])
+  )
+);
+
+export function canonicalDistrictName(name: string): string {
+  const upper = name.toUpperCase();
+  return ALIAS_TO_DISTRICT[upper] ?? upper;
+}
+
 export function loadStoredTags(): GeoTag[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(GEO_TAGS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Pins saved before the switch to common spellings still say e.g. "CHITAWAN".
+    return parsed.map((tag: GeoTag) =>
+      tag.district ? { ...tag, district: canonicalDistrictName(tag.district) } : tag
+    );
   } catch {
     return [];
   }

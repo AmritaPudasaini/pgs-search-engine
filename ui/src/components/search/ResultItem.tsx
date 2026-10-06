@@ -22,9 +22,7 @@ export function ResultItem({ result }: { result: SearchResult }) {
   return (
     <div className="mb-6 max-w-2xl">
       <p className="text-xs text-slate-500 dark:text-slate-400">{result.url}</p>
-      <a href={result.url} className="block text-lg text-blue-700 hover:underline dark:text-blue-400">
-        {result.title}
-      </a>
+      <p className="text-lg text-blue-700 dark:text-blue-400">{result.title}</p>
       <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{result.snippet}</p>
     </div>
   );
