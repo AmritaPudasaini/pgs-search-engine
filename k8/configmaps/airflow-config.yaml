@@ -1,0 +1,23 @@
+# Airflow settings shared by the scheduler, webserver and init Job, and the pod template
+# the KubernetesExecutor uses for every DAG task. DAGs are baked into the ETL image
+# (ETL/Dockerfile), so DAG changes ship by rebuilding the image -- there are no bind mounts
+# in Kubernetes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-config
+  labels:
+    app.kubernetes.io/name: airflow
+data:
+  AIRFLOW__CORE__EXECUTOR: KubernetesExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+  # At most 4 task pods at once on a single local node.
+  AIRFLOW__CORE__PARALLELISM: "4"
+  AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+  AIRFLOW__WEBSERVER__WORKERS: "2"
+  AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: pgs-search-engine
+  AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE: /opt/airflow/pod_templates/pod_template.yaml
+  AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS: "True"
+  # Keep failed task pods around for `kubectl describe` / `kubectl logs`.
+  AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS_ON_FAILURE: "False"

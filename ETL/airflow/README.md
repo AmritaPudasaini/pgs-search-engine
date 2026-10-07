@@ -1,90 +1,82 @@
-# Airflow Docker Setup (Phase 1 - Dummy Test)
+# Airflow In ETL
 
-## What this is
-A local Airflow environment used to prove the orchestration layer works
-before it's connected to the real ETL pipeline (Spark, Kafka, real data).
-Runs using CeleryExecutor, so tasks are handled by a separate worker
-container via a Redis queue - matching how a real, scaled-up setup
-would work, instead of running everything on one process.
+Airflow schedules the crawl and the ETL; the work itself runs on Temporal and
+Spark. It runs from the repository-root `docker-compose.yml` (image:
+`ETL/Dockerfile`) with the LocalExecutor, so there is no Celery worker and no
+Redis: `airflow-scheduler` decides when tasks run and runs them itself (they
+only read Kafka or the `domains` table and start/await Temporal workflows),
+and `airflow-webserver` is the UI. Airflow's metadata is the `airflow` database
+in the shared `postgres` server, created by `db-roles`; on every start the
+scheduler migrates it and creates the admin login (both idempotent) before
+scheduling, and the webserver waits until the scheduler is healthy.
 
-## What's inside
-- `docker-compose.yaml` - defines 6 containers: postgres (Airflow's
-  internal database), redis (task queue broker), airflow-init (one-time
-  setup), airflow-webserver (the dashboard), airflow-scheduler (decides
-  when tasks run), airflow-worker (actually executes tasks).
-- `dags/dummy_test_dag.py` - original test DAG, two tasks that just
-  print text, proving basic scheduling works.
-- `dags/dummy_file_parser_dag.py` - reads real files (`data/sample.html`,
-  `data/sample.txt`), strips HTML tags, prints extracted text and word
-  counts. Simulates the real "text extraction" step Spark will do later.
-- `data/sample.html`, `data/sample.txt` - dummy input files used only
-  for testing. Not real project data.
-- `.env` - sets AIRFLOW_UID (matters mainly on Linux, for file
-  permissions). Safe to leave as-is on Windows/Mac.
-- `logs/`, `plugins/`, `config/` - empty folders Airflow writes into at
-  runtime. Don't add anything here manually.
+From the repository root:
 
-## Prerequisites
-- Docker Desktop installed and running.
-- At least 4 GB RAM / 4 CPUs allocated to Docker (Docker Desktop >
-  Settings > Resources).
-- Port 8080 free on your machine.
+```bash
+cp .env.example .env      # once; AIRFLOW_UID must be your `id -u`
+docker compose up -d --build
+```
 
-## First-time setup
-Run these once, in order, from inside this folder (`ETL/airflow`):
+Airflow UI: http://localhost:8080, login `AIRFLOW_ADMIN_USERNAME` /
+`AIRFLOW_ADMIN_PASSWORD` from `.env` (default `airflow` / `airflow`). The
+webserver is "healthy" in `docker compose ps` after ~30-60s.
 
-    docker compose up airflow-init
-    docker compose up -d
+## Main DAG
 
-First run downloads several images (Postgres, Redis, Airflow) - can
-take a few minutes. `airflow-init` creates the database tables and the
-admin login, then exits (this is expected, not an error).
+`etl_ingestion_pipeline`
 
-## Check it's running
-    docker compose ps
+Tasks:
 
-You should see 6 services: `postgres`, `redis`, `airflow-webserver`,
-`airflow-scheduler`, `airflow-worker` all showing "running" (webserver
-becomes "healthy" after ~30-60s), plus `airflow-init` showing "exited"
-with code 0 (correct - it's a one-time job, not meant to keep running).
+```text
+poll_batch -> process_batch -> commit_offsets
+```
 
-## Verify it works
-1. Open http://localhost:8080
-2. Log in: `airflow` / `airflow`
-3. Find `dummy_file_parser_dag` in the list, toggle it on (un-pause)
-4. Click the play button to trigger it manually
-5. Confirm both `extract_html` and `extract_txt` tasks turn green
-6. Click each task > Logs, confirm you see the extracted text and a
-   word count printed - not just a green checkmark
+Every 2 minutes the DAG checks Kafka topic `scraped_files_topic` (one
+`site_crawl_completed` event per website whose crawl finished). Once
+`ETL_BATCH_SIZE` (100) events are waiting, or the oldest has waited
+`ETL_BATCH_MAX_WAIT_MINUTES` (60), it starts one `EtlBatchWorkflow` on Temporal
+for the batch, waits for it, and then commits the events. The `etl-worker`
+runs the workflow as the Spark driver on the Spark cluster. See
+`../ETL_README.md` for the flow.
 
-(`dummy_test_dag` still works the same way too, if you want to re-check
-the original basic test.)
+`scraper_crawl_schedule`
 
-## Stop everything
-    docker compose down
+Every 30 minutes (`SCRAPER_CRAWL_SCHEDULE`) it reads the websites from the
+`domains` table (PAUSED ones are left out) and starts one
+`CrawlDomainsWorkflow` for all of them on Temporal, which the Go scraper worker
+runs. The workflow ID is fixed, so a tick while the last crawl is still running
+is skipped.
 
-## Stop AND wipe all data (rarely needed, but required after changing
-## the executor type or if things get into a broken state)
-    docker compose down -v
+## Sample Run
 
-## What this does NOT do yet
-No connection to Spark, Kafka, or the project's real PostgreSQL/
-OpenSearch. This only proves Airflow itself - with CeleryExecutor and
-real file-reading logic - works correctly. Real scheduled jobs (nightly
-deduplication, index optimization, cleanup) get added once Spark/Kafka
-are ready and we know how to trigger their real jobs.
+With the stack up (`docker compose --profile scraper up -d`), from the
+repository root:
 
-## Common issues
-- **Port 8080 in use**: change the `"8080:8080"` line in
-  docker-compose.yaml to e.g. `"8081:8080"`, then use that port instead.
-- **airflow-worker not showing as running**: check
-  `docker compose logs airflow-worker` for the actual error - usually a
-  typo in the Redis connection string or Redis not being healthy yet.
-- **DAG doesn't show up**: wait 30-60 seconds and refresh, the scheduler
-  scans the dags folder periodically, not instantly.
-- **Switched executors and things act weird**: run
-  `docker compose down -v` first, then start fresh with
-  `docker compose up airflow-init` again.
+```bash
+docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule
+```
 
-## Stop
-docker compose down
+Each finished website sends its event; `etl_ingestion_pipeline` runs the batch
+when it is full (set `ETL_BATCH_SIZE` lower in `.env` to try it with a few
+sites). The `process_batch` task log ends with each site's summary; the
+Temporal UI (http://localhost:8233) shows the workflows.
+
+## Notes
+
+The healthcheck and extraction-check DAGs are support workflows; the ingestion
+pipeline is the main ETL workflow.
+
+- `dags/`, `plugins/`, `config/`, `data/` and `../spark` are bind-mounted
+  into the Airflow containers, so edits apply without a rebuild; new DAGs
+  appear within 30-60 seconds and start unpaused.
+- Task logs are in `data/airflow-logs/` at the repository root (the
+  `data-airflow-logs` volume), owned by `AIRFLOW_UID`: set it in `.env` to your
+  `id -u` so you can read them.
+- Port 8080 taken: set `AIRFLOW_PORT` in `.env`.
+- A task fails with a ClamAV connection error: on its first start `clamav`
+  downloads its signatures (a few minutes); wait until `docker compose ps`
+  shows it healthy.
+- Reset only Airflow's database:
+  `docker compose exec postgres dropdb -U pgs --force airflow`, then
+  `docker compose up -d` (`db-roles` recreates it). (The stack's state is in `./data/` at the
+  repository root; deleting `data/postgres` resets every database.)

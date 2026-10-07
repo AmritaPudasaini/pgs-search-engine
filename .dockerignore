@@ -1,0 +1,42 @@
+# Build context: the repository root, used by api/Dockerfile, ETL/Dockerfile and
+# search-engine/Dockerfile (they all need the shared database/ package next to their
+# own code). ui/, scraper/ and database/ images use their own directory as context and
+# their own .dockerignore.
+#
+# Allow-list: exclude everything, then re-include only what those Dockerfiles copy.
+*
+!api/
+!database/
+!ETL/
+!search-engine/
+
+# Local environments, caches and secrets anywhere inside the allowed directories
+**/.venv
+**/venv
+**/.env
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.pytest_cache
+**/.ruff_cache
+**/*.log
+**/Dockerfile
+**/*.Dockerfile
+**/.dockerignore
+
+# database/: build output, tests and docs are not needed by any image
+database/build
+database/dist
+database/tests
+database/docs
+database/*.png
+
+# ETL/: runtime state written by Airflow, the DAGs and the Kafka consumer; docs
+ETL/airflow/logs/*
+ETL/airflow/data/processed
+ETL/kafka/*.sqlite3*
+ETL/*.png
+ETL/**/*.md
+
+# search-engine/: tests are not shipped
+search-engine/tests

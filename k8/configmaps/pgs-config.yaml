@@ -1,0 +1,16 @@
+# Non-secret settings shared by the workloads: where each in-cluster service lives.
+# Containers reach each other by Service name, as in docker-compose.yml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgs-config
+data:
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  KAFKA_BROKERS: kafka:29092
+  OPENSEARCH_HOST: opensearch
+  OPENSEARCH_PORT: "9200"
+  CLAMD_HOST: clamav
+  CLAMD_PORT: "3310"
+  SEARCH_GRPC_HOST: search-engine
+  SEARCH_GRPC_PORT: "50051"

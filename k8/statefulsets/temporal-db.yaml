@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: temporal-db
+  labels:
+    app.kubernetes.io/name: temporal-db
+spec:
+  serviceName: temporal-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: temporal-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: temporal-db
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 70 # postgres user of the alpine image
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - { name: POSTGRES_USER, value: temporal }
+            - { name: POSTGRES_DB, value: temporal }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: TEMPORAL_DB_PASSWORD }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "temporal", "-d", "temporal"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "temporal", "-d", "temporal"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

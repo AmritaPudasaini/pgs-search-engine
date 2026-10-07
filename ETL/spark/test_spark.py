@@ -1,13 +1,26 @@
-from pyspark.sql import SparkSession
+from transform import analyze_text
 
-spark = SparkSession.builder \
-    .appName("TestSetup") \
-    .master("local[*]") \
-    .getOrCreate()
 
-data = [("Alice", 25), ("Bob", 30), ("Charlie", 35)]
-df = spark.createDataFrame(data, ["name", "age"])
+def main():
+    try:
+        from pyspark.sql import SparkSession
+    except ImportError:
+        print("PySpark is not installed locally. Run this through the Spark Docker image.")
+        return
 
-df.show()
+    spark = (
+        SparkSession.builder
+        .appName("SparkTransformSmoke")
+        .master("local[*]")
+        .getOrCreate()
+    )
 
-spark.stop()
+    sample_text = "Kathmandu Metropolitan City notice used to test Spark ETL."
+    result = analyze_text(spark, sample_text)
+    result.show(truncate=80)
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

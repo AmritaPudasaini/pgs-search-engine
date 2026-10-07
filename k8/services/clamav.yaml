@@ -1,0 +1,16 @@
+# ClamAV daemon used by spark/security_scanner.py (CLAMD_HOST=clamav, port 3310). The
+# scanner fails closed, so the ETL DAG needs this running. The first start downloads the
+# signatures (a few minutes), hence the long startup probe.
+apiVersion: v1
+kind: Service
+metadata:
+  name: clamav
+  labels:
+    app.kubernetes.io/name: clamav
+spec:
+  selector:
+    app.kubernetes.io/name: clamav
+  ports:
+    - name: clamd
+      port: 3310
+      targetPort: clamd

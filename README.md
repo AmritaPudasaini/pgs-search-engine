@@ -23,9 +23,68 @@ A real-time, geographically aware, cross-lingual (Nepali + English) search engin
 | [`ETL/`](ETL/) | Extraction/transform pipelines (text cleaning, geo-tagging, embedding generation) feeding the search index. |
 | [`search-engine/`](search-engine/) | Search/ranking index configuration (Elasticsearch/Qdrant) and hybrid BM25 + dense-embedding scoring. |
 | [`terraform/`](terraform/) | Infrastructure as code for provisioning (bare-metal and cloud). |
-| [`k8/`](k8/) | Kubernetes manifests for container orchestration. |
+| [`k8/`](k8/) | Kubernetes manifests (Kustomize) for the whole stack; see `k8/README.md`. |
 
 ## Getting started
+
+### Run everything with Docker
+
+The whole stack is defined in one file, [`docker-compose.yml`](docker-compose.yml), at the repo
+root. You need Docker Desktop. On Windows, run these commands inside WSL, with *Settings →
+Resources → WSL Integration* enabled for your distro.
+
+```bash
+cp .env.example .env          # once; set AIRFLOW_UID to `id -u`, change passwords as needed
+docker compose up -d --build
+docker compose ps             # wait until services are "healthy"
+```
+
+On every start, the stack migrates the database with Alembic and seeds the reference data
+(`db-migrate`), then sets each service role's password and creates Airflow's and Temporal's
+databases in the same PostgreSQL server (`db-roles`). Only then do the services that depend on
+those start. The Kafka topic is created by its first event.
+
+| Service | URL on the host | Notes |
+| --- | --- | --- |
+| API | http://localhost:8000 | `api/Dockerfile` |
+| Airflow | http://localhost:8080 | ETL orchestration (`ETL/Dockerfile`); login from `.env` |
+| PostgreSQL 16 + PostGIS + pgvector | `localhost:5432` | `database/Dockerfile`; schema owned by `pgs-db` migrations |
+| OpenSearch 2.19 | http://localhost:9200 | security plugin disabled (local only); 2.x for the ETL index's `nmslib` k-NN engine |
+| Kafka 3.8 (KRaft) | `localhost:9092` | containers use `kafka:29092` |
+| ClamAV | `localhost:3310` | malware scan for ETL intake; first start downloads signatures |
+
+Optional parts are behind Compose profiles. Enable them with `--profile <name>`, or set
+`COMPOSE_PROFILES` in `.env`:
+
+| Profile | Adds | Notes |
+| --- | --- | --- |
+| `scraper` | Go crawler (`scraper/Dockerfile`): LocalStack S3 + browser (http://localhost:8081), headless Chrome, worker, documents API (http://localhost:8082/docs) | Airflow's `scraper_crawl_schedule` crawls every website in `domains` every 30 minutes; crawl now with `docker compose exec airflow-scheduler airflow dags trigger scraper_crawl_schedule` |
+| `scraper-sharded` | the same, with three host-sharded workers | see `scraper/docs/SCALING.md` |
+| `search` | gRPC search engine (`search-engine/Dockerfile`, :50051) + index setup | needs ~3 GB RAM; downloads ~2.5 GB of models on first start |
+| `ui` | Next.js UI (`ui/Dockerfile`) behind nginx on http://localhost (port 80, `HTTP_PORT`; any domain pointed at the machine works too, `nginx/default.conf`), and directly on http://localhost:3000 (`UI_PORT`) | |
+| `tools` | OpenSearch Dashboards (http://localhost:5601), `opensearch-indexer` | one-shot tools run with `docker compose run --rm <name>` |
+
+All published ports bind to `127.0.0.1`. Containers reach each other by service name
+(`postgres`, `kafka`, `opensearch`, `clamav`, `temporal`, `s3`, `search-engine`). `docker compose down` stops the stack;
+all persistent state stays on the host under `./data/<dir>` (`postgres`, `opensearch`, `kafka`,
+`clamav`, `localstack`, `etl-models`, `search-models`, `airflow-logs`; git-ignored), through the
+volumes declared at the end of `docker-compose.yml`. Even `docker compose down -v` keeps those
+files; delete a directory there (`sudo rm -rf data/postgres`; some are owned by the container's
+user) to reset that service.
+
+### Run on Kubernetes
+
+[`k8/`](k8/) has Kustomize manifests for the same stack (single node, non-HA, e.g. Docker
+Desktop's Kubernetes). Airflow uses the KubernetesExecutor there, so every DAG task runs in
+its own pod. See [`k8/README.md`](k8/README.md):
+
+```bash
+docker compose build
+cp k8/secrets/secrets.env.example k8/secrets/secrets.env
+kubectl apply -k k8/
+```
+
+### Run services individually
 
 Each service has its own setup docs in its directory. Quick summary:
 

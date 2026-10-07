@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 type fakePageWriter struct {

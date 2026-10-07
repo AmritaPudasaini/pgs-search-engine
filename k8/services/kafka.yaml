@@ -1,0 +1,20 @@
+# Kafka 3.8 in KRaft mode: one combined broker/controller, no ZooKeeper. Single replica.
+#   PLAINTEXT_INTERNAL kafka:29092    in-cluster clients
+#   PLAINTEXT          localhost:9092 host tools, through
+#                      `kubectl -n pgs-search-engine port-forward svc/kafka 9092:9092`
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app.kubernetes.io/name: kafka
+spec:
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+    - name: internal
+      port: 29092
+      targetPort: internal
+    - name: external
+      port: 9092
+      targetPort: external

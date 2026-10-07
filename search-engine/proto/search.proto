@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package search.engine.v1;
+
+service SearchService {
+  rpc ExecuteSearch(SearchRequest) returns (SearchResponse);
+}
+
+message SearchRequest {
+  string query = 1;
+  string province_code = 2;
+  string district_code = 3;
+  string municipality_id = 4;
+  int32 ward_number = 5;
+  string content_type = 6;
+  string language = 7;
+  int32 page = 8;
+  int32 limit = 9;
+}
+
+message SearchResponse {
+  int32 status_code = 1;
+  int32 total_hits = 2;
+  int64 execution_time_ms = 3;
+  repeated SearchResultItem results = 4;
+}
+
+message SearchResultItem {
+  string id = 1;
+  string result_type = 2;
+  string title = 3;
+  string url = 4;
+  string domain = 5;
+  string snippet = 6;
+  string download_url = 7;
+  int64 file_size_bytes = 8;
+  double relevance_score = 9;
+}

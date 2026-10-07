@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Kubernetes has no depends_on: wait until db-bootstrap has migrated and seeded the
+        # database and set this role's password (logging in as pgs_api proves the last step).
+        - name: wait-for-database
+          image: pgs-search-engine/postgres
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until [ "$(psql -h postgres -U pgs_api -d "$POSTGRES_DB" -tAc 'SELECT count(*) FROM local_bodies' 2>/dev/null)" = "753" ]; do
+                echo "waiting for db-bootstrap"; sleep 5
+              done
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: POSTGRES_DB }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: PGS_API_DB_PASSWORD }
+          securityContext:
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 64Mi }
+      containers:
+        - name: api
+          image: pgs-search-engine/api
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: pgs-config
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: POSTGRES_DB }
+            - name: PGS_API_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: pgs-secrets, key: PGS_API_DB_PASSWORD }
+            - name: DATABASE_URL
+              value: postgresql+psycopg://pgs_api:$(PGS_API_DB_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+            - name: DB_APPLICATION_NAME
+              value: pgs-api
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }

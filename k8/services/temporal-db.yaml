@@ -1,0 +1,16 @@
+# Temporal for the crawler: its own PostgreSQL (temporal-db), the server (auto-setup creates
+# its schemas and the `default` namespace) and the Web UI. UI from the host:
+#   kubectl -n pgs-search-engine port-forward svc/temporal-ui 8233:8080
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-db
+  labels:
+    app.kubernetes.io/name: temporal-db
+spec:
+  selector:
+    app.kubernetes.io/name: temporal-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

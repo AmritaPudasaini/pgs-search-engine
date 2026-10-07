@@ -1,0 +1,24 @@
+# The crawler's binaries (scraper/Dockerfile targets). Each flag is set through the
+# environment variable of the same name (--s3-bucket == S3_BUCKET); flags a binary doesn't
+# have are ignored, so the worker, API and crawl jobs share one ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scraper-config
+  labels:
+    app.kubernetes.io/name: scraper
+data:
+  TEMPORAL_ADDRESS: temporal:7233
+  NAMESPACE: default
+  STORAGE: s3 # s3 | ndjson | kafka
+  RENDER: auto # off | auto | always
+  CHROME_URL: ws://chrome:9222
+  S3_BUCKET: crawled-pages
+  S3_ENDPOINT: http://s3:4566
+  AWS_REGION: us-east-1
+  # LocalStack accepts any credentials; these are not secrets.
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  # Publish one event per website whose crawl finished, for the ETL DAG (empty = S3 only).
+  KAFKA_BROKERS: kafka:29092
+  KAFKA_TOPIC: scraped_files_topic

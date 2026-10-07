@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch
+  labels:
+    app.kubernetes.io/name: opensearch
+spec:
+  serviceName: opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opensearch
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opensearch
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: opensearch
+          image: opensearchproject/opensearch:2.19.6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9200
+          env:
+            - { name: cluster.name, value: pgs-search }
+            - { name: node.name, value: opensearch }
+            - { name: discovery.type, value: single-node }
+            # Pods cannot raise the memlock ulimit, so memory locking stays off.
+            - { name: bootstrap.memory_lock, value: "false" }
+            - { name: OPENSEARCH_JAVA_OPTS, value: "-Xms512m -Xmx512m" }
+            - { name: DISABLE_SECURITY_PLUGIN, value: "true" }
+            - { name: DISABLE_INSTALL_DEMO_CONFIG, value: "true" }
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+          startupProbe:
+            httpGet:
+              path: /_cluster/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' > /dev/null"]
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 250m, memory: 1Gi }
+            limits: { memory: 1536Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

@@ -1,7 +1,0 @@
-This is to test the new branch 'etl_main'
-
-'opensearch_etl' branch added
-'sarbagya_etl' branch added
-'arun_etl' branch added
-'spark_transform_ujjwal' branch added
-'jenisha_etl' branch added

@@ -1,0 +1,18 @@
+# OpenSearch 2.19, single node, security plugin disabled (in-cluster only; reach it from
+# the host with `kubectl -n pgs-search-engine port-forward svc/opensearch 9200:9200`).
+# 2.19 rather than 3.x: the ETL index uses the nmslib k-NN engine, which 3.x refuses for
+# new indexes (see docker-compose.yml). Single-node discovery skips the bootstrap checks;
+# Docker Desktop's VM already has vm.max_map_count >= 262144.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  labels:
+    app.kubernetes.io/name: opensearch
+spec:
+  selector:
+    app.kubernetes.io/name: opensearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http

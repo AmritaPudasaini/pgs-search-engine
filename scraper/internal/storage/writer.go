@@ -12,7 +12,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/tekraj/pgs-search-engine/scraper/internal/model"
+	"search-engine-scraper/internal/model"
 )
 
 // Writer is anything that can persist a crawled Document. Implementations

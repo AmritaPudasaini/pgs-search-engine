@@ -1,0 +1,14 @@
+# Airflow's own metadata database (kept apart from the application's PostgreSQL).
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-db
+  labels:
+    app.kubernetes.io/name: airflow-db
+spec:
+  selector:
+    app.kubernetes.io/name: airflow-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
